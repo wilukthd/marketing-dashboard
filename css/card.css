@@ -1,0 +1,239 @@
+/* ==================================================
+   KPI Grid
+================================================== */
+
+.kpiGrid{
+
+    display:grid;
+
+    grid-template-columns:repeat(4,1fr);
+
+    gap:24px;
+
+    margin-bottom:30px;
+
+}
+
+/* ==================================================
+   KPI Card
+================================================== */
+
+.kpiCard{
+
+    background:#FFFFFF;
+
+    border:1px solid var(--border);
+
+    border-radius:18px;
+
+    padding:24px;
+
+    transition:.25s;
+
+    box-shadow:var(--shadow-sm);
+
+    position:relative;
+
+    overflow:hidden;
+
+}
+
+.kpiCard:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:var(--shadow-md);
+
+}
+
+/* ==================================================
+   Accent Line
+================================================== */
+
+.kpiCard::before{
+
+    content:"";
+
+    position:absolute;
+
+    left:0;
+
+    top:0;
+
+    width:5px;
+
+    height:100%;
+
+    background:var(--blue);
+
+}
+
+/* ==================================================
+   Title
+================================================== */
+
+.cardTitle{
+
+    font-size:14px;
+
+    color:var(--text-light);
+
+    margin-bottom:18px;
+
+    font-weight:600;
+
+}
+
+/* ==================================================
+   Main Value
+================================================== */
+
+.cardValue{
+
+    font-size:36px;
+
+    font-weight:700;
+
+    color:var(--text);
+
+    letter-spacing:-1px;
+
+    margin-bottom:16px;
+
+}
+
+/* ==================================================
+   Footer
+================================================== */
+
+.cardFooter{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-end;
+
+}
+
+/* ==================================================
+   Growth
+================================================== */
+
+.cardGrowth{
+
+    font-size:14px;
+
+    font-weight:700;
+
+}
+
+.cardGrowth.positive{
+
+    color:var(--green);
+
+}
+
+.cardGrowth.negative{
+
+    color:var(--red);
+
+}
+
+/* ==================================================
+   Compare Label
+================================================== */
+
+.compareLabel{
+
+    font-size:12px;
+
+    color:var(--text-light);
+
+    margin-top:4px;
+
+}
+
+/* ==================================================
+   Small KPI
+================================================== */
+
+.smallMetric{
+
+    text-align:right;
+
+}
+
+.smallMetric span{
+
+    display:block;
+
+}
+
+.smallMetric .label{
+
+    font-size:12px;
+
+    color:var(--text-light);
+
+}
+
+.smallMetric .value{
+
+    font-size:16px;
+
+    font-weight:600;
+
+}
+
+/* ==================================================
+   Different Accent Colors
+================================================== */
+
+.kpiCard.revenue::before{
+
+    background:#2563EB;
+
+}
+
+.kpiCard.users::before{
+
+    background:#06B6D4;
+
+}
+
+.kpiCard.orders::before{
+
+    background:#10B981;
+
+}
+
+.kpiCard.cvr::before{
+
+    background:#F59E0B;
+
+}
+
+/* ==================================================
+   Responsive
+================================================== */
+
+@media(max-width:1200px){
+
+    .kpiGrid{
+
+        grid-template-columns:repeat(2,1fr);
+
+    }
+
+}
+
+@media(max-width:700px){
+
+    .kpiGrid{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
