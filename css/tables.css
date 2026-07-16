@@ -1,0 +1,181 @@
+/* ==========================================================
+   Modern Table
+========================================================== */
+
+.tableCard{
+
+    background:#FFFFFF;
+
+    border:1px solid var(--border);
+
+    border-radius:18px;
+
+    box-shadow:var(--shadow-sm);
+
+    overflow:hidden;
+
+    margin-bottom:30px;
+
+}
+
+/* ==========================================================
+   Header
+========================================================== */
+
+.tableHeader{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:22px 28px;
+
+    border-bottom:1px solid var(--border);
+
+}
+
+.tableHeader h3{
+
+    font-size:20px;
+
+}
+
+.tableTools{
+
+    display:flex;
+
+    gap:12px;
+
+}
+
+/* ==========================================================
+   Table
+========================================================== */
+
+.modernTable{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.modernTable thead{
+
+    background:#F9FAFB;
+
+}
+
+.modernTable th{
+
+    padding:18px 20px;
+
+    text-align:left;
+
+    font-size:13px;
+
+    font-weight:600;
+
+    color:var(--text-light);
+
+    text-transform:uppercase;
+
+    letter-spacing:.04em;
+
+}
+
+.modernTable td{
+
+    padding:20px;
+
+    border-top:1px solid #F1F5F9;
+
+    font-size:15px;
+
+}
+
+/* ==========================================================
+   Zebra
+========================================================== */
+
+.modernTable tbody tr:nth-child(even){
+
+    background:#FCFCFD;
+
+}
+
+/* ==========================================================
+   Hover
+========================================================== */
+
+.modernTable tbody tr{
+
+    transition:.25s;
+
+}
+
+.modernTable tbody tr:hover{
+
+    background:#EEF4FF;
+
+}
+
+/* ==========================================================
+   Number
+========================================================== */
+
+.number{
+
+    text-align:right;
+
+    font-variant-numeric:tabular-nums;
+
+}
+
+/* ==========================================================
+   Status
+========================================================== */
+
+.status{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    padding:6px 12px;
+
+    border-radius:30px;
+
+    font-size:13px;
+
+    font-weight:600;
+
+}
+
+.status.up{
+
+    background:#DCFCE7;
+
+    color:#15803D;
+
+}
+
+.status.down{
+
+    background:#FEE2E2;
+
+    color:#B91C1C;
+
+}
+
+/* ==========================================================
+   Responsive
+========================================================== */
+
+.tableResponsive{
+
+    overflow-x:auto;
+
+}
