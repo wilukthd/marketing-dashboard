@@ -1,7 +1,7 @@
 /* ==========================================================
    THD Analytics
    App Init
-   Version 0.3
+   Version 0.4
 
    Data flow:
      THD.data.loadDailyGA4() / loadSources() / loadNewRepeat()
@@ -9,13 +9,14 @@
      and fall back to dummy data below if not configured yet.
 
    The date-range selector re-filters the already-fetched daily
-   rows in memory — no re-fetch needed when switching ranges.
+   and per-day-source rows in memory — no re-fetch on range change.
 ========================================================== */
 
 (function () {
 
     let dailyRows = [];       // full daily GA4 rows (real or dummy), oldest -> newest
-    let currentRangeDays = 30;
+    let sourceRows = [];      // full per-day-per-source rows (real or dummy)
+    let currentRange = "month";
 
     /* ==========================================================
        Dummy Data (fallback when a live source isn't configured)
@@ -32,7 +33,7 @@
         return out;
     }
 
-    function buildDummyDailyRows(days = 90) {
+    function buildDummyDailyRows(days = 366) {
         const users = randomWalk(days, 2000, 350);
         const purchases = randomWalk(days, 130, 40);
         const rows = [];
@@ -60,21 +61,22 @@
         "adclick.g.doubleclick.net / referral", "a20.hm-f.jp / referral", "a05.hm-f.jp / referral"
     ];
 
-    function buildDummySources() {
-        return SOURCE_POOL.map((name) => {
-            const sessions = Math.round(Math.random() * 1800 + 1);
-            const users = Math.round(sessions * (0.75 + Math.random() * 0.2));
-            const purchases = Math.random() < 0.6 ? Math.round(sessions * Math.random() * 0.04) : 0;
-            const revenue = purchases * (7000 + Math.random() * 6000);
-            return {
-                sourceMedium: name,
-                sessions,
-                users,
-                purchases,
-                revenue,
-                cvr: sessions ? (purchases / sessions) * 100 : 0
-            };
-        }).sort((a, b) => b.sessions - a.sessions);
+    function buildDummySourcesDaily(days = 366) {
+        const rows = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - (days - 1 - i));
+            const dateStr = d.toISOString().slice(0, 10);
+
+            SOURCE_POOL.forEach((name) => {
+                const sessions = Math.round(Math.random() * 60 + 1);
+                const users = Math.round(sessions * (0.75 + Math.random() * 0.2));
+                const purchases = Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.04) : 0;
+                const revenue = purchases * (7000 + Math.random() * 6000);
+                rows.push({ sourceMedium: name, date: dateStr, sessions, users, purchases, revenue, channel: null });
+            });
+        }
+        return rows;
     }
 
     function buildDummyNewRepeat() {
@@ -112,21 +114,30 @@
     ];
 
     /* ==========================================================
-       Render current date range from dailyRows already in memory
+       Render current date range from dailyRows/sourceRows
+       already in memory — no re-fetch needed on range change.
     ========================================================== */
 
-    function renderForRange(days) {
-        currentRangeDays = days;
-        const filtered = THD.data.filterDailyRange(dailyRows, days);
+    function renderForRange(rangeKey) {
+        currentRange = rangeKey;
+
+        const filtered = THD.data.filterDailyRange(dailyRows, rangeKey);
         THD.ui.renderKpis(filtered.kpi);
         THD.charts.renderTrendChart(filtered.labels, filtered.users, filtered.purchases);
+
+        const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey);
+        THD.ui.renderSourceTable(sourcesInRange);
+
+        const traffic = THD.data.deriveTrafficBreakdown(sourcesInRange);
+        const legendItems = THD.charts.renderTrafficChart(traffic.labels, traffic.values);
+        THD.ui.renderTrafficLegend(legendItems);
     }
 
     function wireDateRange() {
         const select = document.getElementById("dateRangeSelect");
         if (!select) return;
         select.addEventListener("change", () => {
-            renderForRange(Number(select.value));
+            renderForRange(select.value);
         });
     }
 
@@ -155,21 +166,16 @@
             THD.data.loadLandingPages()
         ]);
 
-        dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows(90);
-        const sources = liveSources && liveSources.length ? liveSources : buildDummySources();
+        dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows(366);
+        sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily(366);
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
         const landingPages = liveLandingPages && liveLandingPages.length ? liveLandingPages : DUMMY_LANDING_PAGES;
 
-        renderForRange(currentRangeDays);
+        renderForRange(currentRange);
 
         THD.ui.renderLandingPages(landingPages);
-        THD.ui.renderSourceTable(sources);
         THD.ui.renderMonthlyTable(DUMMY_MONTHLY);
         THD.ui.renderNewRepeatTable(newRepeat);
-
-        const traffic = THD.data.deriveTrafficBreakdown(sources);
-        const legendItems = THD.charts.renderTrafficChart(traffic.labels, traffic.values);
-        THD.ui.renderTrafficLegend(legendItems);
 
         THD.ui.renderLastUpdate();
     }
