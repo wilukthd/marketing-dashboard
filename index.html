@@ -454,35 +454,69 @@ MAIN
 
             <h3>
 
-                Users &amp; Purchases Trend
+                Metrics Trend
 
             </h3>
 
             <small>
 
-                Last 30 Days
+                Select a Date Range Above
 
             </small>
 
         </div>
 
-        <div class="customLegend">
+        <div class="metricToggles" id="metricToggles">
 
-            <div class="legendItem">
+            <label class="metricToggle" data-metric="users">
 
-                <span class="legendColor legendBlue"></span>
+                <input type="checkbox" checked>
+
+                <span class="metricDot" style="background:#06B6D4"></span>
 
                 Total Users
 
-            </div>
+            </label>
 
-            <div class="legendItem">
+            <label class="metricToggle" data-metric="sessions">
 
-                <span class="legendColor legendOrange"></span>
+                <input type="checkbox">
+
+                <span class="metricDot" style="background:#8B5CF6"></span>
+
+                Sessions
+
+            </label>
+
+            <label class="metricToggle" data-metric="purchases">
+
+                <input type="checkbox" checked>
+
+                <span class="metricDot" style="background:#10B981"></span>
 
                 Ecommerce Purchases
 
-            </div>
+            </label>
+
+            <label class="metricToggle" data-metric="revenue">
+
+                <input type="checkbox">
+
+                <span class="metricDot" style="background:#2563EB"></span>
+
+                Total Revenue
+
+            </label>
+
+            <label class="metricToggle" data-metric="cvr">
+
+                <input type="checkbox">
+
+                <span class="metricDot" style="background:#F59E0B"></span>
+
+                CVR
+
+            </label>
 
         </div>
 
