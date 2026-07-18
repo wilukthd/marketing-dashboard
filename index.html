@@ -2,26 +2,33 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>THD Analytics Dashboard</title>
 
-    <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/cards.css">
-    <link rel="stylesheet" href="css/tables.css">
-    <link rel="stylesheet" href="css/charts.css">
-
     <!-- Google Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PapaParse (CSV parsing for live Google Sheets data) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/cards.css">
+    <link rel="stylesheet" href="css/charts.css">
+    <link rel="stylesheet" href="css/tables.css">
 
 </head>
 
@@ -29,282 +36,695 @@
 
 <div class="app">
 
-    <!-- ========================= -->
-    <!-- Header -->
-    <!-- ========================= -->
+<!-- ======================================================
+SIDEBAR
+======================================================= -->
 
-    <header class="topbar">
+<aside class="sidebar">
 
-        <div>
+    <div>
 
-            <h1>THD Analytics</h1>
+        <div class="logo">
 
-            <p>Marketing Performance Dashboard</p>
+            <h1>THD</h1>
+
+            <span>Analytics</span>
 
         </div>
 
-        <div class="topbar-right">
+        <nav class="sidebarMenu">
 
-            <span id="lastUpdate">
+            <a href="#" class="active">
+
+                <i data-lucide="layout-dashboard"></i>
+
+                <span>Overview</span>
+
+            </a>
+
+            <a href="#">
+
+                <i data-lucide="activity"></i>
+
+                <span>Traffic</span>
+
+            </a>
+
+            <a href="#">
+
+                <i data-lucide="shopping-cart"></i>
+
+                <span>Sales</span>
+
+            </a>
+
+            <a href="#">
+
+                <i data-lucide="package"></i>
+
+                <span>Products</span>
+
+            </a>
+
+            <a href="#">
+
+                <i data-lucide="settings"></i>
+
+                <span>Settings</span>
+
+            </a>
+
+        </nav>
+
+    </div>
+
+    <div class="sidebarBottom">
+
+        <div class="version">
+
+            Version 0.1
+
+        </div>
+
+    </div>
+
+</aside>
+
+
+
+<!-- ======================================================
+MAIN
+======================================================= -->
+
+<main class="mainContent">
+
+<!-- ================= HEADER ================= -->
+
+<header class="pageHeader">
+
+    <div>
+
+        <h2>
+
+            Dashboard Overview
+
+        </h2>
+
+        <p>
+
+            Marketing performance at a glance
+
+        </p>
+
+    </div>
+
+    <div class="headerRight">
+
+        <div class="updateCard">
+
+            <small>
 
                 Last Update
-                <strong>2026/07/16 10:30</strong>
 
-            </span>
+            </small>
 
-            <button class="refreshBtn">
+            <strong id="lastUpdate">
 
-                Refresh
+                --
 
-            </button>
+            </strong>
 
         </div>
 
-    </header>
+        <button class="primaryButton">
 
+            <i data-lucide="refresh-cw"></i>
 
-
-    <!-- ========================= -->
-    <!-- Filter -->
-    <!-- ========================= -->
-
-    <section class="filterBar">
-
-        <select>
-
-            <option>Last 30 Days</option>
-
-        </select>
-
-        <select>
-
-            <option>All Sources</option>
-
-        </select>
-
-        <select>
-
-            <option>All Stores</option>
-
-        </select>
-
-        <button>
-
-            Compare Previous
+            Refresh
 
         </button>
 
-    </section>
+    </div>
+
+</header>
 
 
 
-    <!-- ========================= -->
-    <!-- KPI -->
-    <!-- ========================= -->
+<!-- ================= FILTER ================= -->
 
-    <section class="kpiGrid">
+<section class="filterSection">
 
-        <div class="kpiCard">
+    <select id="dateRangeSelect">
 
-            <div class="cardTitle">
+        <option value="7">Last 7 Days</option>
 
-                👤 Users
+        <option value="14">Last 14 Days</option>
+
+        <option value="30" selected>Last 30 Days</option>
+
+        <option value="90">Last 90 Days</option>
+
+    </select>
+
+    <select>
+
+        <option>All Sources</option>
+
+    </select>
+
+    <select>
+
+        <option>All Stores</option>
+
+    </select>
+
+    <select>
+
+        <option>Compare Previous</option>
+
+    </select>
+
+</section>
+
+
+
+<!-- ================= KPI ================= -->
+
+<section class="kpiGrid">
+
+    <article class="card kpiCard users" data-kpi="users">
+
+        <div class="cardTop">
+
+            <span>Total Users</span>
+
+            <i data-lucide="users"></i>
+
+        </div>
+
+        <h3 data-field="value">--</h3>
+
+        <div class="cardBottom">
+
+            <div>
+
+                <strong data-field="delta">--</strong>
+
+                <small>vs Previous Period</small>
 
             </div>
 
-            <div class="cardValue">
+            <div>
 
-                41,175
+                <small>Avg / Day</small>
 
-            </div>
-
-            <div class="cardGrowth positive">
-
-                ▲ 8.2%
+                <strong data-field="daily">--</strong>
 
             </div>
 
         </div>
 
-<div class="kpiCard revenue">
+    </article>
 
-    <div class="cardTitle">
-        Revenue
+
+
+    <article class="card kpiCard sessions" data-kpi="sessions">
+
+        <div class="cardTop">
+
+            <span>Sessions</span>
+
+            <i data-lucide="activity"></i>
+
+        </div>
+
+        <h3 data-field="value">--</h3>
+
+        <div class="cardBottom">
+
+            <div>
+
+                <strong data-field="delta">--</strong>
+
+                <small>vs Previous Period</small>
+
+            </div>
+
+            <div>
+
+                <small>Avg / Day</small>
+
+                <strong data-field="daily">--</strong>
+
+            </div>
+
+        </div>
+
+    </article>
+
+
+
+    <article class="card kpiCard purchases" data-kpi="purchases">
+
+        <div class="cardTop">
+
+            <span>Ecommerce Purchases</span>
+
+            <i data-lucide="shopping-cart"></i>
+
+        </div>
+
+        <h3 data-field="value">--</h3>
+
+        <div class="cardBottom">
+
+            <div>
+
+                <strong data-field="delta">--</strong>
+
+                <small>vs Previous Period</small>
+
+            </div>
+
+            <div>
+
+                <small>Daily Avg</small>
+
+                <strong data-field="daily">--</strong>
+
+            </div>
+
+        </div>
+
+    </article>
+
+
+
+    <article class="card kpiCard revenue" data-kpi="revenue">
+
+        <div class="cardTop">
+
+            <span>Total Revenue</span>
+
+            <i data-lucide="wallet"></i>
+
+        </div>
+
+        <h3 data-field="value">--</h3>
+
+        <div class="cardBottom">
+
+            <div>
+
+                <strong data-field="delta">--</strong>
+
+                <small>vs Previous Period</small>
+
+            </div>
+
+            <div>
+
+                <small>Daily Avg</small>
+
+                <strong data-field="daily">--</strong>
+
+            </div>
+
+        </div>
+
+    </article>
+
+
+
+    <article class="card kpiCard cvr" data-kpi="cvr">
+
+        <div class="cardTop">
+
+            <span>CVR</span>
+
+            <i data-lucide="target"></i>
+
+        </div>
+
+        <h3 data-field="value">--</h3>
+
+        <div class="cardBottom">
+
+            <div>
+
+                <strong data-field="delta">--</strong>
+
+                <small>vs Previous Period</small>
+
+            </div>
+
+            <div>
+
+                <small>Goal</small>
+
+                <strong data-field="daily">--</strong>
+
+            </div>
+
+        </div>
+
+    </article>
+
+</section>
+
+
+
+<!-- ================= INSIGHTS ================= -->
+
+<section class="insightCard">
+
+    <div class="sectionTitle">
+
+        <h3>
+
+            Key Insights
+
+        </h3>
+
     </div>
 
-    <div class="cardValue">
-        ¥36,182,782
-    </div>
+    <ul>
 
-    <div class="cardFooter">
+        <li>
+
+            Revenue increased by <strong>8.2%</strong> compared to the previous period.
+
+        </li>
+
+        <li>
+
+            Google CPC generated <strong>29%</strong> of total revenue.
+
+        </li>
+
+        <li>
+
+            Organic Search traffic decreased by <strong>12%</strong>.
+
+        </li>
+
+        <li>
+
+            Mobile conversion rate improved this month.
+
+        </li>
+
+    </ul>
+
+</section>
+
+
+
+<!-- ================= MAIN CHART ================= -->
+
+<section class="chartCard">
+
+    <div class="chartHeader">
 
         <div>
 
-            <div class="cardGrowth positive">
-                ▲ 5.4%
-            </div>
+            <h3>
 
-            <div class="compareLabel">
-                vs Previous Period
-            </div>
+                Users &amp; Purchases Trend
+
+            </h3>
+
+            <small>
+
+                Last 30 Days
+
+            </small>
 
         </div>
 
-        <div class="smallMetric">
+        <div class="customLegend">
 
-            <span class="label">
-                Daily Avg
-            </span>
+            <div class="legendItem">
 
-            <span class="value">
-                ¥1.20M
-            </span>
+                <span class="legendColor legendBlue"></span>
+
+                Total Users
+
+            </div>
+
+            <div class="legendItem">
+
+                <span class="legendColor legendOrange"></span>
+
+                Ecommerce Purchases
+
+            </div>
 
         </div>
 
     </div>
 
-</div>
-        <div class="kpiCard">
-
-            <div class="cardTitle">
-
-                🛒 Orders
-
-            </div>
-
-            <div class="cardValue">
-
-                3,719
-
-            </div>
-
-            <div class="cardGrowth negative">
-
-                ▼ 2.1%
-
-            </div>
-
-        </div>
-
-        <div class="kpiCard">
-
-            <div class="cardTitle">
-
-                📈 CVR
-
-            </div>
-
-            <div class="cardValue">
-
-                6.03%
-
-            </div>
-
-            <div class="cardGrowth positive">
-
-                ▲ 0.8%
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-
-    <!-- ========================= -->
-    <!-- Trend -->
-    <!-- ========================= -->
-
-    <section class="panel">
-
-        <div class="panelHeader">
-
-            Revenue & Users Trend
-
-        </div>
+    <div class="chartBody">
 
         <canvas id="trendChart"></canvas>
 
-    </section>
+    </div>
+
+</section>
 
 
 
-    <!-- ========================= -->
-    <!-- Lower -->
-    <!-- ========================= -->
+<!-- ================= TWO COLUMN ================= -->
 
-    <section class="bottomGrid">
+<section class="twoColumn">
 
-        <div class="panel">
+    <div class="chartCard">
 
-            <div class="panelHeader">
+        <div class="chartHeader">
+
+            <h3>
 
                 Traffic Sources
 
-            </div>
+            </h3>
 
         </div>
 
-        <div class="panel">
+        <div class="chartBody smallChart">
 
-            <div class="panelHeader">
-
-                Insights
-
-            </div>
+            <canvas id="trafficChart"></canvas>
 
         </div>
 
-    </section>
+        <div class="customLegend" id="trafficLegend"></div>
+
+    </div>
 
 
 
-    <!-- ========================= -->
-    <!-- Table -->
-    <!-- ========================= -->
+    <div class="chartCard">
 
-    <section class="panel">
+        <div class="chartHeader">
 
-        <div class="panelHeader">
+            <h3>
 
-            Monthly Business Performance
+                Top Landing Pages
+
+            </h3>
 
         </div>
+
+        <div id="landingPages">
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================= SESSION SOURCE TABLE ================= -->
+
+<section class="tableCard">
+
+    <div class="tableHeader">
+
+        <h3>
+
+            Session Source / Medium
+
+        </h3>
+
+        <button class="secondaryButton" id="toggleSourcesBtn">
+
+            Show All
+
+        </button>
+
+    </div>
+
+    <div class="tableResponsive">
 
         <table class="modernTable">
 
             <thead>
 
-            <tr>
+                <tr>
 
-                <th>Month</th>
+                    <th>Session Source / Medium</th>
 
-                <th>Revenue</th>
+                    <th>Sessions</th>
 
-                <th>Orders</th>
+                    <th>Total Users</th>
 
-                <th>Users</th>
+                    <th>Ecommerce Purchases</th>
 
-            </tr>
+                    <th>Total Revenue</th>
+
+                    <th>CVR</th>
+
+                </tr>
 
             </thead>
 
-            <tbody>
+            <tbody id="sourceTable">
 
             </tbody>
 
         </table>
 
-    </section>
+    </div>
+
+</section>
+
+
+
+<!-- ================= TABLE ================= -->
+
+<section class="tableCard">
+
+    <div class="tableHeader">
+
+        <h3>
+
+            Monthly Business Performance
+
+        </h3>
+
+    </div>
+
+    <div class="tableResponsive">
+
+        <table class="modernTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>Month</th>
+
+                    <th>Revenue</th>
+
+                    <th>Orders</th>
+
+                    <th>Users</th>
+
+                    <th>CVR</th>
+
+                    <th>Trend</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="monthlyTable">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================= NEW / REPEAT TABLE (SPREADSHEET) ================= -->
+
+<section class="tableCard">
+
+    <div class="tableHeader">
+
+        <h3>
+
+            WEB本店 新規／リピータ
+
+        </h3>
+
+        <small class="textLight">
+
+            Source: Spreadsheet
+
+        </small>
+
+    </div>
+
+    <div class="tableResponsive">
+
+        <table class="modernTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>年度</th>
+
+                    <th>総合売上</th>
+
+                    <th>総合受注件数</th>
+
+                    <th>新規売上</th>
+
+                    <th>新規受注件数</th>
+
+                    <th>リピーター売上</th>
+
+                    <th>リピーター受注件数</th>
+
+                    <th>訪問者数：PC</th>
+
+                    <th>訪問者数：SP</th>
+
+                    <th>訪問者数：合計</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="newRepeatTable">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+</main>
 
 </div>
 
+<script>
 
+    lucide.createIcons();
+
+</script>
 
 <script src="js/charts.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/data.js"></script>
 <script src="js/app.js"></script>
 
 </body>
