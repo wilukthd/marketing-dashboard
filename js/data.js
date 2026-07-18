@@ -27,6 +27,9 @@ window.THD = window.THD || {};
         // GA4 acquisition breakdown: sourceMedium, sessions, users, purchases, revenue, channel
         GA4_SOURCES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=96802008&single=true&output=csv",
 
+        // GA4 landing page breakdown: path, sessions
+        GA4_LANDING_PAGES_CSV_URL: "",
+
         // Spreadsheet: WEB本店新規／リピータ monthly rollup
         // period, totalRevenue, totalOrders, newRevenue, newOrders,
         // repeatRevenue, repeatOrders, visitorsPc, visitorsSp, visitorsTotal
@@ -124,6 +127,66 @@ window.THD = window.THD || {};
         }
     }
 
+    async function loadLandingPages() {
+        try {
+            const rows = await fetchCsv(CONFIG.GA4_LANDING_PAGES_CSV_URL);
+            return rows
+                .filter((r) => r.path)
+                .map((r) => ({
+                    path: r.path,
+                    sessions: Number(r.sessions) || 0
+                }))
+                .sort((a, b) => b.sessions - a.sessions)
+                .slice(0, 8);
+        } catch (e) {
+            console.warn("[THD.data] Landing pages CSV not available, using dummy data:", e.message);
+            return null;
+        }
+    }
+
+    /* ==========================================================
+       Channel classification (simplified GA4 default channel
+       grouping) — used to build the Traffic Sources doughnut
+       from the same source/medium rows as the Sources table,
+       for sheets that don't include an explicit channel column.
+    ========================================================== */
+
+    function classifySourceChannel(sourceMedium) {
+        if (!sourceMedium) return "Other";
+        const parts = String(sourceMedium).split("/").map((s) => s.trim().toLowerCase());
+        const source = parts[0] || "";
+        const medium = parts[1] || "";
+
+        if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
+        if (medium === "organic") return "Organic Search";
+        if (medium === "cpc" || medium === "ppc" || medium === "paid" || medium === "paidsearch") return "Paid Search";
+        if (medium === "email") return "Email";
+        if (medium === "referral") return "Referral";
+        if (medium === "display" || medium === "cpm" || medium === "banner") return "Display";
+        if (medium === "social") return "Social";
+        return "Other";
+    }
+
+    function deriveTrafficBreakdown(sourceRows) {
+        const totals = {};
+        let totalSessions = 0;
+
+        sourceRows.forEach((r) => {
+            const channel = r.channel || classifySourceChannel(r.sourceMedium);
+            totals[channel] = (totals[channel] || 0) + r.sessions;
+            totalSessions += r.sessions;
+        });
+
+        const entries = Object.entries(totals)
+            .filter(([, sessions]) => sessions > 0)
+            .sort((a, b) => b[1] - a[1]);
+
+        return {
+            labels: entries.map(([channel]) => channel),
+            values: entries.map(([, sessions]) => totalSessions ? Math.round((sessions / totalSessions) * 100) : 0)
+        };
+    }
+
     /* ==========================================================
        Date-range filtering (client-side, no re-fetch)
        Computes current-period totals + delta vs the prior
@@ -170,6 +233,9 @@ window.THD = window.THD || {};
         loadDailyGA4,
         loadSources,
         loadNewRepeat,
+        loadLandingPages,
+        classifySourceChannel,
+        deriveTrafficBreakdown,
         filterDailyRange
     };
 
