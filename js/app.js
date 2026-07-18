@@ -94,11 +94,6 @@
         ];
     }
 
-    const DUMMY_TRAFFIC = {
-        labels: ["Google CPC", "Organic Search", "Direct", "Social", "Referral"],
-        values: [29, 26, 21, 15, 9]
-    };
-
     const DUMMY_LANDING_PAGES = [
         { path: "/products/summer-sale", sessions: 8420 },
         { path: "/", sessions: 7110 },
@@ -153,24 +148,27 @@
 
         // Each source loads independently and falls back to dummy
         // data on its own, so a partial live setup still works.
-        const [liveDaily, liveSources, liveNewRepeat] = await Promise.all([
+        const [liveDaily, liveSources, liveNewRepeat, liveLandingPages] = await Promise.all([
             THD.data.loadDailyGA4(),
             THD.data.loadSources(),
-            THD.data.loadNewRepeat()
+            THD.data.loadNewRepeat(),
+            THD.data.loadLandingPages()
         ]);
 
         dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows(90);
         const sources = liveSources && liveSources.length ? liveSources : buildDummySources();
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
+        const landingPages = liveLandingPages && liveLandingPages.length ? liveLandingPages : DUMMY_LANDING_PAGES;
 
         renderForRange(currentRangeDays);
 
-        THD.ui.renderLandingPages(DUMMY_LANDING_PAGES);
+        THD.ui.renderLandingPages(landingPages);
         THD.ui.renderSourceTable(sources);
         THD.ui.renderMonthlyTable(DUMMY_MONTHLY);
         THD.ui.renderNewRepeatTable(newRepeat);
 
-        const legendItems = THD.charts.renderTrafficChart(DUMMY_TRAFFIC.labels, DUMMY_TRAFFIC.values);
+        const traffic = THD.data.deriveTrafficBreakdown(sources);
+        const legendItems = THD.charts.renderTrafficChart(traffic.labels, traffic.values);
         THD.ui.renderTrafficLegend(legendItems);
 
         THD.ui.renderLastUpdate();
