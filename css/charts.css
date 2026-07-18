@@ -1,0 +1,237 @@
+/* ==========================================================
+   Charts
+========================================================== */
+
+.chartCard{
+
+    background:#FFFFFF;
+
+    border:1px solid var(--border);
+
+    border-radius:18px;
+
+    box-shadow:var(--shadow-sm);
+
+    padding:28px;
+
+    margin-bottom:28px;
+
+    transition:.25s;
+
+}
+
+.chartCard:hover{
+
+    box-shadow:var(--shadow-md);
+
+}
+
+/* ==========================================================
+   Header
+========================================================== */
+
+.chartHeader{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:28px;
+
+}
+
+.chartTitle{
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+.chartTitle h3{
+
+    font-size:20px;
+
+    margin-bottom:6px;
+
+}
+
+.chartTitle span{
+
+    color:var(--text-light);
+
+    font-size:13px;
+
+}
+
+/* ==========================================================
+   Right Area
+========================================================== */
+
+.chartTools{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+}
+
+.chartBadge{
+
+    background:#EEF4FF;
+
+    color:var(--blue);
+
+    padding:8px 14px;
+
+    border-radius:30px;
+
+    font-size:13px;
+
+    font-weight:600;
+
+}
+
+.chartMenu{
+
+    border:1px solid var(--border);
+
+    border-radius:10px;
+
+    padding:10px 14px;
+
+    background:white;
+
+}
+
+/* ==========================================================
+   Chart Area
+========================================================== */
+
+.chartBody{
+
+    position:relative;
+
+    height:420px;
+
+}
+
+/* ==========================================================
+   Mini Charts
+========================================================== */
+
+.smallChart{
+
+    height:280px;
+
+}
+
+/* ==========================================================
+   Legend
+========================================================== */
+
+.customLegend{
+
+    display:flex;
+
+    gap:20px;
+
+    margin-top:20px;
+
+}
+
+.legendItem{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    color:var(--text-light);
+
+    font-size:14px;
+
+}
+
+.legendColor{
+
+    width:12px;
+
+    height:12px;
+
+    border-radius:50%;
+
+}
+
+.legendBlue{
+
+    background:#2563EB;
+
+}
+
+.legendGreen{
+
+    background:#10B981;
+
+}
+
+.legendOrange{
+
+    background:#F59E0B;
+
+}
+
+.legendRed{
+
+    background:#EF4444;
+
+}
+
+/* ==========================================================
+   Empty State
+========================================================== */
+
+.emptyChart{
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    height:350px;
+
+    color:var(--text-light);
+
+}
+
+/* ==========================================================
+   Responsive
+========================================================== */
+
+@media(max-width:900px){
+
+    .chartHeader{
+
+        flex-direction:column;
+
+        align-items:flex-start;
+
+        gap:16px;
+
+    }
+
+    .chartTools{
+
+        width:100%;
+
+        justify-content:space-between;
+
+    }
+
+}

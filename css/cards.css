@@ -1,0 +1,277 @@
+/* ==========================================================
+   THD Analytics
+   KPI Cards
+   Version 0.1
+========================================================== */
+
+
+/* ==========================================================
+   KPI Grid
+========================================================== */
+
+.kpiGrid{
+
+    display:grid;
+
+    grid-template-columns:repeat(5,minmax(0,1fr));
+
+    gap:24px;
+
+    margin-bottom:32px;
+
+}
+
+
+/* ==========================================================
+   KPI Card
+========================================================== */
+
+.kpiCard{
+
+    padding:24px;
+
+    position:relative;
+
+    overflow:hidden;
+
+    transition:.25s;
+
+}
+
+.kpiCard:hover{
+
+    transform:translateY(-4px);
+
+}
+
+
+/* ==========================================================
+   Accent Border
+========================================================== */
+
+.kpiCard::before{
+
+    content:"";
+
+    position:absolute;
+
+    top:0;
+
+    left:0;
+
+    width:5px;
+
+    height:100%;
+
+}
+
+
+/* ==========================================================
+   Accent Colors
+========================================================== */
+
+.users::before{
+
+    background:#06B6D4;
+
+}
+
+.sessions::before{
+
+    background:#8B5CF6;
+
+}
+
+.purchases::before{
+
+    background:#10B981;
+
+}
+
+.revenue::before{
+
+    background:#2563EB;
+
+}
+
+.cvr::before{
+
+    background:#F59E0B;
+
+}
+
+
+/* ==========================================================
+   Top
+========================================================== */
+
+.cardTop{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:22px;
+
+}
+
+.cardTop span{
+
+    color:var(--text-light);
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+.cardTop svg{
+
+    width:22px;
+
+    height:22px;
+
+    color:var(--text-light);
+
+}
+
+
+/* ==========================================================
+   Main Number
+========================================================== */
+
+.kpiCard h3{
+
+    font-size:36px;
+
+    font-weight:700;
+
+    letter-spacing:-1px;
+
+    margin-bottom:22px;
+
+}
+
+
+/* ==========================================================
+   Bottom
+========================================================== */
+
+.cardBottom{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:flex-end;
+
+    gap:20px;
+
+}
+
+.cardBottom small{
+
+    display:block;
+
+    margin-top:4px;
+
+}
+
+.cardBottom strong{
+
+    font-size:15px;
+
+}
+
+
+/* ==========================================================
+   Hover Effect
+========================================================== */
+
+.kpiCard:hover svg{
+
+    transform:scale(1.08);
+
+    transition:.2s;
+
+}
+
+
+/* ==========================================================
+   Small Animation
+========================================================== */
+
+.kpiCard::after{
+
+    content:"";
+
+    position:absolute;
+
+    width:180px;
+
+    height:180px;
+
+    background:rgba(37,99,235,.04);
+
+    border-radius:50%;
+
+    right:-80px;
+
+    top:-80px;
+
+    transition:.4s;
+
+}
+
+.kpiCard:hover::after{
+
+    transform:scale(1.15);
+
+}
+
+
+/* ==========================================================
+   Wide Tablet / Small Desktop
+========================================================== */
+
+@media(max-width:1400px){
+
+    .kpiGrid{
+
+        grid-template-columns:repeat(3,1fr);
+
+    }
+
+}
+
+
+/* ==========================================================
+   Tablet
+========================================================== */
+
+@media(max-width:900px){
+
+    .kpiGrid{
+
+        grid-template-columns:repeat(2,1fr);
+
+    }
+
+}
+
+
+/* ==========================================================
+   Mobile
+========================================================== */
+
+@media(max-width:640px){
+
+    .kpiGrid{
+
+        grid-template-columns:1fr;
+
+    }
+
+}

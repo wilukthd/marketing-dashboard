@@ -1,0 +1,432 @@
+/* ==========================================================
+   THD Analytics
+   Main Theme
+   Version 0.1
+========================================================== */
+
+
+/* ==========================================================
+   Root Variables
+========================================================== */
+
+:root{
+
+    /* Colors */
+
+    --primary:#2563EB;
+    --primary-light:#DBEAFE;
+
+    --success:#16A34A;
+    --success-light:#DCFCE7;
+
+    --danger:#DC2626;
+    --danger-light:#FEE2E2;
+
+    --warning:#F59E0B;
+    --warning-light:#FEF3C7;
+
+    --bg:#F5F7FA;
+    --surface:#FFFFFF;
+
+    --border:#E5E7EB;
+
+    --text:#111827;
+    --text-light:#6B7280;
+
+    --shadow-sm:0 1px 3px rgba(0,0,0,.05);
+
+    --shadow-md:0 8px 24px rgba(0,0,0,.08);
+
+    --shadow-lg:0 20px 40px rgba(0,0,0,.12);
+
+    --radius-sm:10px;
+    --radius:16px;
+    --radius-lg:24px;
+
+}
+
+
+/* ==========================================================
+   Reset
+========================================================== */
+
+*{
+
+    margin:0;
+    padding:0;
+
+    box-sizing:border-box;
+
+}
+
+html{
+
+    scroll-behavior:smooth;
+
+}
+
+body{
+
+    background:var(--bg);
+
+    color:var(--text);
+
+    font-family:'Inter',sans-serif;
+
+    font-size:15px;
+
+    line-height:1.6;
+
+}
+
+
+/* ==========================================================
+   Typography
+========================================================== */
+
+h1{
+
+    font-size:30px;
+    font-weight:800;
+
+}
+
+h2{
+
+    font-size:28px;
+    font-weight:700;
+
+}
+
+h3{
+
+    font-size:20px;
+    font-weight:700;
+
+}
+
+h4{
+
+    font-size:16px;
+    font-weight:600;
+
+}
+
+p{
+
+    color:var(--text-light);
+
+}
+
+small{
+
+    color:var(--text-light);
+
+    font-size:13px;
+
+}
+
+
+/* ==========================================================
+   Links
+========================================================== */
+
+a{
+
+    color:inherit;
+
+    text-decoration:none;
+
+}
+
+
+/* ==========================================================
+   Buttons
+========================================================== */
+
+button{
+
+    border:none;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+    font-family:inherit;
+
+}
+
+button:hover{
+
+    transform:translateY(-2px);
+
+}
+
+button:active{
+
+    transform:translateY(0);
+
+}
+
+button:disabled{
+
+    opacity:.7;
+
+    cursor:default;
+
+    transform:none;
+
+}
+
+@keyframes spin{
+
+    from{ transform:rotate(0deg); }
+
+    to{ transform:rotate(360deg); }
+
+}
+
+
+/* ==========================================================
+   Primary Button
+========================================================== */
+
+.primaryButton{
+
+    background:var(--primary);
+
+    color:white;
+
+    padding:12px 20px;
+
+    border-radius:12px;
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    font-weight:600;
+
+    box-shadow:var(--shadow-sm);
+
+}
+
+.primaryButton:hover{
+
+    box-shadow:var(--shadow-md);
+
+}
+
+
+/* ==========================================================
+   Secondary Button
+========================================================== */
+
+.secondaryButton{
+
+    background:white;
+
+    border:1px solid var(--border);
+
+    padding:12px 18px;
+
+    border-radius:12px;
+
+}
+
+
+/* ==========================================================
+   Form Controls
+========================================================== */
+
+select{
+
+    background:white;
+
+    border:1px solid var(--border);
+
+    border-radius:12px;
+
+    padding:12px 16px;
+
+    font-size:14px;
+
+    font-family:inherit;
+
+    color:var(--text);
+
+    transition:.25s;
+
+}
+
+select:hover{
+
+    border-color:var(--primary);
+
+}
+
+select:focus{
+
+    outline:none;
+
+    border-color:var(--primary);
+
+}
+
+
+/* ==========================================================
+   Cards
+========================================================== */
+
+.card{
+
+    background:var(--surface);
+
+    border:1px solid var(--border);
+
+    border-radius:var(--radius);
+
+    box-shadow:var(--shadow-sm);
+
+}
+
+.card:hover{
+
+    box-shadow:var(--shadow-md);
+
+}
+
+
+/* ==========================================================
+   Utilities
+========================================================== */
+
+.positive{
+
+    color:var(--success);
+
+}
+
+.negative{
+
+    color:var(--danger);
+
+}
+
+.warning{
+
+    color:var(--warning);
+
+}
+
+.textLight{
+
+    color:var(--text-light);
+
+}
+
+.center{
+
+    text-align:center;
+
+}
+
+.right{
+
+    text-align:right;
+
+}
+
+
+/* ==========================================================
+   Spacing Helpers
+========================================================== */
+
+.mt8{margin-top:8px;}
+.mt16{margin-top:16px;}
+.mt24{margin-top:24px;}
+.mt32{margin-top:32px;}
+
+.mb8{margin-bottom:8px;}
+.mb16{margin-bottom:16px;}
+.mb24{margin-bottom:24px;}
+.mb32{margin-bottom:32px;}
+
+
+/* ==========================================================
+   Scrollbar
+========================================================== */
+
+::-webkit-scrollbar{
+
+    width:10px;
+
+}
+
+::-webkit-scrollbar-track{
+
+    background:transparent;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:#CBD5E1;
+
+    border-radius:100px;
+
+}
+
+::-webkit-scrollbar-thumb:hover{
+
+    background:#94A3B8;
+
+}
+
+
+/* ==========================================================
+   Fade Animation
+========================================================== */
+
+.fadeIn{
+
+    animation:fade .4s ease;
+
+}
+
+@keyframes fade{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(8px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+
+/* ==========================================================
+   Responsive
+========================================================== */
+
+@media(max-width:768px){
+
+    body{
+
+        font-size:14px;
+
+    }
+
+}
