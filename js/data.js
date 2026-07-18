@@ -100,17 +100,16 @@ window.THD = window.THD || {};
         try {
             const rows = await fetchCsv(CONFIG.GA4_SOURCES_CSV_URL);
             return rows
-                .filter((r) => r.sourceMedium)
+                .filter((r) => r.sourceMedium && r.date)
                 .map((r) => ({
                     sourceMedium: r.sourceMedium,
+                    date: parseGA4Date(r.date),
                     sessions: Number(r.sessions) || 0,
                     users: Number(r.users) || 0,
                     purchases: Number(r.purchases) || 0,
                     revenue: Number(r.revenue) || 0,
-                    channel: r.channel || null,
-                    cvr: r.sessions ? ((Number(r.purchases) || 0) / Number(r.sessions)) * 100 : 0
-                }))
-                .sort((a, b) => b.sessions - a.sessions);
+                    channel: r.channel || null
+                }));
         } catch (e) {
             console.warn("[THD.data] GA4 sources CSV not available, using dummy data:", e.message);
             return null;
@@ -188,15 +187,66 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
-       Date-range filtering (client-side, no re-fetch)
-       Computes current-period totals + delta vs the prior
-       period of equal length, from a full daily row set.
+       Date Range Resolution
+       Supports both rolling windows (7d/14d/3m/6m) and
+       calendar-anchored windows (this month/this year).
+       "Previous period" for delta comparisons is always the
+       same-length window immediately preceding the start date,
+       kept simple and consistent across range types.
     ========================================================== */
 
-    function filterDailyRange(dailyRows, days) {
+    function startOfDay(d) {
+        const copy = new Date(d);
+        copy.setHours(0, 0, 0, 0);
+        return copy;
+    }
 
-        const current = dailyRows.slice(-days);
-        const previous = dailyRows.slice(-days * 2, -days);
+    function daysAgo(n, from) {
+        const d = startOfDay(from || new Date());
+        d.setDate(d.getDate() - n);
+        return d;
+    }
+
+    const RANGE_DEFS = {
+        "7d": () => ({ start: daysAgo(6), end: startOfDay(new Date()) }),
+        "14d": () => ({ start: daysAgo(13), end: startOfDay(new Date()) }),
+        "month": () => {
+            const now = new Date();
+            return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: startOfDay(now) };
+        },
+        "3m": () => ({ start: daysAgo(89), end: startOfDay(new Date()) }),
+        "6m": () => ({ start: daysAgo(179), end: startOfDay(new Date()) }),
+        "year": () => {
+            const now = new Date();
+            return { start: new Date(now.getFullYear(), 0, 1), end: startOfDay(now) };
+        }
+    };
+
+    function resolveRange(rangeKey) {
+        const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
+        const { start, end } = def();
+        const spanDays = Math.round((end - start) / 86400000) + 1;
+        const prevEnd = new Date(start);
+        prevEnd.setDate(prevEnd.getDate() - 1);
+        const prevStart = daysAgo(spanDays - 1, prevEnd);
+        return { start, end, spanDays, prevStart, prevEnd };
+    }
+
+    function inRange(dateStr, start, end) {
+        const d = startOfDay(new Date(dateStr));
+        return d >= start && d <= end;
+    }
+
+    /* ==========================================================
+       Daily rows -> KPI cards + trend chart
+    ========================================================== */
+
+    function filterDailyRange(dailyRows, rangeKey) {
+
+        const { start, end, prevStart, prevEnd } = resolveRange(rangeKey);
+
+        const current = dailyRows.filter((r) => inRange(r.date, start, end));
+        const previous = dailyRows.filter((r) => inRange(r.date, prevStart, prevEnd));
 
         const sum = (rows, key) => rows.reduce((acc, r) => acc + r[key], 0);
         const pctDelta = (curr, prev) => (prev ? ((curr - prev) / prev) * 100 : 0);
@@ -213,19 +263,52 @@ window.THD = window.THD || {};
 
         const curCvr = curSessions ? (curPurchases / curSessions) * 100 : 0;
         const prevCvr = prevSessions ? (prevPurchases / prevSessions) * 100 : 0;
+        const dayCount = current.length || 1;
 
         return {
             labels: current.map((r) => new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })),
             users: current.map((r) => r.users),
             purchases: current.map((r) => r.purchases),
             kpi: {
-                users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / current.length },
-                sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / current.length },
-                purchases: { value: curPurchases, delta: pctDelta(curPurchases, prevPurchases), daily: curPurchases / current.length },
-                revenue: { value: curRevenue, delta: pctDelta(curRevenue, prevRevenue), daily: curRevenue / current.length },
+                users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / dayCount },
+                sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / dayCount },
+                purchases: { value: curPurchases, delta: pctDelta(curPurchases, prevPurchases), daily: curPurchases / dayCount },
+                revenue: { value: curRevenue, delta: pctDelta(curRevenue, prevRevenue), daily: curRevenue / dayCount },
                 cvr: { value: curCvr, delta: pctDelta(curCvr, prevCvr), daily: 6.50 }
             }
         };
+    }
+
+    /* ==========================================================
+       Per-day-per-source rows -> Session Source table +
+       Traffic Sources doughnut. Aggregates matching rows within
+       the range into one row per sourceMedium.
+    ========================================================== */
+
+    function filterSourcesRange(sourceRows, rangeKey) {
+
+        const { start, end } = resolveRange(rangeKey);
+        const inWindow = sourceRows.filter((r) => inRange(r.date, start, end));
+
+        const totals = {};
+        inWindow.forEach((r) => {
+            if (!totals[r.sourceMedium]) {
+                totals[r.sourceMedium] = {
+                    sourceMedium: r.sourceMedium,
+                    sessions: 0, users: 0, purchases: 0, revenue: 0,
+                    channel: r.channel || null
+                };
+            }
+            const t = totals[r.sourceMedium];
+            t.sessions += r.sessions;
+            t.users += r.users;
+            t.purchases += r.purchases;
+            t.revenue += r.revenue;
+        });
+
+        return Object.values(totals)
+            .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
+            .sort((a, b) => b.sessions - a.sessions);
     }
 
     THD.data = {
@@ -236,7 +319,9 @@ window.THD = window.THD || {};
         loadLandingPages,
         classifySourceChannel,
         deriveTrafficBreakdown,
-        filterDailyRange
+        resolveRange,
+        filterDailyRange,
+        filterSourcesRange
     };
 
 })(window.THD);
