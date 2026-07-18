@@ -123,7 +123,7 @@
 
         const filtered = THD.data.filterDailyRange(dailyRows, rangeKey);
         THD.ui.renderKpis(filtered.kpi);
-        THD.charts.renderTrendChart(filtered.labels, filtered.users, filtered.purchases);
+        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
 
         const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey);
         THD.ui.renderSourceTable(sourcesInRange);
@@ -131,6 +131,11 @@
         const traffic = THD.data.deriveTrafficBreakdown(sourcesInRange);
         const legendItems = THD.charts.renderTrafficChart(traffic.labels, traffic.values);
         THD.ui.renderTrafficLegend(legendItems);
+    }
+
+    function renderTrendOnly() {
+        const filtered = THD.data.filterDailyRange(dailyRows, currentRange);
+        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
     }
 
     function wireDateRange() {
@@ -150,6 +155,7 @@
         THD.ui.renderLastUpdate();
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
+        THD.ui.wireMetricToggles(renderTrendOnly);
         wireDateRange();
 
         await loadAndRenderAll();
