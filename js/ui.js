@@ -204,6 +204,26 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Trend Chart Metric Toggles
+    ========================================================== */
+
+    function getCheckedMetrics() {
+        const container = document.getElementById("metricToggles");
+        if (!container) return [];
+        return Array.from(container.querySelectorAll(".metricToggle"))
+            .filter((label) => label.querySelector("input").checked)
+            .map((label) => label.dataset.metric);
+    }
+
+    function wireMetricToggles(onChange) {
+        const container = document.getElementById("metricToggles");
+        if (!container) return;
+        container.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            cb.addEventListener("change", () => onChange(getCheckedMetrics()));
+        });
+    }
+
+    /* ==========================================================
        Refresh Button
     ========================================================== */
 
@@ -234,6 +254,8 @@ window.THD = window.THD || {};
         wireSourceTableToggle,
         renderMonthlyTable,
         renderNewRepeatTable,
+        getCheckedMetrics,
+        wireMetricToggles,
         wireRefreshButton
     };
 
