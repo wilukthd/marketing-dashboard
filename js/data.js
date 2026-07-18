@@ -267,8 +267,13 @@ window.THD = window.THD || {};
 
         return {
             labels: current.map((r) => new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })),
-            users: current.map((r) => r.users),
-            purchases: current.map((r) => r.purchases),
+            series: {
+                users: current.map((r) => r.users),
+                sessions: current.map((r) => r.sessions),
+                purchases: current.map((r) => r.purchases),
+                revenue: current.map((r) => r.revenue),
+                cvr: current.map((r) => (r.sessions ? (r.purchases / r.sessions) * 100 : 0))
+            },
             kpi: {
                 users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / dayCount },
                 sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / dayCount },
