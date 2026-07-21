@@ -172,17 +172,28 @@ window.THD = window.THD || {};
 
         sourceRows.forEach((r) => {
             const channel = r.channel || classifySourceChannel(r.sourceMedium);
-            totals[channel] = (totals[channel] || 0) + r.sessions;
+            if (!totals[channel]) totals[channel] = { sessions: 0, revenue: 0, purchases: 0 };
+            totals[channel].sessions += r.sessions;
+            totals[channel].revenue += r.revenue;
+            totals[channel].purchases += r.purchases;
             totalSessions += r.sessions;
         });
 
         const entries = Object.entries(totals)
-            .filter(([, sessions]) => sessions > 0)
-            .sort((a, b) => b[1] - a[1]);
+            .filter(([, t]) => t.sessions > 0)
+            .sort((a, b) => b[1].sessions - a[1].sessions);
 
         return {
+            totalSessions,
             labels: entries.map(([channel]) => channel),
-            values: entries.map(([, sessions]) => totalSessions ? Math.round((sessions / totalSessions) * 100) : 0)
+            values: entries.map(([, t]) => totalSessions ? Math.round((t.sessions / totalSessions) * 100) : 0),
+            channels: entries.map(([channel, t]) => ({
+                label: channel,
+                sessions: t.sessions,
+                revenue: t.revenue,
+                cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0,
+                percent: totalSessions ? Math.round((t.sessions / totalSessions) * 100) : 0
+            }))
         };
     }
 
@@ -210,9 +221,16 @@ window.THD = window.THD || {};
     const RANGE_DEFS = {
         "7d": () => ({ start: daysAgo(6), end: startOfDay(new Date()) }),
         "14d": () => ({ start: daysAgo(13), end: startOfDay(new Date()) }),
+        "30d": () => ({ start: daysAgo(29), end: startOfDay(new Date()) }),
         "month": () => {
             const now = new Date();
             return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: startOfDay(now) };
+        },
+        "lastMonth": () => {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of previous month
+            return { start, end: startOfDay(end) };
         },
         "3m": () => ({ start: daysAgo(89), end: startOfDay(new Date()) }),
         "6m": () => ({ start: daysAgo(179), end: startOfDay(new Date()) }),
@@ -222,9 +240,15 @@ window.THD = window.THD || {};
         }
     };
 
-    function resolveRange(rangeKey) {
-        const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
-        const { start, end } = def();
+    function resolveRange(rangeKey, customRange) {
+        let start, end;
+        if (rangeKey === "custom" && customRange && customRange.start && customRange.end) {
+            start = startOfDay(customRange.start);
+            end = startOfDay(customRange.end);
+        } else {
+            const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
+            ({ start, end } = def());
+        }
         const spanDays = Math.round((end - start) / 86400000) + 1;
         const prevEnd = new Date(start);
         prevEnd.setDate(prevEnd.getDate() - 1);
@@ -241,9 +265,9 @@ window.THD = window.THD || {};
        Daily rows -> KPI cards + trend chart
     ========================================================== */
 
-    function filterDailyRange(dailyRows, rangeKey) {
+    function filterDailyRange(dailyRows, rangeKey, customRange) {
 
-        const { start, end, prevStart, prevEnd } = resolveRange(rangeKey);
+        const { start, end, prevStart, prevEnd } = resolveRange(rangeKey, customRange);
 
         const current = dailyRows.filter((r) => inRange(r.date, start, end));
         const previous = dailyRows.filter((r) => inRange(r.date, prevStart, prevEnd));
@@ -285,14 +309,132 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Key Insights
+       Turns the KPI deltas and traffic channel breakdown that
+       are already computed for the current date range into a
+       few sentences, so the panel reflects whatever range/filter
+       is active instead of showing fixed placeholder text.
+    ========================================================== */
+
+    function buildInsights(kpi, channels) {
+        const insights = [];
+
+        if (kpi && kpi.revenue) {
+            const d = kpi.revenue.delta;
+            insights.push(`Revenue ${d >= 0 ? "increased" : "decreased"} by ${Math.abs(d).toFixed(1)}% compared to the previous period.`);
+        }
+
+        if (channels && channels.length) {
+            const totalRevenue = channels.reduce((sum, c) => sum + c.revenue, 0);
+            const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
+            const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
+            insights.push(`${topByRevenue.label} generated ${share}% of total revenue.`);
+        }
+
+        if (kpi) {
+            const movers = [
+                { key: "users", label: "User traffic" },
+                { key: "sessions", label: "Session traffic" },
+                { key: "purchases", label: "Purchases" }
+            ];
+            let biggest = null;
+            movers.forEach(({ key, label }) => {
+                const d = kpi[key] ? kpi[key].delta : 0;
+                if (!biggest || Math.abs(d) > Math.abs(biggest.delta)) biggest = { label, delta: d };
+            });
+            if (biggest) {
+                insights.push(`${biggest.label} ${biggest.delta >= 0 ? "increased" : "decreased"} by ${Math.abs(biggest.delta).toFixed(1)}%.`);
+            }
+        }
+
+        if (kpi && kpi.cvr) {
+            const d = kpi.cvr.delta;
+            insights.push(`Conversion rate ${d >= 0 ? "improved" : "declined"} to ${kpi.cvr.value.toFixed(2)}% this period.`);
+        }
+
+        return insights;
+    }
+
+    /* ==========================================================
+       Anomaly Detection
+       Flags any day within the selected range whose value sits
+       far outside that same range's own average (z-score based,
+       so "far outside" is relative to the period, not a fixed
+       number) — a simple stand-in for "something happened here"
+       without needing an external events calendar.
+    ========================================================== */
+
+    const ANOMALY_Z_THRESHOLD = 2;
+    const ANOMALY_MIN_DAYS = 5;
+
+    const ANOMALY_METRIC_LABELS = {
+        users: "Total Users",
+        sessions: "Sessions",
+        purchases: "Ecommerce Purchases",
+        revenue: "Revenue",
+        cvr: "CVR"
+    };
+
+    const ANOMALY_FORMATTERS = {
+        users: (v) => Math.round(v).toLocaleString("en-US"),
+        sessions: (v) => Math.round(v).toLocaleString("en-US"),
+        purchases: (v) => Math.round(v).toLocaleString("en-US"),
+        revenue: (v) => "¥" + Math.round(v).toLocaleString("en-US"),
+        cvr: (v) => v.toFixed(2) + "%"
+    };
+
+    function detectAnomalies(labels, series) {
+        const anomalies = [];
+
+        Object.keys(series || {}).forEach((key) => {
+            const values = series[key] || [];
+            const n = values.length;
+            if (n < ANOMALY_MIN_DAYS) return;
+
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            if (!stdDev) return;
+
+            const format = ANOMALY_FORMATTERS[key] || ((v) => v);
+
+            values.forEach((v, i) => {
+                const z = (v - mean) / stdDev;
+                if (Math.abs(z) >= ANOMALY_Z_THRESHOLD) {
+                    anomalies.push({
+                        metric: ANOMALY_METRIC_LABELS[key] || key,
+                        date: labels[i],
+                        valueText: format(v),
+                        meanText: format(mean),
+                        z,
+                        direction: z > 0 ? "spike" : "drop"
+                    });
+                }
+            });
+        });
+
+        anomalies.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+        return anomalies;
+    }
+
+    function buildAnomalyInsights(labels, series) {
+        return detectAnomalies(labels, series)
+            .slice(0, 2)
+            .map((a) => {
+                const verb = a.direction === "spike" ? "spiked" : "dropped";
+                return `${a.metric} ${verb} on ${a.date} (${a.valueText} vs a typical ${a.meanText} for this period) — there might have been an external event, promotion, or outage around that date worth checking.`;
+            });
+    }
+
+    /* ==========================================================
        Per-day-per-source rows -> Session Source table +
        Traffic Sources doughnut. Aggregates matching rows within
        the range into one row per sourceMedium.
     ========================================================== */
 
-    function filterSourcesRange(sourceRows, rangeKey) {
+    function filterSourcesRange(sourceRows, rangeKey, customRange) {
 
-        const { start, end } = resolveRange(rangeKey);
+        const { start, end } = resolveRange(rangeKey, customRange);
         const inWindow = sourceRows.filter((r) => inRange(r.date, start, end));
 
         const totals = {};
@@ -324,6 +466,9 @@ window.THD = window.THD || {};
         loadLandingPages,
         classifySourceChannel,
         deriveTrafficBreakdown,
+        buildInsights,
+        detectAnomalies,
+        buildAnomalyInsights,
         resolveRange,
         filterDailyRange,
         filterSourcesRange

@@ -275,6 +275,45 @@ select:focus{
 
 }
 
+.customRangeInputs{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+}
+
+.customRangeInputs input[type="date"]{
+
+    background:white;
+
+    border:1px solid var(--border);
+
+    border-radius:12px;
+
+    padding:11px 14px;
+
+    font-size:14px;
+
+    font-family:inherit;
+
+    color:var(--text);
+
+    transition:.25s;
+
+}
+
+.customRangeInputs input[type="date"]:hover,
+.customRangeInputs input[type="date"]:focus{
+
+    outline:none;
+
+    border-color:var(--primary);
+
+}
+
 
 /* ==========================================================
    Cards

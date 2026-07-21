@@ -94,6 +94,22 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Key Insights
+    ========================================================== */
+
+    function renderInsights(insights) {
+        const container = document.querySelector(".insightCard ul");
+        if (!container) return;
+
+        if (!insights || !insights.length) {
+            container.innerHTML = `<li>Not enough data yet to generate insights for this period.</li>`;
+            return;
+        }
+
+        container.innerHTML = insights.map((text) => `<li>${text}</li>`).join("");
+    }
+
+    /* ==========================================================
        Traffic Legend
     ========================================================== */
 
@@ -104,7 +120,15 @@ window.THD = window.THD || {};
         container.innerHTML = items.map((item) => `
             <div class="legendItem">
                 <span class="legendColor" style="background:${item.color}"></span>
-                ${item.label}
+                <div class="legendItemBody">
+                    <div class="legendItemTop">
+                        <span>${item.label}</span>
+                        <strong>${item.percent}%</strong>
+                    </div>
+                    <div class="legendItemMeta">
+                        ${fmtNumber(item.sessions)} sessions · ${fmtYen(item.revenue)} · ${fmtPercent(item.cvr)} CVR
+                    </div>
+                </div>
             </div>
         `).join("");
     }
@@ -245,9 +269,52 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Sidebar Navigation
+       Sections are grouped into <div class="dashboardView"
+       data-view="...">; a click on a nav link shows only the
+       divs whose data-view matches (a view can have more than
+       one div, since related sections aren't always contiguous
+       in the markup — e.g. Key Insights sits between two
+       Traffic sections but belongs to Overview).
+    ========================================================== */
+
+    function wireSidebarNav() {
+        const links = document.querySelectorAll(".sidebarMenu a[data-view]");
+        const views = document.querySelectorAll(".dashboardView");
+        if (!links.length || !views.length) return;
+
+        const HEADER_TEXT = {
+            overview: ["Dashboard Overview", "Marketing performance at a glance"],
+            traffic: ["Traffic", "Where sessions are coming from"],
+            sales: ["Sales", "Revenue, orders, and repeat purchase performance"],
+            products: ["Products", "Per-product performance"],
+            settings: ["Settings", "Dashboard preferences"]
+        };
+        const titleEl = document.getElementById("pageTitle");
+        const subtitleEl = document.getElementById("pageSubtitle");
+
+        links.forEach((link) => {
+            link.addEventListener("click", (e) => {
+                e.preventDefault();
+                const target = link.dataset.view;
+
+                links.forEach((l) => l.classList.toggle("active", l === link));
+                views.forEach((v) => v.classList.toggle("viewHidden", v.dataset.view !== target));
+
+                const text = HEADER_TEXT[target];
+                if (text) {
+                    if (titleEl) titleEl.textContent = text[0];
+                    if (subtitleEl) subtitleEl.textContent = text[1];
+                }
+            });
+        });
+    }
+
     THD.ui = {
         renderLastUpdate,
         renderKpis,
+        renderInsights,
         renderLandingPages,
         renderTrafficLegend,
         renderSourceTable,
@@ -256,7 +323,8 @@ window.THD = window.THD || {};
         renderNewRepeatTable,
         getCheckedMetrics,
         wireMetricToggles,
-        wireRefreshButton
+        wireRefreshButton,
+        wireSidebarNav
     };
 
 })(window.THD);

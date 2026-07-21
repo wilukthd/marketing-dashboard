@@ -18,12 +18,15 @@ window.THD = window.THD || {};
 
     // Colors match each metric's KPI card accent, so the chart
     // and the cards above it read as the same visual language.
+    // Hues spread ~72° apart around the wheel (blue / orange / green /
+    // magenta / purple) so no two lines read as "the same color family"
+    // when several are stacked together — unlike the old cyan+blue pair.
     const METRIC_CONFIG = {
-        users: { label: "Total Users", color: "#06B6D4", format: (v) => Math.round(v).toLocaleString("en-US") },
-        sessions: { label: "Sessions", color: "#8B5CF6", format: (v) => Math.round(v).toLocaleString("en-US") },
-        purchases: { label: "Ecommerce Purchases", color: "#10B981", format: (v) => Math.round(v).toLocaleString("en-US") },
-        revenue: { label: "Total Revenue", color: "#2563EB", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
-        cvr: { label: "CVR", color: "#F59E0B", format: (v) => v.toFixed(2) + "%" }
+        users: { label: "Total Users", color: "#2563EB", format: (v) => Math.round(v).toLocaleString("en-US") },
+        sessions: { label: "Sessions", color: "#EA580C", format: (v) => Math.round(v).toLocaleString("en-US") },
+        purchases: { label: "Ecommerce Purchases", color: "#16A34A", format: (v) => Math.round(v).toLocaleString("en-US") },
+        revenue: { label: "Total Revenue", color: "#DB2777", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
+        cvr: { label: "CVR", color: "#7C3AED", format: (v) => v.toFixed(2) + "%" }
     };
 
     Chart.defaults.font.family = "'Inter', sans-serif";
@@ -116,17 +119,41 @@ window.THD = window.THD || {};
        Traffic Sources (doughnut)
     ========================================================== */
 
-    function renderTrafficChart(labels, values) {
+    function renderTrafficChart(channels, totalSessions) {
 
         const canvas = document.getElementById("trafficChart");
-        if (!canvas) return;
+        if (!canvas) return [];
 
-        const palette = ["#2563EB", "#10B981", "#F59E0B", "#06B6D4", "#8B5CF6", "#EF4444"];
+        const labels = channels.map((c) => c.label);
+        const values = channels.map((c) => c.percent);
+        const palette = ["#2563EB", "#16A34A", "#EA580C", "#7C3AED", "#DB2777", "#6B7280"];
 
         if (trafficChartInstance) {
             trafficChartInstance.destroy();
             trafficChartInstance = null;
         }
+
+        // Draws the running total in the doughnut's hole so the empty
+        // center carries information instead of being dead space.
+        const centerTextPlugin = {
+            id: "trafficCenterText",
+            afterDraw(chart) {
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                const cx = (chartArea.left + chartArea.right) / 2;
+                const cy = (chartArea.top + chartArea.bottom) / 2;
+                ctx.save();
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#111827";
+                ctx.font = "700 22px 'Inter', sans-serif";
+                ctx.fillText(Math.round(totalSessions || 0).toLocaleString("en-US"), cx, cy - 10);
+                ctx.fillStyle = COLORS.textLight;
+                ctx.font = "500 12px 'Inter', sans-serif";
+                ctx.fillText("Sessions", cx, cy + 12);
+                ctx.restore();
+            }
+        };
 
         trafficChartInstance = new Chart(canvas.getContext("2d"), {
             type: "doughnut",
@@ -155,10 +182,11 @@ window.THD = window.THD || {};
                         }
                     }
                 }
-            }
+            },
+            plugins: [centerTextPlugin]
         });
 
-        return labels.map((label, i) => ({ label, color: palette[i % palette.length] }));
+        return channels.map((c, i) => ({ ...c, color: palette[i % palette.length] }));
     }
 
     THD.charts = {

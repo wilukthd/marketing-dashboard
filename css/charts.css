@@ -138,7 +138,9 @@
 
     display:flex;
 
-    gap:20px;
+    flex-direction:column;
+
+    gap:14px;
 
     margin-top:20px;
 
@@ -216,7 +218,7 @@
 
     display:flex;
 
-    align-items:center;
+    align-items:flex-start;
 
     gap:10px;
 
@@ -233,6 +235,44 @@
     height:12px;
 
     border-radius:50%;
+
+    margin-top:5px;
+
+    flex-shrink:0;
+
+}
+
+.legendItemBody{
+
+    flex:1;
+
+    min-width:0;
+
+}
+
+.legendItemTop{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    color:var(--text);
+
+    font-weight:600;
+
+    font-size:14px;
+
+}
+
+.legendItemMeta{
+
+    color:var(--text-light);
+
+    font-size:12.5px;
+
+    margin-top:2px;
 
 }
 
@@ -275,6 +315,60 @@
     height:350px;
 
     color:var(--text-light);
+
+}
+
+.viewHidden{
+
+    display:none !important;
+
+}
+
+.emptyState{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    justify-content:center;
+
+    text-align:center;
+
+    gap:10px;
+
+    padding:80px 20px;
+
+    color:var(--text-light);
+
+}
+
+.emptyState i{
+
+    width:36px;
+
+    height:36px;
+
+    color:var(--primary);
+
+    opacity:.6;
+
+}
+
+.emptyState h3{
+
+    color:var(--text);
+
+    font-size:17px;
+
+}
+
+.emptyState p{
+
+    max-width:360px;
+
+    font-size:14px;
 
 }
 

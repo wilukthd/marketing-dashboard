@@ -54,7 +54,7 @@ SIDEBAR
 
         <nav class="sidebarMenu">
 
-            <a href="#" class="active">
+            <a href="#" class="active" data-view="overview">
 
                 <i data-lucide="layout-dashboard"></i>
 
@@ -62,7 +62,7 @@ SIDEBAR
 
             </a>
 
-            <a href="#">
+            <a href="#" data-view="traffic">
 
                 <i data-lucide="activity"></i>
 
@@ -70,7 +70,7 @@ SIDEBAR
 
             </a>
 
-            <a href="#">
+            <a href="#" data-view="sales">
 
                 <i data-lucide="shopping-cart"></i>
 
@@ -78,7 +78,7 @@ SIDEBAR
 
             </a>
 
-            <a href="#">
+            <a href="#" data-view="products">
 
                 <i data-lucide="package"></i>
 
@@ -86,7 +86,7 @@ SIDEBAR
 
             </a>
 
-            <a href="#">
+            <a href="#" data-view="settings">
 
                 <i data-lucide="settings"></i>
 
@@ -124,13 +124,13 @@ MAIN
 
     <div>
 
-        <h2>
+        <h2 id="pageTitle">
 
             Dashboard Overview
 
         </h2>
 
-        <p>
+        <p id="pageSubtitle">
 
             Marketing performance at a glance
 
@@ -180,7 +180,11 @@ MAIN
 
         <option value="14d">Last 14 Days</option>
 
+        <option value="30d">Last 30 Days</option>
+
         <option value="month" selected>This Month</option>
+
+        <option value="lastMonth">Last Month</option>
 
         <option value="3m">3 Months</option>
 
@@ -188,7 +192,19 @@ MAIN
 
         <option value="year">This Year</option>
 
+        <option value="custom">Custom Range</option>
+
     </select>
+
+    <div class="customRangeInputs" id="customRangeInputs" style="display:none;">
+
+        <input type="date" id="customStartDate">
+
+        <input type="date" id="customEndDate">
+
+        <button class="secondaryButton" id="applyCustomRange">Apply</button>
+
+    </div>
 
     <select>
 
@@ -211,6 +227,8 @@ MAIN
 </section>
 
 
+
+<div class="dashboardView" data-view="overview">
 
 <!-- ================= KPI ================= -->
 
@@ -398,52 +416,6 @@ MAIN
 
 
 
-<!-- ================= INSIGHTS ================= -->
-
-<section class="insightCard">
-
-    <div class="sectionTitle">
-
-        <h3>
-
-            Key Insights
-
-        </h3>
-
-    </div>
-
-    <ul>
-
-        <li>
-
-            Revenue increased by <strong>8.2%</strong> compared to the previous period.
-
-        </li>
-
-        <li>
-
-            Google CPC generated <strong>29%</strong> of total revenue.
-
-        </li>
-
-        <li>
-
-            Organic Search traffic decreased by <strong>12%</strong>.
-
-        </li>
-
-        <li>
-
-            Mobile conversion rate improved this month.
-
-        </li>
-
-    </ul>
-
-</section>
-
-
-
 <!-- ================= MAIN CHART ================= -->
 
 <section class="chartCard">
@@ -472,7 +444,7 @@ MAIN
 
                 <input type="checkbox" checked>
 
-                <span class="metricDot" style="background:#06B6D4"></span>
+                <span class="metricDot" style="background:#2563EB"></span>
 
                 Total Users
 
@@ -482,7 +454,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#8B5CF6"></span>
+                <span class="metricDot" style="background:#EA580C"></span>
 
                 Sessions
 
@@ -492,7 +464,7 @@ MAIN
 
                 <input type="checkbox" checked>
 
-                <span class="metricDot" style="background:#10B981"></span>
+                <span class="metricDot" style="background:#16A34A"></span>
 
                 Ecommerce Purchases
 
@@ -502,7 +474,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#2563EB"></span>
+                <span class="metricDot" style="background:#DB2777"></span>
 
                 Total Revenue
 
@@ -512,7 +484,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#F59E0B"></span>
+                <span class="metricDot" style="background:#7C3AED"></span>
 
                 CVR
 
@@ -530,9 +502,13 @@ MAIN
 
 </section>
 
+</div>
+
 
 
 <!-- ================= TWO COLUMN ================= -->
+
+<div class="dashboardView viewHidden" data-view="traffic">
 
 <section class="twoColumn">
 
@@ -580,9 +556,41 @@ MAIN
 
 </section>
 
+</div>
+
+
+
+<!-- ================= INSIGHTS ================= -->
+
+<div class="dashboardView" data-view="overview">
+
+<section class="insightCard">
+
+    <div class="sectionTitle">
+
+        <h3>
+
+            Key Insights
+
+        </h3>
+
+    </div>
+
+    <ul>
+
+        <li>Loading insights…</li>
+
+    </ul>
+
+</section>
+
+</div>
+
 
 
 <!-- ================= SESSION SOURCE TABLE ================= -->
+
+<div class="dashboardView viewHidden" data-view="traffic">
 
 <section class="tableCard">
 
@@ -612,15 +620,15 @@ MAIN
 
                     <th>Session Source / Medium</th>
 
-                    <th>Sessions</th>
+                    <th class="number">Sessions</th>
 
-                    <th>Total Users</th>
+                    <th class="number">Total Users</th>
 
-                    <th>Ecommerce Purchases</th>
+                    <th class="number">Ecommerce Purchases</th>
 
-                    <th>Total Revenue</th>
+                    <th class="number">Total Revenue</th>
 
-                    <th>CVR</th>
+                    <th class="number">CVR</th>
 
                 </tr>
 
@@ -636,9 +644,13 @@ MAIN
 
 </section>
 
+</div>
+
 
 
 <!-- ================= TABLE ================= -->
+
+<div class="dashboardView viewHidden" data-view="sales">
 
 <section class="tableCard">
 
@@ -662,13 +674,13 @@ MAIN
 
                     <th>Month</th>
 
-                    <th>Revenue</th>
+                    <th class="number">Revenue</th>
 
-                    <th>Orders</th>
+                    <th class="number">Orders</th>
 
-                    <th>Users</th>
+                    <th class="number">Users</th>
 
-                    <th>CVR</th>
+                    <th class="number">CVR</th>
 
                     <th>Trend</th>
 
@@ -710,7 +722,7 @@ MAIN
 
     <div class="tableResponsive">
 
-        <table class="modernTable">
+        <table class="modernTable spreadsheetTable">
 
             <thead>
 
@@ -718,23 +730,23 @@ MAIN
 
                     <th>年度</th>
 
-                    <th>総合売上</th>
+                    <th class="number">総合売上</th>
 
-                    <th>総合受注件数</th>
+                    <th class="number">総合受注件数</th>
 
-                    <th>新規売上</th>
+                    <th class="number">新規売上</th>
 
-                    <th>新規受注件数</th>
+                    <th class="number">新規受注件数</th>
 
-                    <th>リピーター売上</th>
+                    <th class="number">リピーター売上</th>
 
-                    <th>リピーター受注件数</th>
+                    <th class="number">リピーター受注件数</th>
 
-                    <th>訪問者数：PC</th>
+                    <th class="number">訪問者数：PC</th>
 
-                    <th>訪問者数：SP</th>
+                    <th class="number">訪問者数：SP</th>
 
-                    <th>訪問者数：合計</th>
+                    <th class="number">訪問者数：合計</th>
 
                 </tr>
 
@@ -749,6 +761,52 @@ MAIN
     </div>
 
 </section>
+
+</div>
+
+
+
+<!-- ================= PRODUCTS (placeholder) ================= -->
+
+<div class="dashboardView viewHidden" data-view="products">
+
+<section class="chartCard">
+
+    <div class="emptyState">
+
+        <i data-lucide="package"></i>
+
+        <h3>Products view coming soon</h3>
+
+        <p>Per-SKU sales, stock, and performance data isn't wired up yet — let us know if you'd like this built out.</p>
+
+    </div>
+
+</section>
+
+</div>
+
+
+
+<!-- ================= SETTINGS (placeholder) ================= -->
+
+<div class="dashboardView viewHidden" data-view="settings">
+
+<section class="chartCard">
+
+    <div class="emptyState">
+
+        <i data-lucide="settings"></i>
+
+        <h3>Settings coming soon</h3>
+
+        <p>Account, data source, and notification preferences will live here.</p>
+
+    </div>
+
+</section>
+
+</div>
 
 </main>
 

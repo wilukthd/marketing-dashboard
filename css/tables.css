@@ -123,6 +123,35 @@
 }
 
 /* ==========================================================
+   Spreadsheet Column Groups (新規／リピータ table)
+   年度 | 総合(2) | 新規(2) | リピーター(2) | 訪問者数(3)
+   A visible divider before each group's first column makes the
+   wide row easier to scan without reading every header twice.
+========================================================== */
+
+.spreadsheetTable th:nth-child(2),
+.spreadsheetTable td:nth-child(2),
+.spreadsheetTable th:nth-child(4),
+.spreadsheetTable td:nth-child(4),
+.spreadsheetTable th:nth-child(6),
+.spreadsheetTable td:nth-child(6),
+.spreadsheetTable th:nth-child(8),
+.spreadsheetTable td:nth-child(8){
+
+    border-left:2px solid var(--border);
+
+}
+
+.spreadsheetTable td:nth-child(2),
+.spreadsheetTable td:nth-child(4),
+.spreadsheetTable td:nth-child(6),
+.spreadsheetTable td:nth-child(8){
+
+    background:#FBFCFE;
+
+}
+
+/* ==========================================================
    Number
 ========================================================== */
 

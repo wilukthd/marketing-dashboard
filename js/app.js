@@ -17,6 +17,7 @@
     let dailyRows = [];       // full daily GA4 rows (real or dummy), oldest -> newest
     let sourceRows = [];      // full per-day-per-source rows (real or dummy)
     let currentRange = "month";
+    let currentCustomRange = null; // { start: Date, end: Date }, only used when currentRange === "custom"
 
     /* ==========================================================
        Dummy Data (fallback when a live source isn't configured)
@@ -118,32 +119,61 @@
        already in memory — no re-fetch needed on range change.
     ========================================================== */
 
-    function renderForRange(rangeKey) {
+    function renderForRange(rangeKey, customRange) {
         currentRange = rangeKey;
+        currentCustomRange = rangeKey === "custom" ? customRange : null;
 
-        const filtered = THD.data.filterDailyRange(dailyRows, rangeKey);
+        const filtered = THD.data.filterDailyRange(dailyRows, rangeKey, currentCustomRange);
         THD.ui.renderKpis(filtered.kpi);
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
 
-        const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey);
+        const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey, currentCustomRange);
         THD.ui.renderSourceTable(sourcesInRange);
 
         const traffic = THD.data.deriveTrafficBreakdown(sourcesInRange);
-        const legendItems = THD.charts.renderTrafficChart(traffic.labels, traffic.values);
+        const legendItems = THD.charts.renderTrafficChart(traffic.channels, traffic.totalSessions);
         THD.ui.renderTrafficLegend(legendItems);
+
+        THD.ui.renderInsights([
+            ...THD.data.buildInsights(filtered.kpi, traffic.channels),
+            ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
+        ]);
     }
 
     function renderTrendOnly() {
-        const filtered = THD.data.filterDailyRange(dailyRows, currentRange);
+        const filtered = THD.data.filterDailyRange(dailyRows, currentRange, currentCustomRange);
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
     }
 
+    // "Custom Range" needs two dates before it can render anything, so
+    // selecting it just reveals the pickers; rendering happens on Apply.
+    // Every other option renders immediately and hides the pickers.
     function wireDateRange() {
         const select = document.getElementById("dateRangeSelect");
+        const customInputs = document.getElementById("customRangeInputs");
+        const startInput = document.getElementById("customStartDate");
+        const endInput = document.getElementById("customEndDate");
+        const applyBtn = document.getElementById("applyCustomRange");
         if (!select) return;
+
         select.addEventListener("change", () => {
+            if (select.value === "custom") {
+                if (customInputs) customInputs.style.display = "flex";
+                return;
+            }
+            if (customInputs) customInputs.style.display = "none";
             renderForRange(select.value);
         });
+
+        if (applyBtn) {
+            applyBtn.addEventListener("click", () => {
+                if (!startInput.value || !endInput.value) return;
+                const start = new Date(startInput.value);
+                const end = new Date(endInput.value);
+                if (start > end) return;
+                renderForRange("custom", { start, end });
+            });
+        }
     }
 
     /* ==========================================================
@@ -156,6 +186,7 @@
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
+        THD.ui.wireSidebarNav();
         wireDateRange();
 
         await loadAndRenderAll();
@@ -177,7 +208,7 @@
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
         const landingPages = liveLandingPages && liveLandingPages.length ? liveLandingPages : DUMMY_LANDING_PAGES;
 
-        renderForRange(currentRange);
+        renderForRange(currentRange, currentCustomRange);
 
         THD.ui.renderLandingPages(landingPages);
         THD.ui.renderMonthlyTable(DUMMY_MONTHLY);
