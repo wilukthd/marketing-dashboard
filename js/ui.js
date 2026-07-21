@@ -279,7 +279,7 @@ window.THD = window.THD || {};
        Traffic sections but belongs to Overview).
     ========================================================== */
 
-    function wireSidebarNav() {
+    function wireSidebarNav(onSwitch) {
         const links = document.querySelectorAll(".sidebarMenu a[data-view]");
         const views = document.querySelectorAll(".dashboardView");
         if (!links.length || !views.length) return;
@@ -307,6 +307,11 @@ window.THD = window.THD || {};
                     if (titleEl) titleEl.textContent = text[0];
                     if (subtitleEl) subtitleEl.textContent = text[1];
                 }
+
+                // Charts inside the newly-shown view were sized while
+                // hidden and need a beat for layout to settle before
+                // they can correctly measure their container.
+                if (onSwitch) requestAnimationFrame(() => requestAnimationFrame(onSwitch));
             });
         });
     }

@@ -189,9 +189,19 @@ window.THD = window.THD || {};
         return channels.map((c, i) => ({ ...c, color: palette[i % palette.length] }));
     }
 
+    // Charts created while their tab is hidden (display:none) get stuck
+    // at Chart.js's zero-size fallback, since nothing tells them to
+    // remeasure once the container becomes visible again. Call this
+    // right after a tab switch to fix that.
+    function resizeCharts() {
+        if (trendChartInstance) trendChartInstance.resize();
+        if (trafficChartInstance) trafficChartInstance.resize();
+    }
+
     THD.charts = {
         renderTrendChart,
-        renderTrafficChart
+        renderTrafficChart,
+        resizeCharts
     };
 
 })(window.THD);

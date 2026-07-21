@@ -186,7 +186,7 @@
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
-        THD.ui.wireSidebarNav();
+        THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         wireDateRange();
 
         await loadAndRenderAll();
