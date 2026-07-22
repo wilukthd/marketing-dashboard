@@ -1,0 +1,93 @@
+/* ==========================================================
+   THD Analytics
+   Dark Theme
+   Activated via [data-theme="dark"] on <html> (see the inline
+   script in <head> and js/ui.js:wireThemeToggle).
+
+   Most of the app is already built on CSS variables (--surface,
+   --border, --text, etc.), so overriding those here re-themes
+   the majority of the UI for free. What's left below is the
+   handful of places in the original stylesheets that used a
+   literal white/near-white value instead of a variable.
+========================================================== */
+
+[data-theme="dark"]{
+
+    --primary-light:#1E3A6E;
+    --success-light:#14331F;
+    --danger-light:#3F1D1D;
+    --warning-light:#3F2F0F;
+
+    --bg:#0F172A;
+    --surface:#1E293B;
+
+    --border:#334155;
+
+    --text:#F1F5F9;
+    --text-light:#94A3B8;
+
+    --shadow-sm:0 1px 3px rgba(0,0,0,.35);
+    --shadow-md:0 8px 24px rgba(0,0,0,.4);
+    --shadow-lg:0 20px 40px rgba(0,0,0,.5);
+
+}
+
+/* Components that used a literal white/near-white background
+   instead of var(--surface) in the base stylesheets. */
+[data-theme="dark"] .chartCard,
+[data-theme="dark"] .tableCard,
+[data-theme="dark"] .chartMenu{
+
+    background:var(--surface);
+
+}
+
+[data-theme="dark"] .secondaryButton,
+[data-theme="dark"] select,
+[data-theme="dark"] .customRangeInputs input[type="date"]{
+
+    background:var(--surface);
+    color:var(--text);
+    border-color:var(--border);
+
+}
+
+[data-theme="dark"] .chartBadge{
+
+    background:#1E3A6E;
+    color:#BFDBFE;
+
+}
+
+[data-theme="dark"] .modernTable thead{
+
+    background:#151F30;
+
+}
+
+[data-theme="dark"] .modernTable tbody tr:nth-child(even){
+
+    background:#19233A;
+
+}
+
+[data-theme="dark"] .modernTable tbody tr:hover{
+
+    background:#24365B;
+
+}
+
+[data-theme="dark"] .spreadsheetTable td:nth-child(2),
+[data-theme="dark"] .spreadsheetTable td:nth-child(4),
+[data-theme="dark"] .spreadsheetTable td:nth-child(6),
+[data-theme="dark"] .spreadsheetTable td:nth-child(8){
+
+    background:#182238;
+
+}
+
+[data-theme="dark"] .rangeCompareBar{
+
+    background:#1E3A6E;
+
+}

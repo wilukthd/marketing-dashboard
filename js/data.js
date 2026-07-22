@@ -383,6 +383,23 @@ window.THD = window.THD || {};
         cvr: (v) => v.toFixed(2) + "%"
     };
 
+    // Today's row is still accumulating live traffic, so it always
+    // reads as a drop relative to any finished day — not a real
+    // anomaly. Strip it before anomaly detection only; KPI totals
+    // still include today, since "This Month" etc. should naturally
+    // include today-so-far like any other dashboard.
+    function excludeToday(labels, series) {
+        const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        if (!labels.length || labels[labels.length - 1] !== todayLabel) {
+            return { labels, series };
+        }
+        const trimmedSeries = {};
+        Object.keys(series).forEach((key) => {
+            trimmedSeries[key] = series[key].slice(0, -1);
+        });
+        return { labels: labels.slice(0, -1), series: trimmedSeries };
+    }
+
     function detectAnomalies(labels, series) {
         const anomalies = [];
 
@@ -418,7 +435,8 @@ window.THD = window.THD || {};
     }
 
     function buildAnomalyInsights(labels, series) {
-        return detectAnomalies(labels, series)
+        const trimmed = excludeToday(labels, series);
+        return detectAnomalies(trimmed.labels, trimmed.series)
             .slice(0, 2)
             .map((a) => {
                 const verb = a.direction === "spike" ? "spiked" : "dropped";

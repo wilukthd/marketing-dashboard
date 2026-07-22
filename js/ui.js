@@ -17,6 +17,32 @@ window.THD = window.THD || {};
     const fmtNumber = (n) => Math.round(n).toLocaleString("en-US");
     const fmtPercent = (n) => n.toFixed(2) + "%";
     const fmtDelta = (n) => (n > 0 ? "▲ " : n < 0 ? "▼ " : "– ") + Math.abs(n).toFixed(1) + "%";
+    const fmtISODate = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}/${m}/${day}`;
+    };
+
+    /* ==========================================================
+       Range Comparison Bar
+       Spells out the exact two date windows behind whatever the
+       KPI cards are currently comparing, since "This Month" alone
+       doesn't say what it's being measured against.
+    ========================================================== */
+
+    function renderRangeCompare(range) {
+        const el = document.getElementById("rangeCompareBar");
+        if (!el || !range) return;
+
+        el.innerHTML = `
+            <i data-lucide="calendar-range"></i>
+            Looking at <strong>${fmtISODate(range.start)} – ${fmtISODate(range.end)}</strong>
+            <span class="rangeVs">vs previous period</span>
+            <strong>${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}</strong>
+        `;
+        if (window.lucide) lucide.createIcons();
+    }
 
     /* ==========================================================
        Last Update
@@ -107,6 +133,117 @@ window.THD = window.THD || {};
         }
 
         container.innerHTML = insights.map((text) => `<li>${text}</li>`).join("");
+    }
+
+    /* ==========================================================
+       Dark Theme Toggle
+       The actual dark/light attribute + localStorage persistence
+       is handled here; onToggle lets app.js re-render charts
+       afterward, since Chart.js colors are baked in at creation
+       time and won't update on their own.
+    ========================================================== */
+
+    function wireThemeToggle(onToggle) {
+        const checkbox = document.getElementById("darkThemeToggle");
+        if (!checkbox) return;
+
+        checkbox.checked = document.documentElement.getAttribute("data-theme") === "dark";
+
+        checkbox.addEventListener("change", () => {
+            const isDark = checkbox.checked;
+            document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+            try {
+                localStorage.setItem("thd-theme", isDark ? "dark" : "light");
+            } catch (e) {
+                // Private browsing / storage disabled — theme just won't persist across reloads.
+            }
+            if (onToggle) onToggle();
+        });
+    }
+
+    /* ==========================================================
+       Notes
+       A simple dated remarks log, kept in localStorage since
+       there's no backend — meant for things like "discussed
+       re-pricing X after the Q3 review" rather than analytics.
+    ========================================================== */
+
+    const NOTES_KEY = "thd-notes";
+
+    function loadNotes() {
+        try {
+            return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveNotes(notes) {
+        try {
+            localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+        } catch (e) {
+            // Private browsing / storage disabled — notes just won't persist across reloads.
+        }
+    }
+
+    function renderNotesList(notes) {
+        const container = document.getElementById("notesList");
+        if (!container) return;
+
+        if (!notes.length) {
+            container.innerHTML = `<p class="notesEmpty">No notes yet — add one above.</p>`;
+            return;
+        }
+
+        container.innerHTML = notes.map((n) => `
+            <div class="noteItem" data-id="${n.id}">
+                <div class="noteItemBody">
+                    <div class="noteItemDate">${new Date(n.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                    <div class="noteItemText"></div>
+                </div>
+                <button class="noteDeleteBtn" data-id="${n.id}" title="Delete note">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        `).join("");
+
+        // Set text via textContent (not template interpolation) so a
+        // note containing HTML-looking text can't inject markup.
+        container.querySelectorAll(".noteItem").forEach((el) => {
+            const id = el.dataset.id;
+            const note = notes.find((n) => String(n.id) === id);
+            const textEl = el.querySelector(".noteItemText");
+            if (note && textEl) textEl.textContent = note.text;
+        });
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function wireNotes() {
+        const input = document.getElementById("noteInput");
+        const addBtn = document.getElementById("addNoteBtn");
+        const list = document.getElementById("notesList");
+        if (!input || !addBtn || !list) return;
+
+        let notes = loadNotes();
+        renderNotesList(notes);
+
+        addBtn.addEventListener("click", () => {
+            const text = input.value.trim();
+            if (!text) return;
+            notes = [{ id: Date.now(), text, createdAt: Date.now() }, ...notes];
+            saveNotes(notes);
+            renderNotesList(notes);
+            input.value = "";
+        });
+
+        list.addEventListener("click", (e) => {
+            const btn = e.target.closest(".noteDeleteBtn");
+            if (!btn) return;
+            notes = notes.filter((n) => String(n.id) !== btn.dataset.id);
+            saveNotes(notes);
+            renderNotesList(notes);
+        });
     }
 
     /* ==========================================================
@@ -288,7 +425,7 @@ window.THD = window.THD || {};
             overview: ["Dashboard Overview", "Marketing performance at a glance"],
             traffic: ["Traffic", "Where sessions are coming from"],
             sales: ["Sales", "Revenue, orders, and repeat purchase performance"],
-            products: ["Products", "Per-product performance"],
+            notes: ["Notes", "Remarks and discussion history"],
             settings: ["Settings", "Dashboard preferences"]
         };
         const titleEl = document.getElementById("pageTitle");
@@ -320,6 +457,7 @@ window.THD = window.THD || {};
         renderLastUpdate,
         renderKpis,
         renderInsights,
+        renderRangeCompare,
         renderLandingPages,
         renderTrafficLegend,
         renderSourceTable,
@@ -329,7 +467,9 @@ window.THD = window.THD || {};
         getCheckedMetrics,
         wireMetricToggles,
         wireRefreshButton,
-        wireSidebarNav
+        wireSidebarNav,
+        wireThemeToggle,
+        wireNotes
     };
 
 })(window.THD);

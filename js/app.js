@@ -125,6 +125,7 @@
 
         const filtered = THD.data.filterDailyRange(dailyRows, rangeKey, currentCustomRange);
         THD.ui.renderKpis(filtered.kpi);
+        THD.ui.renderRangeCompare(THD.data.resolveRange(rangeKey, currentCustomRange));
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
 
         const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey, currentCustomRange);
@@ -187,6 +188,8 @@
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
+        THD.ui.wireThemeToggle(() => renderForRange(currentRange, currentCustomRange));
+        THD.ui.wireNotes();
         wireDateRange();
 
         await loadAndRenderAll();

@@ -228,6 +228,46 @@
 
 }
 
+.rangeCompareBar{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    background:var(--primary-light);
+
+    color:var(--primary);
+
+    border-radius:12px;
+
+    padding:12px 18px;
+
+    font-size:13.5px;
+
+    font-weight:500;
+
+    margin-top:-16px;
+
+    margin-bottom:28px;
+
+}
+
+.rangeCompareBar strong{
+
+    font-weight:700;
+
+}
+
+.rangeCompareBar .rangeVs{
+
+    color:var(--text-light);
+
+    font-weight:500;
+
+}
+
 
 /* ==========================================================
    Section Title
@@ -587,5 +627,269 @@
         padding:20px 16px 96px;
 
     }
+
+}
+
+/* ==========================================================
+   Settings Row + Theme Switch
+========================================================== */
+
+.settingRow{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    gap:20px;
+
+    padding:6px 0;
+
+}
+
+.settingLabel{
+
+    font-weight:600;
+
+    color:var(--text);
+
+    margin-bottom:4px;
+
+}
+
+.settingDesc{
+
+    color:var(--text-light);
+
+    font-size:13.5px;
+
+    max-width:420px;
+
+}
+
+.themeSwitch{
+
+    position:relative;
+
+    display:inline-block;
+
+    width:46px;
+
+    height:26px;
+
+    flex-shrink:0;
+
+}
+
+.themeSwitch input{
+
+    opacity:0;
+
+    width:0;
+
+    height:0;
+
+}
+
+.themeSwitchTrack{
+
+    position:absolute;
+
+    cursor:pointer;
+
+    inset:0;
+
+    background:var(--border);
+
+    border-radius:30px;
+
+    transition:.25s;
+
+}
+
+.themeSwitchTrack::before{
+
+    content:"";
+
+    position:absolute;
+
+    width:20px;
+
+    height:20px;
+
+    left:3px;
+
+    top:3px;
+
+    background:#FFFFFF;
+
+    border-radius:50%;
+
+    transition:.25s;
+
+    box-shadow:var(--shadow-sm);
+
+}
+
+.themeSwitch input:checked + .themeSwitchTrack{
+
+    background:var(--primary);
+
+}
+
+.themeSwitch input:checked + .themeSwitchTrack::before{
+
+    transform:translateX(20px);
+
+}
+
+/* ==========================================================
+   Notes
+========================================================== */
+
+.notesSubtitle{
+
+    color:var(--text-light);
+
+    font-size:14px;
+
+    margin:8px 0 16px;
+
+}
+
+.noteInput{
+
+    width:100%;
+
+    resize:vertical;
+
+    min-height:70px;
+
+    border:1px solid var(--border);
+
+    border-radius:12px;
+
+    padding:14px;
+
+    font-family:inherit;
+
+    font-size:14px;
+
+    color:var(--text);
+
+    background:var(--surface);
+
+}
+
+.noteInput:focus{
+
+    outline:none;
+
+    border-color:var(--primary);
+
+}
+
+.noteActions{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    margin-top:14px;
+
+}
+
+.notesList{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:12px;
+
+}
+
+.notesEmpty{
+
+    color:var(--text-light);
+
+    font-size:14px;
+
+}
+
+.noteItem{
+
+    display:flex;
+
+    align-items:flex-start;
+
+    justify-content:space-between;
+
+    gap:12px;
+
+    padding:14px 16px;
+
+    border:1px solid var(--border);
+
+    border-radius:12px;
+
+}
+
+.noteItemDate{
+
+    color:var(--text-light);
+
+    font-size:12.5px;
+
+    margin-bottom:4px;
+
+}
+
+.noteItemText{
+
+    color:var(--text);
+
+    font-size:14px;
+
+    white-space:pre-wrap;
+
+    word-break:break-word;
+
+}
+
+.noteDeleteBtn{
+
+    background:none;
+
+    border:none;
+
+    cursor:pointer;
+
+    color:var(--text-light);
+
+    padding:4px;
+
+    border-radius:8px;
+
+    flex-shrink:0;
+
+    display:flex;
+
+}
+
+.noteDeleteBtn:hover{
+
+    background:var(--danger-light);
+
+    color:var(--danger);
+
+}
+
+.noteDeleteBtn svg{
+
+    width:16px;
+
+    height:16px;
 
 }

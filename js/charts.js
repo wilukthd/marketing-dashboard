@@ -11,10 +11,18 @@ window.THD = window.THD || {};
     let trendChartInstance = null;
     let trafficChartInstance = null;
 
-    const COLORS = {
-        grid: "#F1F5F9",
-        textLight: "#6B7280"
-    };
+    // Read fresh at render time (not cached) so charts pick up the
+    // right palette whether they're being created for the first time
+    // or re-rendered after a dark/light theme toggle.
+    function getChartColors() {
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        return {
+            grid: dark ? "#334155" : "#F1F5F9",
+            textLight: dark ? "#94A3B8" : "#6B7280",
+            text: dark ? "#F1F5F9" : "#111827",
+            surface: dark ? "#1E293B" : "#FFFFFF"
+        };
+    }
 
     // Colors match each metric's KPI card accent, so the chart
     // and the cards above it read as the same visual language.
@@ -30,7 +38,6 @@ window.THD = window.THD || {};
     };
 
     Chart.defaults.font.family = "'Inter', sans-serif";
-    Chart.defaults.color = COLORS.textLight;
 
     /* ==========================================================
        Trend Chart
@@ -45,6 +52,8 @@ window.THD = window.THD || {};
 
         const canvas = document.getElementById("trendChart");
         if (!canvas) return;
+
+        const colors = getChartColors();
 
         if (trendChartInstance) {
             trendChartInstance.destroy();
@@ -74,7 +83,7 @@ window.THD = window.THD || {};
         const scales = {
             x: {
                 grid: { display: false },
-                ticks: { maxTicksLimit: 8 }
+                ticks: { maxTicksLimit: 8, color: colors.textLight }
             }
         };
 
@@ -83,9 +92,9 @@ window.THD = window.THD || {};
             scales[`y_${key}`] = {
                 position: i % 2 === 0 ? "left" : "right",
                 display: i < 2,
-                grid: { display: i === 0, color: COLORS.grid },
+                grid: { display: i === 0, color: colors.grid },
                 border: { display: false },
-                ticks: { callback: (v) => cfg.format(v) }
+                ticks: { callback: (v) => cfg.format(v), color: colors.textLight }
             };
         });
 
@@ -127,6 +136,7 @@ window.THD = window.THD || {};
         const labels = channels.map((c) => c.label);
         const values = channels.map((c) => c.percent);
         const palette = ["#2563EB", "#16A34A", "#EA580C", "#7C3AED", "#DB2777", "#6B7280"];
+        const colors = getChartColors();
 
         if (trafficChartInstance) {
             trafficChartInstance.destroy();
@@ -145,10 +155,10 @@ window.THD = window.THD || {};
                 ctx.save();
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillStyle = "#111827";
+                ctx.fillStyle = colors.text;
                 ctx.font = "700 22px 'Inter', sans-serif";
                 ctx.fillText(Math.round(totalSessions || 0).toLocaleString("en-US"), cx, cy - 10);
-                ctx.fillStyle = COLORS.textLight;
+                ctx.fillStyle = colors.textLight;
                 ctx.font = "500 12px 'Inter', sans-serif";
                 ctx.fillText("Sessions", cx, cy + 12);
                 ctx.restore();
@@ -162,7 +172,7 @@ window.THD = window.THD || {};
                 datasets: [{
                     data: values,
                     backgroundColor: palette,
-                    borderColor: "#FFFFFF",
+                    borderColor: colors.surface,
                     borderWidth: 3,
                     hoverOffset: 6
                 }]

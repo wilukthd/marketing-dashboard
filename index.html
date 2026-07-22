@@ -8,6 +8,18 @@
 
     <title>THD Analytics Dashboard</title>
 
+    <!-- Applied before any CSS paints, so a saved dark-mode
+         preference doesn't flash light-then-dark on load. -->
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem("thd-theme") === "dark") {
+                    document.documentElement.setAttribute("data-theme", "dark");
+                }
+            } catch (e) {}
+        })();
+    </script>
+
     <!-- Google Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,6 +41,7 @@
     <link rel="stylesheet" href="css/cards.css">
     <link rel="stylesheet" href="css/charts.css">
     <link rel="stylesheet" href="css/tables.css">
+    <link rel="stylesheet" href="css/dark.css">
 
 </head>
 
@@ -78,11 +91,11 @@ SIDEBAR
 
             </a>
 
-            <a href="#" data-view="products">
+            <a href="#" data-view="notes">
 
-                <i data-lucide="package"></i>
+                <i data-lucide="sticky-note"></i>
 
-                <span>Products</span>
+                <span>Notes</span>
 
             </a>
 
@@ -225,6 +238,8 @@ MAIN
     </select>
 
 </section>
+
+<div class="rangeCompareBar" id="rangeCompareBar"></div>
 
 
 
@@ -766,19 +781,39 @@ MAIN
 
 
 
-<!-- ================= PRODUCTS (placeholder) ================= -->
+<!-- ================= NOTES ================= -->
 
-<div class="dashboardView viewHidden" data-view="products">
+<div class="dashboardView viewHidden" data-view="notes">
 
 <section class="chartCard">
 
-    <div class="emptyState">
+    <div class="chartHeader">
 
-        <i data-lucide="package"></i>
+        <h3>Team Notes</h3>
 
-        <h3>Products view coming soon</h3>
+    </div>
 
-        <p>Per-SKU sales, stock, and performance data isn't wired up yet — let us know if you'd like this built out.</p>
+    <p class="notesSubtitle">Jot down remarks from a discussion, a product observation, or anything worth remembering next time you're in the dashboard. Saved on this device.</p>
+
+    <textarea id="noteInput" class="noteInput" rows="3" placeholder="e.g. Discussed re-pricing the SP-14 bundle after the Q3 review — revisit next month."></textarea>
+
+    <div class="noteActions">
+
+        <button class="primaryButton" id="addNoteBtn">Add Note</button>
+
+    </div>
+
+</section>
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <h3>History</h3>
+
+    </div>
+
+    <div id="notesList" class="notesList">
 
     </div>
 
@@ -788,9 +823,39 @@ MAIN
 
 
 
-<!-- ================= SETTINGS (placeholder) ================= -->
+<!-- ================= SETTINGS ================= -->
 
 <div class="dashboardView viewHidden" data-view="settings">
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <h3>Appearance</h3>
+
+    </div>
+
+    <div class="settingRow">
+
+        <div>
+
+            <div class="settingLabel">Dark theme</div>
+
+            <div class="settingDesc">Switch the dashboard to a dark color scheme. Saved on this device.</div>
+
+        </div>
+
+        <label class="themeSwitch">
+
+            <input type="checkbox" id="darkThemeToggle">
+
+            <span class="themeSwitchTrack"></span>
+
+        </label>
+
+    </div>
+
+</section>
 
 <section class="chartCard">
 
@@ -798,7 +863,7 @@ MAIN
 
         <i data-lucide="settings"></i>
 
-        <h3>Settings coming soon</h3>
+        <h3>More settings coming soon</h3>
 
         <p>Account, data source, and notification preferences will live here.</p>
 
