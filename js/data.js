@@ -257,10 +257,17 @@ window.THD = window.THD || {};
     /* ==========================================================
        Date Range Resolution
        Supports both rolling windows (7d/14d/3m/6m) and
-       calendar-anchored windows (this month/this year).
-       "Previous period" for delta comparisons is always the
-       same-length window immediately preceding the start date,
-       kept simple and consistent across range types.
+       calendar-anchored windows (this month/this year/last year).
+
+       "Previous period" for delta comparisons is normally the
+       same-length window immediately preceding the start date.
+       Year-level ranges ("year", "lastYear") are the exception:
+       since they're meant to show seasonal performance, their
+       comparison window is the same month/day span exactly one
+       calendar year earlier — e.g. Jan 1–Jul 22 2026 compares to
+       Jan 1–Jul 22 2025, not a same-length rolling window ending
+       Dec 31 2025 (which would land mostly in H2 and say nothing
+       about season-over-season change).
     ========================================================== */
 
     function startOfDay(d) {
@@ -294,8 +301,17 @@ window.THD = window.THD || {};
         "year": () => {
             const now = new Date();
             return { start: new Date(now.getFullYear(), 0, 1), end: startOfDay(now) };
+        },
+        "lastYear": () => {
+            const y = new Date().getFullYear() - 1;
+            return { start: new Date(y, 0, 1), end: new Date(y, 11, 31) };
         }
     };
+
+    // Ranges whose comparison window should be "same calendar dates,
+    // one year back" rather than "same number of days, immediately
+    // preceding" — see note above.
+    const YEAR_ALIGNED_RANGES = new Set(["year", "lastYear"]);
 
     function resolveRange(rangeKey, customRange) {
         let start, end;
@@ -306,10 +322,19 @@ window.THD = window.THD || {};
             const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
             ({ start, end } = def());
         }
+
         const spanDays = Math.round((end - start) / 86400000) + 1;
-        const prevEnd = new Date(start);
-        prevEnd.setDate(prevEnd.getDate() - 1);
-        const prevStart = daysAgo(spanDays - 1, prevEnd);
+
+        let prevStart, prevEnd;
+        if (YEAR_ALIGNED_RANGES.has(rangeKey)) {
+            prevStart = startOfDay(new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()));
+            prevEnd = startOfDay(new Date(end.getFullYear() - 1, end.getMonth(), end.getDate()));
+        } else {
+            prevEnd = new Date(start);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            prevStart = daysAgo(spanDays - 1, prevEnd);
+        }
+
         return { start, end, spanDays, prevStart, prevEnd };
     }
 

@@ -34,7 +34,7 @@
         return out;
     }
 
-    function buildDummyDailyRows(days = 366) {
+    function buildDummyDailyRows(days = 900) {
         const users = randomWalk(days, 2000, 350);
         const purchases = randomWalk(days, 130, 40);
         const rows = [];
@@ -63,7 +63,7 @@
         "adclick.g.doubleclick.net / referral", "a20.hm-f.jp / referral", "a05.hm-f.jp / referral"
     ];
 
-    function buildDummySourcesDaily(days = 366) {
+    function buildDummySourcesDaily(days = 900) {
         const rows = [];
         for (let i = 0; i < days; i++) {
             const d = new Date();
@@ -225,8 +225,8 @@
             THD.data.loadLandingPages()
         ]);
 
-        dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows(366);
-        sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily(366);
+        dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows();
+        sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
         const landingPages = liveLandingPages && liveLandingPages.length ? liveLandingPages : DUMMY_LANDING_PAGES;
 
