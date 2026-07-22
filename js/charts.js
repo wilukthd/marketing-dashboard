@@ -9,7 +9,7 @@ window.THD = window.THD || {};
 (function (THD) {
 
     let trendChartInstance = null;
-    let trafficChartInstance = null;
+    const trafficChartInstances = {}; // keyed by canvas id, since current/previous each get their own doughnut
 
     // Read fresh at render time (not cached) so charts pick up the
     // right palette whether they're being created for the first time
@@ -48,12 +48,13 @@ window.THD = window.THD || {};
        rest still scale correctly, just without visible ticks.
     ========================================================== */
 
-    function renderTrendChart(labels, series, visibleMetrics) {
+    function renderTrendChart(labels, series, visibleMetrics, options) {
 
         const canvas = document.getElementById("trendChart");
         if (!canvas) return;
 
         const colors = getChartColors();
+        const showTrendOverlay = !!(options && options.showTrendOverlay);
 
         if (trendChartInstance) {
             trendChartInstance.destroy();
@@ -62,9 +63,14 @@ window.THD = window.THD || {};
 
         if (!visibleMetrics || !visibleMetrics.length) return;
 
-        const datasets = visibleMetrics.map((key) => {
+        // Each metric contributes its solid line, and — when the
+        // moving-average toggle is on — a dashed overlay right after
+        // it sharing the same axis/color, so it reads as "this line,
+        // smoothed" rather than a new unrelated series.
+        const datasets = [];
+        visibleMetrics.forEach((key) => {
             const cfg = METRIC_CONFIG[key];
-            return {
+            datasets.push({
                 label: cfg.label,
                 data: series[key],
                 borderColor: cfg.color,
@@ -76,8 +82,27 @@ window.THD = window.THD || {};
                 pointHoverBorderColor: "#fff",
                 pointHoverBorderWidth: 2,
                 tension: 0.35,
-                yAxisID: `y_${key}`
-            };
+                yAxisID: `y_${key}`,
+                metricKey: key,
+                isTrendline: false
+            });
+
+            if (showTrendOverlay && THD.data && THD.data.computeMovingAverage) {
+                datasets.push({
+                    label: `${cfg.label} · 7-day avg`,
+                    data: THD.data.computeMovingAverage(series[key], 7),
+                    borderColor: cfg.color,
+                    backgroundColor: "transparent",
+                    borderWidth: 2,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    tension: 0.35,
+                    yAxisID: `y_${key}`,
+                    metricKey: key,
+                    isTrendline: true
+                });
+            }
         });
 
         const scales = {
@@ -113,8 +138,10 @@ window.THD = window.THD || {};
                         cornerRadius: 10,
                         callbacks: {
                             label: (item) => {
-                                const key = visibleMetrics[item.datasetIndex];
-                                return `${item.dataset.label}: ${METRIC_CONFIG[key].format(item.parsed.y)}`;
+                                const key = item.dataset.metricKey;
+                                const cfg = METRIC_CONFIG[key];
+                                const suffix = item.dataset.isTrendline ? " (7-day avg)" : "";
+                                return `${cfg.label}${suffix}: ${cfg.format(item.parsed.y)}`;
                             }
                         }
                     }
@@ -128,19 +155,37 @@ window.THD = window.THD || {};
        Traffic Sources (doughnut)
     ========================================================== */
 
-    function renderTrafficChart(channels, totalSessions) {
+    // A single, shared palette (rather than one derived per-call) so a
+    // given channel/platform gets the same color in both the current
+    // and previous doughnut, which is what makes the two visually
+    // comparable at a glance instead of just two unrelated pie charts.
+    const TRAFFIC_PALETTE = [
+        "#2563EB", "#16A34A", "#EA580C", "#7C3AED", "#DB2777", "#0891B2",
+        "#CA8A04", "#DC2626", "#4F46E5", "#059669", "#9333EA", "#6B7280"
+    ];
+    const trafficColorAssignments = {}; // label -> color, built up as labels are seen
 
-        const canvas = document.getElementById("trafficChart");
+    function colorForLabel(label) {
+        if (!trafficColorAssignments[label]) {
+            const used = Object.keys(trafficColorAssignments).length;
+            trafficColorAssignments[label] = TRAFFIC_PALETTE[used % TRAFFIC_PALETTE.length];
+        }
+        return trafficColorAssignments[label];
+    }
+
+    function renderTrafficChart(canvasId, channels, totalSessions) {
+
+        const canvas = document.getElementById(canvasId);
         if (!canvas) return [];
 
         const labels = channels.map((c) => c.label);
         const values = channels.map((c) => c.percent);
-        const palette = ["#2563EB", "#16A34A", "#EA580C", "#7C3AED", "#DB2777", "#6B7280"];
+        const palette = labels.map(colorForLabel);
         const colors = getChartColors();
 
-        if (trafficChartInstance) {
-            trafficChartInstance.destroy();
-            trafficChartInstance = null;
+        if (trafficChartInstances[canvasId]) {
+            trafficChartInstances[canvasId].destroy();
+            delete trafficChartInstances[canvasId];
         }
 
         // Draws the running total in the doughnut's hole so the empty
@@ -165,7 +210,7 @@ window.THD = window.THD || {};
             }
         };
 
-        trafficChartInstance = new Chart(canvas.getContext("2d"), {
+        trafficChartInstances[canvasId] = new Chart(canvas.getContext("2d"), {
             type: "doughnut",
             data: {
                 labels: labels,
@@ -196,7 +241,7 @@ window.THD = window.THD || {};
             plugins: [centerTextPlugin]
         });
 
-        return channels.map((c, i) => ({ ...c, color: palette[i % palette.length] }));
+        return channels.map((c) => ({ ...c, color: colorForLabel(c.label) }));
     }
 
     // Charts created while their tab is hidden (display:none) get stuck
@@ -205,7 +250,7 @@ window.THD = window.THD || {};
     // right after a tab switch to fix that.
     function resizeCharts() {
         if (trendChartInstance) trendChartInstance.resize();
-        if (trafficChartInstance) trafficChartInstance.resize();
+        Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
     THD.charts = {

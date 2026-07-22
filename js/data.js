@@ -166,12 +166,69 @@ window.THD = window.THD || {};
         return "Other";
     }
 
-    function deriveTrafficBreakdown(sourceRows) {
+    /* ==========================================================
+       Ad Platform classification
+       A finer cut than the standard channel grouping above —
+       groups by the actual vendor (Google, Meta, Yahoo, Criteo,
+       LINE, Bing…) and splits paid vs organic within each, so ad
+       spend efficiency can be compared platform-by-platform
+       instead of lumped into "Paid Search" / "Display" / "Social".
+       This is what different agencies actually run campaigns on,
+       so it's the more useful cut when the question is "which
+       platform's ads are working."
+    ========================================================== */
+
+    const PLATFORM_MATCHERS = [
+        { test: /google|doubleclick|admanager/, label: "Google" },
+        { test: /facebook|instagram|meta/, label: "Meta" },
+        { test: /yahoo/, label: "Yahoo" },
+        { test: /criteo/, label: "Criteo" },
+        { test: /^line$|\bline\b/, label: "LINE" },
+        { test: /bing|microsoft/, label: "Bing" },
+        { test: /twitter|^x\.com$|^x$/, label: "Twitter/X" },
+        { test: /pinterest/, label: "Pinterest" },
+        { test: /rakuten/, label: "Rakuten" },
+        { test: /newsletter|email|mailchimp|klaviyo/, label: "Email" }
+    ];
+
+    // Platforms that run both ads and organic/owned presence get
+    // split into "<Platform> Ads" vs "<Platform> Organic" so the two
+    // don't get averaged together; platforms below are effectively
+    // single-channel in this data and read fine as just the name.
+    const SPLIT_PAID_ORGANIC = ["Google", "Meta", "Yahoo", "Bing"];
+
+    function classifyPlatform(sourceMedium) {
+        if (!sourceMedium) return "Other";
+        const parts = String(sourceMedium).split("/").map((s) => s.trim().toLowerCase());
+        const source = parts[0] || "";
+        const medium = parts[1] || "";
+
+        if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
+
+        const match = PLATFORM_MATCHERS.find((m) => m.test.test(source));
+        if (match) {
+            if (SPLIT_PAID_ORGANIC.includes(match.label)) {
+                const isPaid = /cpc|ppc|paid|cpm|display|banner/.test(medium);
+                return `${match.label} ${isPaid ? "Ads" : "Organic"}`;
+            }
+            return match.label;
+        }
+
+        if (medium === "referral") return "Referral (Other)";
+        if (medium === "organic") return "Organic Search (Other)";
+        if (medium === "social") return "Social (Other)";
+        if (medium === "cpc" || medium === "ppc" || medium === "paid" || medium === "cpm" || medium === "display") return "Paid (Other)";
+        return "Other";
+    }
+
+    function deriveTrafficBreakdown(sourceRows, groupBy) {
         const totals = {};
         let totalSessions = 0;
 
         sourceRows.forEach((r) => {
-            const channel = r.channel || classifySourceChannel(r.sourceMedium);
+            const channel = groupBy === "platform"
+                ? classifyPlatform(r.sourceMedium)
+                : (r.channel || classifySourceChannel(r.sourceMedium));
             if (!totals[channel]) totals[channel] = { sessions: 0, revenue: 0, purchases: 0 };
             totals[channel].sessions += r.sessions;
             totals[channel].revenue += r.revenue;
@@ -316,19 +373,30 @@ window.THD = window.THD || {};
        is active instead of showing fixed placeholder text.
     ========================================================== */
 
+    // Wraps a figure in a <span> so ui.js's renderInsights (which
+    // inserts these strings via innerHTML) can visually emphasize it
+    // with color — green/red for a clear direction, blue for a
+    // neutral highlight like a share-of-total. Kept as a tiny helper
+    // here rather than in ui.js since this is where the sentiment
+    // ("is this good or bad") is actually known.
+    function highlight(text, sentiment) {
+        return `<span class="insightNum ${sentiment}">${text}</span>`;
+    }
+
     function buildInsights(kpi, channels) {
         const insights = [];
 
         if (kpi && kpi.revenue) {
             const d = kpi.revenue.delta;
-            insights.push(`Revenue ${d >= 0 ? "increased" : "decreased"} by ${Math.abs(d).toFixed(1)}% compared to the previous period.`);
+            const figure = highlight(`${Math.abs(d).toFixed(1)}%`, d >= 0 ? "pos" : "neg");
+            insights.push(`Revenue ${d >= 0 ? "increased" : "decreased"} by ${figure} compared to the previous period.`);
         }
 
         if (channels && channels.length) {
             const totalRevenue = channels.reduce((sum, c) => sum + c.revenue, 0);
             const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
             const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
-            insights.push(`${topByRevenue.label} generated ${share}% of total revenue.`);
+            insights.push(`<strong>${topByRevenue.label}</strong> generated ${highlight(share + "%", "neutral")} of total revenue.`);
         }
 
         if (kpi) {
@@ -343,13 +411,15 @@ window.THD = window.THD || {};
                 if (!biggest || Math.abs(d) > Math.abs(biggest.delta)) biggest = { label, delta: d };
             });
             if (biggest) {
-                insights.push(`${biggest.label} ${biggest.delta >= 0 ? "increased" : "decreased"} by ${Math.abs(biggest.delta).toFixed(1)}%.`);
+                const figure = highlight(`${Math.abs(biggest.delta).toFixed(1)}%`, biggest.delta >= 0 ? "pos" : "neg");
+                insights.push(`${biggest.label} ${biggest.delta >= 0 ? "increased" : "decreased"} by ${figure}.`);
             }
         }
 
         if (kpi && kpi.cvr) {
             const d = kpi.cvr.delta;
-            insights.push(`Conversion rate ${d >= 0 ? "improved" : "declined"} to ${kpi.cvr.value.toFixed(2)}% this period.`);
+            const figure = highlight(`${kpi.cvr.value.toFixed(2)}%`, d >= 0 ? "pos" : "neg");
+            insights.push(`Conversion rate ${d >= 0 ? "improved" : "declined"} to ${figure} this period.`);
         }
 
         return insights;
@@ -440,19 +510,20 @@ window.THD = window.THD || {};
             .slice(0, 2)
             .map((a) => {
                 const verb = a.direction === "spike" ? "spiked" : "dropped";
-                return `${a.metric} ${verb} on ${a.date} (${a.valueText} vs a typical ${a.meanText} for this period) — there might have been an external event, promotion, or outage around that date worth checking.`;
+                const figure = highlight(a.valueText, a.direction === "spike" ? "pos" : "neg");
+                return `${a.metric} ${verb} on ${a.date} (${figure} vs a typical ${a.meanText} for this period) — there might have been an external event, promotion, or outage around that date worth checking.`;
             });
     }
 
     /* ==========================================================
        Per-day-per-source rows -> Session Source table +
-       Traffic Sources doughnut. Aggregates matching rows within
-       the range into one row per sourceMedium.
+       Traffic Sources doughnuts. Aggregates matching rows within
+       an arbitrary [start, end] window into one row per
+       sourceMedium — used for both the current and the previous
+       period so the two are built the exact same way.
     ========================================================== */
 
-    function filterSourcesRange(sourceRows, rangeKey, customRange) {
-
-        const { start, end } = resolveRange(rangeKey, customRange);
+    function filterSourcesByDates(sourceRows, start, end) {
         const inWindow = sourceRows.filter((r) => inRange(r.date, start, end));
 
         const totals = {};
@@ -476,6 +547,55 @@ window.THD = window.THD || {};
             .sort((a, b) => b.sessions - a.sessions);
     }
 
+    function filterSourcesRange(sourceRows, rangeKey, customRange) {
+        const { start, end } = resolveRange(rangeKey, customRange);
+        return filterSourcesByDates(sourceRows, start, end);
+    }
+
+    /* ==========================================================
+       Current vs previous period, merged into one row per
+       channel/platform so the two can be shown side by side
+       (and so a channel that only appears in one period still
+       shows up, with the other side reading "—").
+    ========================================================== */
+
+    function buildTrafficComparison(currentChannels, previousChannels) {
+        const map = {};
+
+        (currentChannels || []).forEach((c) => {
+            map[c.label] = { label: c.label, current: c, previous: null };
+        });
+        (previousChannels || []).forEach((c) => {
+            if (!map[c.label]) map[c.label] = { label: c.label, current: null, previous: c };
+            else map[c.label].previous = c;
+        });
+
+        return Object.values(map).sort((a, b) => {
+            const aSessions = a.current ? a.current.sessions : 0;
+            const bSessions = b.current ? b.current.sessions : 0;
+            return bSessions - aSessions;
+        });
+    }
+
+    /* ==========================================================
+       Moving Average
+       Simple trailing-window average (default 7 days) used as an
+       optional overlay on the trend chart to smooth out day-to-day
+       noise. Early points use whatever days are available so the
+       line still starts at index 0 instead of leaving a gap.
+    ========================================================== */
+
+    function computeMovingAverage(values, windowSize) {
+        const w = windowSize || 7;
+        const out = [];
+        for (let i = 0; i < values.length; i++) {
+            const from = Math.max(0, i - w + 1);
+            const slice = values.slice(from, i + 1);
+            out.push(slice.reduce((a, b) => a + b, 0) / slice.length);
+        }
+        return out;
+    }
+
     THD.data = {
         CONFIG,
         loadDailyGA4,
@@ -483,13 +603,17 @@ window.THD = window.THD || {};
         loadNewRepeat,
         loadLandingPages,
         classifySourceChannel,
+        classifyPlatform,
         deriveTrafficBreakdown,
         buildInsights,
         detectAnomalies,
         buildAnomalyInsights,
         resolveRange,
         filterDailyRange,
-        filterSourcesRange
+        filterSourcesRange,
+        filterSourcesByDates,
+        buildTrafficComparison,
+        computeMovingAverage
     };
 
 })(window.THD);

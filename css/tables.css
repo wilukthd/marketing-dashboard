@@ -208,3 +208,21 @@
     overflow-x:auto;
 
 }
+
+/* ==========================================================
+   Center Alignment — Traffic & Sales Tabs
+   Every table in these two tabs (Session Source/Medium, the
+   Traffic Sources comparison table, Monthly Business
+   Performance, and the 新規／リピータ spreadsheet table) centers
+   both its label column and its .number columns, per request —
+   other tabs are unaffected.
+========================================================== */
+
+[data-view="traffic"] .modernTable th,
+[data-view="traffic"] .modernTable td,
+[data-view="sales"] .modernTable th,
+[data-view="sales"] .modernTable td{
+
+    text-align:center;
+
+}

@@ -45,6 +45,21 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Traffic Doughnut Period Labels
+       Spells out the exact dates behind "selected period" and
+       "previous period" next to each doughnut, same idea as
+       renderRangeCompare above but placed at the chart itself.
+    ========================================================== */
+
+    function renderTrafficPeriodLabels(range) {
+        if (!range) return;
+        const curEl = document.getElementById("trafficPeriodCurrent");
+        const prevEl = document.getElementById("trafficPeriodPrevious");
+        if (curEl) curEl.textContent = `${fmtISODate(range.start)} – ${fmtISODate(range.end)}`;
+        if (prevEl) prevEl.textContent = `${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}`;
+    }
+
+    /* ==========================================================
        Last Update
     ========================================================== */
 
@@ -247,27 +262,70 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
-       Traffic Legend
+       Traffic Comparison Table
+       One row per channel/platform, showing the current period
+       right next to the previous one (rather than two separate
+       legends) so the reader can actually compare them instead of
+       cross-referencing two lists by eye.
     ========================================================== */
 
-    function renderTrafficLegend(items) {
-        const container = document.getElementById("trafficLegend");
-        if (!container) return;
+    function trafficCompareRowHtml(row) {
+        const cur = row.current;
+        const prev = row.previous;
+        const curSessions = cur ? cur.sessions : 0;
+        const prevSessions = prev ? prev.sessions : 0;
+        const color = (cur && cur.color) || (prev && prev.color) || "#94A3B8";
 
-        container.innerHTML = items.map((item) => `
-            <div class="legendItem">
-                <span class="legendColor" style="background:${item.color}"></span>
-                <div class="legendItemBody">
-                    <div class="legendItemTop">
-                        <span>${item.label}</span>
-                        <strong>${item.percent}%</strong>
-                    </div>
-                    <div class="legendItemMeta">
-                        ${fmtNumber(item.sessions)} sessions · ${fmtYen(item.revenue)} · ${fmtPercent(item.cvr)} CVR
-                    </div>
-                </div>
-            </div>
-        `).join("");
+        let deltaHtml = "—";
+        if (prevSessions > 0) {
+            const delta = ((curSessions - prevSessions) / prevSessions) * 100;
+            deltaHtml = `<span class="deltaBadge ${delta >= 0 ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
+        } else if (curSessions > 0) {
+            deltaHtml = `<span class="deltaBadge positive">New</span>`;
+        }
+
+        return `
+            <tr>
+                <td class="tcSource">
+                    <span class="tcSourceInner">
+                        <span class="legendColor" style="background:${color}"></span>
+                        ${row.label}
+                    </span>
+                </td>
+                <td class="number">${cur ? fmtNumber(cur.sessions) : "—"}</td>
+                <td class="number">${prev ? fmtNumber(prev.sessions) : "—"}</td>
+                <td class="number">${deltaHtml}</td>
+                <td class="number">${cur ? fmtYen(cur.revenue) : "—"}</td>
+                <td class="number">${cur ? fmtPercent(cur.cvr) : "—"}</td>
+            </tr>
+        `;
+    }
+
+    function renderTrafficComparison(rows) {
+        const tbody = document.getElementById("trafficCompareTable");
+        if (!tbody) return;
+
+        if (!rows || !rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">No traffic data for this period.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = rows.map(trafficCompareRowHtml).join("");
+    }
+
+    /* ==========================================================
+       Traffic Grouping Toggle (Ad Platform vs GA4 Channel)
+    ========================================================== */
+
+    function getTrafficGroupBy() {
+        const select = document.getElementById("trafficGroupSelect");
+        return select ? select.value : "platform";
+    }
+
+    function wireTrafficGroupToggle(onChange) {
+        const select = document.getElementById("trafficGroupSelect");
+        if (!select) return;
+        select.addEventListener("change", () => onChange(select.value));
     }
 
     /* ==========================================================
@@ -385,6 +443,21 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Trend Overlay Toggle (7-day moving average)
+    ========================================================== */
+
+    function getTrendOverlayState() {
+        const cb = document.getElementById("movingAverageToggle");
+        return !!(cb && cb.checked);
+    }
+
+    function wireTrendOverlayToggle(onChange) {
+        const cb = document.getElementById("movingAverageToggle");
+        if (!cb) return;
+        cb.addEventListener("change", () => onChange(cb.checked));
+    }
+
+    /* ==========================================================
        Refresh Button
     ========================================================== */
 
@@ -458,14 +531,19 @@ window.THD = window.THD || {};
         renderKpis,
         renderInsights,
         renderRangeCompare,
+        renderTrafficPeriodLabels,
         renderLandingPages,
-        renderTrafficLegend,
+        renderTrafficComparison,
+        getTrafficGroupBy,
+        wireTrafficGroupToggle,
         renderSourceTable,
         wireSourceTableToggle,
         renderMonthlyTable,
         renderNewRepeatTable,
         getCheckedMetrics,
         wireMetricToggles,
+        getTrendOverlayState,
+        wireTrendOverlayToggle,
         wireRefreshButton,
         wireSidebarNav,
         wireThemeToggle,

@@ -509,6 +509,18 @@ MAIN
 
     </div>
 
+    <div class="trendOverlayRow">
+
+        <label class="trendOverlayToggle">
+
+            <input type="checkbox" id="movingAverageToggle">
+
+            <span>Show 7-day moving average</span>
+
+        </label>
+
+    </div>
+
     <div class="chartBody">
 
         <canvas id="trendChart"></canvas>
@@ -521,15 +533,15 @@ MAIN
 
 
 
-<!-- ================= TWO COLUMN ================= -->
+<!-- ================= TRAFFIC SOURCES ================= -->
 
 <div class="dashboardView viewHidden" data-view="traffic">
 
-<section class="twoColumn">
+<section class="chartCard trafficSourcesCard">
 
-    <div class="chartCard">
+    <div class="chartHeader">
 
-        <div class="chartHeader">
+        <div>
 
             <h3>
 
@@ -537,35 +549,117 @@ MAIN
 
             </h3>
 
+            <small>
+
+                Selected period vs. the period before it, by ad platform
+
+            </small>
+
         </div>
 
-        <div class="chartBody smallChart">
+        <div class="chartTools">
 
-            <canvas id="trafficChart"></canvas>
+            <select id="trafficGroupSelect">
+
+                <option value="platform" selected>By Ad Platform (Google, Meta, Yahoo, Criteo…)</option>
+
+                <option value="channel">By Channel (GA4 default grouping)</option>
+
+            </select>
 
         </div>
-
-        <div class="customLegend" id="trafficLegend"></div>
 
     </div>
 
+    <div class="trafficDoughnutRow">
 
+        <div class="trafficDoughnutCol">
 
-    <div class="chartCard">
+            <div class="trafficPeriodLabel">
 
-        <div class="chartHeader">
+                <span class="trafficPeriodDot current"></span>
 
-            <h3>
+                Selected period: <strong id="trafficPeriodCurrent">--</strong>
 
-                Top Landing Pages
+            </div>
 
-            </h3>
+            <div class="chartBody smallChart">
+
+                <canvas id="trafficChartCurrent"></canvas>
+
+            </div>
 
         </div>
 
-        <div id="landingPages">
+        <div class="trafficDoughnutCol">
+
+            <div class="trafficPeriodLabel">
+
+                <span class="trafficPeriodDot previous"></span>
+
+                Previous period: <strong id="trafficPeriodPrevious">--</strong>
+
+            </div>
+
+            <div class="chartBody smallChart">
+
+                <canvas id="trafficChartPrevious"></canvas>
+
+            </div>
 
         </div>
+
+    </div>
+
+    <div class="tableResponsive trafficCompareWrap">
+
+        <table class="modernTable trafficCompareTable">
+
+            <thead>
+
+                <tr>
+
+                    <th>Source</th>
+
+                    <th class="number">Sessions (Current)</th>
+
+                    <th class="number">Sessions (Previous)</th>
+
+                    <th class="number">Δ vs Previous</th>
+
+                    <th class="number">Revenue (Current)</th>
+
+                    <th class="number">CVR (Current)</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody id="trafficCompareTable">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <h3>
+
+            Top Landing Pages
+
+        </h3>
+
+    </div>
+
+    <div id="landingPages">
 
     </div>
 

@@ -56,6 +56,7 @@
     const SOURCE_POOL = [
         "google / cpc", "google / organic", "(direct) / (none)", "yahoo / organic",
         "instagram / social", "line / social", "facebook / social", "yahoo / cpc",
+        "facebook / cpc", "instagram / cpc",
         "newsletter / email", "ameblo.jp / referral", "rakuten / referral",
         "criteo / display", "bing / organic", "twitter / social", "pinterest / social",
         "biopaste.jp / referral", "aosorahiroba.jugem.jp / referral", "admanager.google.com / referral",
@@ -123,27 +124,43 @@
         currentRange = rangeKey;
         currentCustomRange = rangeKey === "custom" ? customRange : null;
 
+        const range = THD.data.resolveRange(rangeKey, currentCustomRange);
+
         const filtered = THD.data.filterDailyRange(dailyRows, rangeKey, currentCustomRange);
         THD.ui.renderKpis(filtered.kpi);
-        THD.ui.renderRangeCompare(THD.data.resolveRange(rangeKey, currentCustomRange));
-        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
+        THD.ui.renderRangeCompare(range);
+        THD.ui.renderTrafficPeriodLabels(range);
+        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
+            showTrendOverlay: THD.ui.getTrendOverlayState()
+        });
 
-        const sourcesInRange = THD.data.filterSourcesRange(sourceRows, rangeKey, currentCustomRange);
-        THD.ui.renderSourceTable(sourcesInRange);
+        // Session Source table stays on the current period only.
+        const sourcesCurrent = THD.data.filterSourcesByDates(sourceRows, range.start, range.end);
+        THD.ui.renderSourceTable(sourcesCurrent);
 
-        const traffic = THD.data.deriveTrafficBreakdown(sourcesInRange);
-        const legendItems = THD.charts.renderTrafficChart(traffic.channels, traffic.totalSessions);
-        THD.ui.renderTrafficLegend(legendItems);
+        // Traffic Sources doughnuts: same current window, plus the
+        // matching previous window, both grouped the same way.
+        const sourcesPrevious = THD.data.filterSourcesByDates(sourceRows, range.prevStart, range.prevEnd);
+        const groupBy = THD.ui.getTrafficGroupBy();
+        const trafficCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, groupBy);
+        const trafficPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, groupBy);
+
+        const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", trafficCurrent.channels, trafficCurrent.totalSessions);
+        const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", trafficPrevious.channels, trafficPrevious.totalSessions);
+
+        THD.ui.renderTrafficComparison(THD.data.buildTrafficComparison(currentChannels, previousChannels));
 
         THD.ui.renderInsights([
-            ...THD.data.buildInsights(filtered.kpi, traffic.channels),
+            ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
             ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
         ]);
     }
 
     function renderTrendOnly() {
         const filtered = THD.data.filterDailyRange(dailyRows, currentRange, currentCustomRange);
-        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics());
+        THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
+            showTrendOverlay: THD.ui.getTrendOverlayState()
+        });
     }
 
     // "Custom Range" needs two dates before it can render anything, so
@@ -187,6 +204,8 @@
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
+        THD.ui.wireTrendOverlayToggle(renderTrendOnly);
+        THD.ui.wireTrafficGroupToggle(() => renderForRange(currentRange, currentCustomRange));
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => renderForRange(currentRange, currentCustomRange));
         THD.ui.wireNotes();

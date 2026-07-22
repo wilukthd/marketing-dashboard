@@ -91,3 +91,14 @@
     background:#1E3A6E;
 
 }
+
+/* #trafficGroupSelect in charts.css uses an ID selector for its
+   base (white) styling, which outranks the generic "select" rule
+   above on specificity alone — this re-asserts dark colors for it. */
+[data-theme="dark"] #trafficGroupSelect{
+
+    background:var(--surface);
+    color:var(--text);
+    border-color:var(--border);
+
+}

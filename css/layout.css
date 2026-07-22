@@ -459,6 +459,54 @@
 
     margin-bottom:12px;
 
+    line-height:1.6;
+
+}
+
+/* ==========================================================
+   Insight Number Highlight
+   Wraps the figure a given insight is actually about (a %
+   delta, a share of revenue, an anomaly value) so the eye
+   lands on the number instead of having to read the full
+   sentence to find it.
+========================================================== */
+
+.insightNum{
+
+    display:inline-block;
+
+    font-weight:700;
+
+    padding:2px 9px;
+
+    border-radius:6px;
+
+    font-variant-numeric:tabular-nums;
+
+}
+
+.insightNum.pos{
+
+    color:#15803D;
+
+    background:#DCFCE7;
+
+}
+
+.insightNum.neg{
+
+    color:#B91C1C;
+
+    background:#FEE2E2;
+
+}
+
+.insightNum.neutral{
+
+    color:#1D4ED8;
+
+    background:#EEF4FF;
+
 }
 
 
