@@ -156,6 +156,12 @@ window.THD = window.THD || {};
         const source = parts[0] || "";
         const medium = parts[1] || "";
 
+        // Broken/missing attribution (bad UTMs, cross-domain linking
+        // gaps, ad blockers stripping referrers, etc.) — kept as its
+        // own bucket rather than folded into "Other" so it's visible
+        // instead of quietly inflating a generic catch-all.
+        if (source === "(not set)" || medium === "(not set)") return "(not set)";
+
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
         if (medium === "organic") return "Organic Search";
         if (medium === "cpc" || medium === "ppc" || medium === "paid" || medium === "paidsearch") return "Paid Search";
@@ -203,6 +209,8 @@ window.THD = window.THD || {};
         const source = parts[0] || "";
         const medium = parts[1] || "";
 
+        if (source === "(not set)" || medium === "(not set)") return "(not set)";
+
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
 
         const match = PLATFORM_MATCHERS.find((m) => m.test.test(source));
@@ -221,14 +229,23 @@ window.THD = window.THD || {};
         return "Other";
     }
 
+    // Same classification a source/medium row would fall into for a
+    // given groupBy ("platform" or "channel") — shared so the Session
+    // Source table can be filtered down to exactly the rows behind
+    // one doughnut/comparison-table bucket (e.g. drilling into
+    // "Referral (Other)" to see which sites make it up).
+    function classifyForGroupBy(row, groupBy) {
+        return groupBy === "platform"
+            ? classifyPlatform(row.sourceMedium)
+            : (row.channel || classifySourceChannel(row.sourceMedium));
+    }
+
     function deriveTrafficBreakdown(sourceRows, groupBy) {
         const totals = {};
         let totalSessions = 0;
 
         sourceRows.forEach((r) => {
-            const channel = groupBy === "platform"
-                ? classifyPlatform(r.sourceMedium)
-                : (r.channel || classifySourceChannel(r.sourceMedium));
+            const channel = classifyForGroupBy(r, groupBy);
             if (!totals[channel]) totals[channel] = { sessions: 0, revenue: 0, purchases: 0 };
             totals[channel].sessions += r.sessions;
             totals[channel].revenue += r.revenue;
@@ -422,6 +439,16 @@ window.THD = window.THD || {};
             const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
             const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
             insights.push(`<strong>${topByRevenue.label}</strong> generated ${highlight(share + "%", "neutral")} of total revenue.`);
+
+            const notSet = channels.find((c) => c.label === "(not set)");
+            if (notSet) {
+                const totalSessions = channels.reduce((sum, c) => sum + c.sessions, 0);
+                const notSetShare = totalSessions ? Math.round((notSet.sessions / totalSessions) * 100) : 0;
+                if (notSetShare >= 5) {
+                    const figure = highlight(notSetShare + "%", "neg");
+                    insights.push(`${figure} of sessions have no attribution data (<strong>(not set)</strong>) — worth checking GA4 tagging/UTM setup, since this may be skewing channel-level numbers.`);
+                }
+            }
         }
 
         if (kpi) {
@@ -603,6 +630,67 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Monthly Business Performance
+       Company's fiscal "month" runs 21st of the previous calendar
+       month through the 20th of the named month — e.g. the "Feb
+       2026" bucket is 2026-01-21 ~ 2026-02-20. Any day from the
+       21st onward rolls forward into the following calendar
+       month's bucket; the 1st-20th stay in their own calendar
+       month. Built straight from daily GA4 rows so it always
+       reflects whatever's actually loaded (live or dummy).
+    ========================================================== */
+
+    function businessMonthOf(dateStr) {
+        const d = new Date(dateStr);
+        let month = d.getMonth(); // 0-indexed
+        let year = d.getFullYear();
+        if (d.getDate() >= 21) {
+            month += 1;
+            if (month > 11) { month = 0; year += 1; }
+        }
+        return { year, month };
+    }
+
+    function businessMonthLabel(year, month) {
+        return new Date(year, month, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    }
+
+    function buildBusinessMonths(dailyRows, monthsToShow = 12) {
+        const buckets = {};
+
+        (dailyRows || []).forEach((r) => {
+            const { year, month } = businessMonthOf(r.date);
+            const key = `${year}-${month}`;
+            if (!buckets[key]) buckets[key] = { year, month, revenue: 0, orders: 0, users: 0, sessions: 0 };
+            const b = buckets[key];
+            b.revenue += r.revenue;
+            b.orders += r.purchases;
+            b.users += r.users;
+            b.sessions += r.sessions;
+        });
+
+        const sortedKeys = Object.keys(buckets).sort((a, b) => {
+            const A = buckets[a], B = buckets[b];
+            return (A.year * 12 + A.month) - (B.year * 12 + B.month);
+        });
+
+        const rows = sortedKeys.map((key, i) => {
+            const b = buckets[key];
+            const prev = i > 0 ? buckets[sortedKeys[i - 1]] : null;
+            return {
+                month: businessMonthLabel(b.year, b.month),
+                revenue: b.revenue,
+                orders: b.orders,
+                users: b.users,
+                cvr: b.sessions ? (b.orders / b.sessions) * 100 : 0,
+                trend: prev && prev.revenue ? ((b.revenue - prev.revenue) / prev.revenue) * 100 : 0
+            };
+        });
+
+        return rows.slice(-monthsToShow);
+    }
+
+    /* ==========================================================
        Moving Average
        Simple trailing-window average (default 7 days) used as an
        optional overlay on the trend chart to smooth out day-to-day
@@ -629,6 +717,7 @@ window.THD = window.THD || {};
         loadLandingPages,
         classifySourceChannel,
         classifyPlatform,
+        classifyForGroupBy,
         deriveTrafficBreakdown,
         buildInsights,
         detectAnomalies,
@@ -638,7 +727,8 @@ window.THD = window.THD || {};
         filterSourcesRange,
         filterSourcesByDates,
         buildTrafficComparison,
-        computeMovingAverage
+        computeMovingAverage,
+        buildBusinessMonths
     };
 
 })(window.THD);

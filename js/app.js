@@ -19,6 +19,24 @@
     let currentRange = "month";
     let currentCustomRange = null; // { start: Date, end: Date }, only used when currentRange === "custom"
 
+    // Drill-down filter: set by clicking a row in the Traffic
+    // Comparison table (e.g. "Referral (Other)") to narrow the
+    // Session Source table below to just the rows behind that
+    // bucket. sourcesCurrentForFilter/lastTrafficComparisonRows hold
+    // the last-computed data so the filter can be toggled without
+    // recomputing the whole period.
+    let activeSourceFilter = null;
+    let sourcesCurrentForFilter = [];
+    let lastTrafficComparisonRows = [];
+
+    function renderFilteredSourceTable() {
+        const rows = activeSourceFilter
+            ? sourcesCurrentForFilter.filter((r) => THD.data.classifyForGroupBy(r, THD.ui.getTrafficGroupBy()) === activeSourceFilter)
+            : sourcesCurrentForFilter;
+        THD.ui.renderSourceTable(rows);
+        THD.ui.renderSourceFilterStatus(activeSourceFilter);
+    }
+
     /* ==========================================================
        Dummy Data (fallback when a live source isn't configured)
     ========================================================== */
@@ -136,7 +154,8 @@
 
         // Session Source table stays on the current period only.
         const sourcesCurrent = THD.data.filterSourcesByDates(sourceRows, range.start, range.end);
-        THD.ui.renderSourceTable(sourcesCurrent);
+        sourcesCurrentForFilter = sourcesCurrent;
+        renderFilteredSourceTable();
 
         // Traffic Sources doughnuts: same current window, plus the
         // matching previous window, both grouped the same way.
@@ -148,7 +167,8 @@
         const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", trafficCurrent.channels, trafficCurrent.totalSessions);
         const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", trafficPrevious.channels, trafficPrevious.totalSessions);
 
-        THD.ui.renderTrafficComparison(THD.data.buildTrafficComparison(currentChannels, previousChannels));
+        lastTrafficComparisonRows = THD.data.buildTrafficComparison(currentChannels, previousChannels);
+        THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
 
         THD.ui.renderInsights([
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
@@ -205,7 +225,20 @@
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
         THD.ui.wireTrendOverlayToggle(renderTrendOnly);
-        THD.ui.wireTrafficGroupToggle(() => renderForRange(currentRange, currentCustomRange));
+        THD.ui.wireTrafficGroupToggle(() => {
+            activeSourceFilter = null;
+            renderForRange(currentRange, currentCustomRange);
+        });
+        THD.ui.wireTrafficComparisonFilter((label) => {
+            activeSourceFilter = (activeSourceFilter === label) ? null : label;
+            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
+            renderFilteredSourceTable();
+        });
+        THD.ui.wireClearSourceFilter(() => {
+            activeSourceFilter = null;
+            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
+            renderFilteredSourceTable();
+        });
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => renderForRange(currentRange, currentCustomRange));
         THD.ui.wireNotes();
@@ -233,7 +266,15 @@
         renderForRange(currentRange, currentCustomRange);
 
         THD.ui.renderLandingPages(landingPages);
-        THD.ui.renderMonthlyTable(DUMMY_MONTHLY);
+
+        // Business month = 21st of the previous calendar month
+        // through the 20th of the named month (e.g. "Feb 2026" =
+        // 2026-01-21 ~ 2026-02-20). Built from whatever's in
+        // dailyRows (live GA4 if configured, dummy otherwise), so
+        // it's real data as soon as GA4_DAILY_CSV_URL is live.
+        const businessMonths = THD.data.buildBusinessMonths(dailyRows, 12);
+        THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
+
         THD.ui.renderNewRepeatTable(newRepeat);
 
         THD.ui.renderLastUpdate();

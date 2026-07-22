@@ -269,12 +269,13 @@ window.THD = window.THD || {};
        cross-referencing two lists by eye.
     ========================================================== */
 
-    function trafficCompareRowHtml(row) {
+    function trafficCompareRowHtml(row, activeLabel) {
         const cur = row.current;
         const prev = row.previous;
         const curSessions = cur ? cur.sessions : 0;
         const prevSessions = prev ? prev.sessions : 0;
         const color = (cur && cur.color) || (prev && prev.color) || "#94A3B8";
+        const isActive = !!activeLabel && activeLabel === row.label;
 
         let deltaHtml = "—";
         if (prevSessions > 0) {
@@ -285,7 +286,7 @@ window.THD = window.THD || {};
         }
 
         return `
-            <tr>
+            <tr class="tcRow${isActive ? " active" : ""}" data-label="${row.label}" title="Click to see the sources behind ${row.label} below">
                 <td class="tcSource">
                     <span class="tcSourceInner">
                         <span class="legendColor" style="background:${color}"></span>
@@ -301,7 +302,7 @@ window.THD = window.THD || {};
         `;
     }
 
-    function renderTrafficComparison(rows) {
+    function renderTrafficComparison(rows, activeLabel) {
         const tbody = document.getElementById("trafficCompareTable");
         if (!tbody) return;
 
@@ -310,7 +311,22 @@ window.THD = window.THD || {};
             return;
         }
 
-        tbody.innerHTML = rows.map(trafficCompareRowHtml).join("");
+        tbody.innerHTML = rows.map((r) => trafficCompareRowHtml(r, activeLabel)).join("");
+    }
+
+    // Clicking a row asks app.js (which holds the raw source rows and
+    // current groupBy) to filter the Session Source table down to just
+    // that bucket — e.g. click "Referral (Other)" to see which actual
+    // sites make it up. Clicking the same row again clears it; app.js
+    // owns that toggle logic, this just reports which label was clicked.
+    function wireTrafficComparisonFilter(onRowClick) {
+        const tbody = document.getElementById("trafficCompareTable");
+        if (!tbody) return;
+        tbody.addEventListener("click", (e) => {
+            const row = e.target.closest("tr.tcRow");
+            if (!row) return;
+            onRowClick(row.dataset.label);
+        });
     }
 
     /* ==========================================================
@@ -354,15 +370,43 @@ window.THD = window.THD || {};
         const tbody = document.getElementById("sourceTable");
         if (!tbody) return;
 
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">No sources match this filter for the selected period.</td></tr>`;
+            const btn = document.getElementById("toggleSourcesBtn");
+            if (btn) btn.style.display = "none";
+            return;
+        }
+
         const visible = sourcesExpanded ? allSourceRows : allSourceRows.slice(0, COLLAPSED_ROW_COUNT);
         tbody.innerHTML = visible.map(sourceRowHtml).join("");
 
         const btn = document.getElementById("toggleSourcesBtn");
         if (btn) {
+            btn.style.display = "";
             btn.textContent = sourcesExpanded
                 ? "Show Less"
                 : `Show All (${allSourceRows.length})`;
         }
+    }
+
+    // Small "Filtered by: <label> [Clear]" indicator shown above the
+    // Session Source table once a Traffic Comparison row is clicked.
+    function renderSourceFilterStatus(label) {
+        const status = document.getElementById("sourceFilterStatus");
+        const labelEl = document.getElementById("sourceFilterLabel");
+        if (!status || !labelEl) return;
+        if (label) {
+            labelEl.textContent = label;
+            status.style.display = "flex";
+        } else {
+            status.style.display = "none";
+        }
+    }
+
+    function wireClearSourceFilter(onClear) {
+        const btn = document.getElementById("clearSourceFilterBtn");
+        if (!btn) return;
+        btn.addEventListener("click", onClear);
     }
 
     function wireSourceTableToggle() {
@@ -534,9 +578,12 @@ window.THD = window.THD || {};
         renderTrafficPeriodLabels,
         renderLandingPages,
         renderTrafficComparison,
+        wireTrafficComparisonFilter,
         getTrafficGroupBy,
         wireTrafficGroupToggle,
         renderSourceTable,
+        renderSourceFilterStatus,
+        wireClearSourceFilter,
         wireSourceTableToggle,
         renderMonthlyTable,
         renderNewRepeatTable,

@@ -463,6 +463,83 @@
 }
 
 /* ==========================================================
+   Traffic Comparison Row — Drill-down
+   Rows are clickable to filter the Session Source table below
+   down to just that bucket (e.g. "Referral (Other)" -> which
+   actual sites make it up).
+========================================================== */
+
+.tcRow{
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.tcRow.active{
+
+    background:var(--primary-light) !important;
+
+}
+
+.tcRow.active td.tcSource{
+
+    color:var(--primary);
+
+}
+
+/* ==========================================================
+   Session Source Filter Status
+========================================================== */
+
+.sourceFilterStatus{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    font-size:14px;
+
+    color:var(--text-light);
+
+    background:var(--primary-light);
+
+    padding:8px 14px;
+
+    border-radius:12px;
+
+}
+
+.sourceFilterStatus strong{
+
+    color:var(--primary);
+
+}
+
+.clearFilterBtn{
+
+    background:none;
+
+    border:none;
+
+    color:var(--primary);
+
+    font-size:13px;
+
+    font-weight:600;
+
+    cursor:pointer;
+
+    padding:0;
+
+    text-decoration:underline;
+
+}
+
+/* ==========================================================
    Trend Overlay Toggle (moving average)
 ========================================================== */
 
