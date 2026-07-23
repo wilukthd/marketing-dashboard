@@ -244,18 +244,153 @@ window.THD = window.THD || {};
         return channels.map((c) => ({ ...c, color: colorForLabel(c.label) }));
     }
 
+    /* ==========================================================
+       New vs Repeat Customers
+       Stacked bars (New / Repeat, in whichever metric — orders or
+       revenue — is selected) with a "New Customer Share" line on
+       its own 0-100% axis, so both the absolute mix and the trend
+       in acquisition-vs-retention balance read at a glance.
+    ========================================================== */
+
+    let newRepeatChartInstance = null;
+
+    const NEW_REPEAT_COLORS = {
+        newBar: "#2563EB",
+        repeatBar: "#94A3B8",
+        pctLine: "#16A34A"
+    };
+
+    function formatNewRepeatValue(v, isRevenue) {
+        return isRevenue
+            ? "¥" + Math.round(v).toLocaleString("en-US")
+            : Math.round(v).toLocaleString("en-US");
+    }
+
+    function renderNewRepeatChart(rows, metric) {
+        const canvas = document.getElementById("newRepeatChart");
+        if (!canvas) return;
+
+        const colors = getChartColors();
+        const isRevenue = metric === "revenue";
+
+        if (newRepeatChartInstance) {
+            newRepeatChartInstance.destroy();
+            newRepeatChartInstance = null;
+        }
+
+        if (!rows || !rows.length) return;
+
+        const labels = rows.map((r) => r.period);
+        const newValues = rows.map((r) => (isRevenue ? r.newRevenue : r.newOrders));
+        const repeatValues = rows.map((r) => (isRevenue ? r.repeatRevenue : r.repeatOrders));
+        const newShare = rows.map((r) => {
+            const newV = isRevenue ? r.newRevenue : r.newOrders;
+            const repeatV = isRevenue ? r.repeatRevenue : r.repeatOrders;
+            const total = newV + repeatV;
+            return total ? (newV / total) * 100 : 0;
+        });
+
+        newRepeatChartInstance = new Chart(canvas.getContext("2d"), {
+            data: {
+                labels,
+                datasets: [
+                    {
+                        type: "bar",
+                        label: "New",
+                        data: newValues,
+                        backgroundColor: NEW_REPEAT_COLORS.newBar,
+                        stack: "total",
+                        yAxisID: "yValue",
+                        borderRadius: 4,
+                        maxBarThickness: 40
+                    },
+                    {
+                        type: "bar",
+                        label: "Repeat",
+                        data: repeatValues,
+                        backgroundColor: NEW_REPEAT_COLORS.repeatBar,
+                        stack: "total",
+                        yAxisID: "yValue",
+                        borderRadius: 4,
+                        maxBarThickness: 40
+                    },
+                    {
+                        type: "line",
+                        label: "New Customer Share",
+                        data: newShare,
+                        borderColor: NEW_REPEAT_COLORS.pctLine,
+                        backgroundColor: NEW_REPEAT_COLORS.pctLine,
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.35,
+                        yAxisID: "yPct",
+                        order: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
+                    },
+                    tooltip: {
+                        backgroundColor: "#111827",
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: (item) => item.dataset.yAxisID === "yPct"
+                                ? `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`
+                                : `${item.dataset.label}: ${formatNewRepeatValue(item.parsed.y, isRevenue)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        ticks: { color: colors.textLight }
+                    },
+                    yValue: {
+                        stacked: true,
+                        position: "left",
+                        grid: { color: colors.grid },
+                        border: { display: false },
+                        ticks: { callback: (v) => formatNewRepeatValue(v, isRevenue), color: colors.textLight }
+                    },
+                    yPct: {
+                        position: "right",
+                        min: 0,
+                        max: 100,
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { callback: (v) => v + "%", color: colors.textLight }
+                    }
+                }
+            }
+        });
+    }
+
     // Charts created while their tab is hidden (display:none) get stuck
     // at Chart.js's zero-size fallback, since nothing tells them to
     // remeasure once the container becomes visible again. Call this
     // right after a tab switch to fix that.
     function resizeCharts() {
         if (trendChartInstance) trendChartInstance.resize();
+        if (newRepeatChartInstance) newRepeatChartInstance.resize();
         Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
     THD.charts = {
         renderTrendChart,
         renderTrafficChart,
+        renderNewRepeatChart,
         resizeCharts
     };
 

@@ -27,13 +27,13 @@ window.THD = window.THD || {};
         // GA4 acquisition breakdown: sourceMedium, sessions, users, purchases, revenue, channel
         GA4_SOURCES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=96802008&single=true&output=csv",
 
-        // GA4 landing page breakdown: path, sessions
+        // GA4 landing page breakdown: date, path, sessions, purchases, revenue
         GA4_LANDING_PAGES_CSV_URL: "",
 
-        // Spreadsheet: WEB本店新規／リピータ monthly rollup
-        // period, totalRevenue, totalOrders, newRevenue, newOrders,
-        // repeatRevenue, repeatOrders, visitorsPc, visitorsSp, visitorsTotal
-        NEW_REPEAT_CSV_URL: ""
+        // Spreadsheet: WEB本店新規／リピータ — published as-is, raw
+        // layout (two header rows, no need to restructure the sheet).
+        // See loadNewRepeat() for the exact column mapping.
+        NEW_REPEAT_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSRf48VUc7RKvkbgkwFXDrYxPidpJaOX6xRRsu-y19J4Jas-RsrLlzNT3CCh0pxR1Ha7rLaXF1TJvS/pub?gid=0&single=true&output=csv"
     };
 
     /* ==========================================================
@@ -49,6 +49,28 @@ window.THD = window.THD || {};
             Papa.parse(url, {
                 download: true,
                 header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: (results) => resolve(results.data),
+                error: (err) => reject(err)
+            });
+        });
+    }
+
+    // For sheets with merged/multi-row headers (like WEB本店新規／
+    // リピータ), header:true would collapse duplicate sub-header
+    // names (前月比 repeats 8 times) into one column and lose data.
+    // This reads plain row arrays instead so the loader can map
+    // columns by position.
+    function fetchRawCsv(url) {
+        return new Promise((resolve, reject) => {
+            if (!url) {
+                reject(new Error("No URL configured"));
+                return;
+            }
+            Papa.parse(url, {
+                download: true,
+                header: false,
                 dynamicTyping: true,
                 skipEmptyLines: true,
                 complete: (results) => resolve(results.data),
@@ -116,10 +138,61 @@ window.THD = window.THD || {};
         }
     }
 
+    // Raw column layout (0-indexed), matching the sheet exactly as
+    // published — two header rows (merged group labels, then the
+    // 売上/前月比/昨年比/受注件数/... sub-labels), then one row per
+    // month. No blank spacer column — confirmed against the actual
+    // published CSV (the web-preview HTML table view showed an
+    // extra blank column C, but that turned out to be a rendering
+    // artifact only, not real data):
+    //   0  年度 (year)              13 リピーター 昨年比
+    //   1  月度 (month, 1-12)       14 リピーター 売上
+    //   2  総合 売上                15 リピーター 前月比
+    //   3  総合 前月比               16 リピーター 昨年比
+    //   4  総合 昨年比               17 リピーター 受注件数
+    //   5  総合 受注件数             18 リピーター 前月比
+    //   6  総合 前月比               19 リピーター 昨年比
+    //   7  総合 昨年比               20 訪問者数 PC
+    //   8  新規 売上                 21 訪問者数 スマホ
+    //   9  新規 前月比               22 訪問者数 合計
+    //   10 新規 昨年比               23 訪問者数 前月比
+    //   11 新規 受注件数             24 訪問者数 昨年比
+    //   12 新規 前月比
+    // Only year/month/revenue/orders/visitor columns are used — the
+    // 前月比/昨年比 (MoM/YoY %) columns are ignored since the dashboard
+    // computes its own period-over-period deltas from the raw figures.
+    // The published sheet formats larger numbers with thousand-
+    // separator commas plus a trailing space (e.g. "29,515,711 "),
+    // which arrive as unparsed strings since PapaParse's dynamic
+    // typing only auto-converts plain numeric strings. Number()
+    // on a comma-containing string returns NaN, so this strips
+    // commas/whitespace first.
+    function parseFormattedNumber(v) {
+        if (typeof v === "number") return v;
+        if (v === null || v === undefined || v === "") return 0;
+        const n = parseFloat(String(v).replace(/,/g, "").trim());
+        return Number.isFinite(n) ? n : 0;
+    }
+
     async function loadNewRepeat() {
         try {
-            const rows = await fetchCsv(CONFIG.NEW_REPEAT_CSV_URL);
-            return rows.filter((r) => r.period);
+            const raw = await fetchRawCsv(CONFIG.NEW_REPEAT_CSV_URL);
+            return raw
+                .slice(2) // skip the two header rows
+                .filter((r) => Number.isFinite(r[0]) && Number.isFinite(r[1])) // drops blank/leftover formula rows at the bottom
+                .sort((a, b) => (a[0] * 12 + a[1]) - (b[0] * 12 + b[1]))
+                .map((r) => ({
+                    period: businessMonthLabel(r[0], r[1] - 1),
+                    totalRevenue: parseFormattedNumber(r[2]),
+                    totalOrders: parseFormattedNumber(r[5]),
+                    newRevenue: parseFormattedNumber(r[8]),
+                    newOrders: parseFormattedNumber(r[11]),
+                    repeatRevenue: parseFormattedNumber(r[14]),
+                    repeatOrders: parseFormattedNumber(r[17]),
+                    visitorsPc: parseFormattedNumber(r[20]),
+                    visitorsSp: parseFormattedNumber(r[21]),
+                    visitorsTotal: parseFormattedNumber(r[22])
+                }));
         } catch (e) {
             console.warn("[THD.data] New/Repeat CSV not available, using dummy data:", e.message);
             return null;
@@ -130,13 +203,14 @@ window.THD = window.THD || {};
         try {
             const rows = await fetchCsv(CONFIG.GA4_LANDING_PAGES_CSV_URL);
             return rows
-                .filter((r) => r.path)
+                .filter((r) => r.path && r.date)
                 .map((r) => ({
                     path: r.path,
-                    sessions: Number(r.sessions) || 0
-                }))
-                .sort((a, b) => b.sessions - a.sessions)
-                .slice(0, 8);
+                    date: parseGA4Date(r.date),
+                    sessions: Number(r.sessions) || 0,
+                    purchases: Number(r.purchases) || 0,
+                    revenue: Number(r.revenue) || 0
+                }));
         } catch (e) {
             console.warn("[THD.data] Landing pages CSV not available, using dummy data:", e.message);
             return null;
@@ -605,6 +679,34 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Per-day-per-path rows -> Top Landing Pages. Same shape as
+       filterSourcesByDates: aggregates matching rows within an
+       arbitrary [start, end] window into one row per path, so the
+       list responds to whatever date range is selected instead of
+       always showing one fixed snapshot.
+    ========================================================== */
+
+    function filterLandingPagesByDates(landingRows, start, end, limit = 8) {
+        const inWindow = landingRows.filter((r) => inRange(r.date, start, end));
+
+        const totals = {};
+        inWindow.forEach((r) => {
+            if (!totals[r.path]) {
+                totals[r.path] = { path: r.path, sessions: 0, purchases: 0, revenue: 0 };
+            }
+            const t = totals[r.path];
+            t.sessions += r.sessions;
+            t.purchases += r.purchases;
+            t.revenue += r.revenue;
+        });
+
+        return Object.values(totals)
+            .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
+            .sort((a, b) => b.sessions - a.sessions)
+            .slice(0, limit);
+    }
+
+    /* ==========================================================
        Current vs previous period, merged into one row per
        channel/platform so the two can be shown side by side
        (and so a channel that only appears in one period still
@@ -726,6 +828,7 @@ window.THD = window.THD || {};
         filterDailyRange,
         filterSourcesRange,
         filterSourcesByDates,
+        filterLandingPagesByDates,
         buildTrafficComparison,
         computeMovingAverage,
         buildBusinessMonths

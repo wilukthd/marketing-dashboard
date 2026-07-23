@@ -653,11 +653,19 @@ MAIN
 
     <div class="chartHeader">
 
-        <h3>
+        <div>
 
-            Top Landing Pages
+            <h3>
 
-        </h3>
+                Top Landing Pages
+
+            </h3>
+
+            <small id="landingPagesPeriod">
+
+            </small>
+
+        </div>
 
     </div>
 
@@ -816,6 +824,52 @@ MAIN
             </tbody>
 
         </table>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================= NEW / REPEAT CHART ================= -->
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <div>
+
+            <h3>
+
+                New vs Repeat Customers
+
+            </h3>
+
+            <small>
+
+                WEB本店 新規／リピータ — by business month
+
+            </small>
+
+        </div>
+
+        <div class="chartTools">
+
+            <select id="newRepeatMetricSelect">
+
+                <option value="orders" selected>Orders</option>
+
+                <option value="revenue">Revenue</option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div class="chartBody">
+
+        <canvas id="newRepeatChart"></canvas>
 
     </div>
 

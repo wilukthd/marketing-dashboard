@@ -16,6 +16,7 @@
 
     let dailyRows = [];       // full daily GA4 rows (real or dummy), oldest -> newest
     let sourceRows = [];      // full per-day-per-source rows (real or dummy)
+    let landingRows = [];     // full per-day-per-path rows (real or dummy)
     let currentRange = "month";
     let currentCustomRange = null; // { start: Date, end: Date }, only used when currentRange === "custom"
 
@@ -28,6 +29,7 @@
     let activeSourceFilter = null;
     let sourcesCurrentForFilter = [];
     let lastTrafficComparisonRows = [];
+    let newRepeatRows = []; // last-loaded new/repeat rows, kept so the Orders/Revenue toggle can re-render without re-fetching
 
     function renderFilteredSourceTable() {
         const rows = activeSourceFilter
@@ -35,6 +37,10 @@
             : sourcesCurrentForFilter;
         THD.ui.renderSourceTable(rows);
         THD.ui.renderSourceFilterStatus(activeSourceFilter);
+    }
+
+    function renderNewRepeatChartForMetric() {
+        THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric());
     }
 
     /* ==========================================================
@@ -116,13 +122,30 @@
         ];
     }
 
-    const DUMMY_LANDING_PAGES = [
-        { path: "/products/summer-sale", sessions: 8420 },
-        { path: "/", sessions: 7110 },
-        { path: "/blog/style-guide-2026", sessions: 4890 },
-        { path: "/products/new-arrivals", sessions: 3260 },
-        { path: "/about", sessions: 1540 }
+    const LANDING_PAGE_POOL = [
+        "/", "/products/summer-sale", "/blog/style-guide-2026", "/products/new-arrivals",
+        "/about", "/products/best-sellers", "/campaign/lp-2026-spring", "/sale"
     ];
+
+    function buildDummyLandingPagesDaily(days = 900) {
+        const rows = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - (days - 1 - i));
+            const dateStr = d.toISOString().slice(0, 10);
+
+            LANDING_PAGE_POOL.forEach((path, idx) => {
+                // Rough relative popularity by pool position, so the
+                // top-8 ranking looks realistic instead of flat noise.
+                const weight = 1 - idx * 0.1;
+                const sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
+                const purchases = Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0;
+                const revenue = purchases * (7000 + Math.random() * 6000);
+                rows.push({ path, date: dateStr, sessions, purchases, revenue });
+            });
+        }
+        return rows;
+    }
 
     const DUMMY_MONTHLY = [
         { month: "Feb 2026", revenue: 31250400, orders: 3210, users: 36800, cvr: 5.62, trend: 4.1 },
@@ -148,6 +171,10 @@
         THD.ui.renderKpis(filtered.kpi);
         THD.ui.renderRangeCompare(range);
         THD.ui.renderTrafficPeriodLabels(range);
+
+        const landingCurrent = THD.data.filterLandingPagesByDates(landingRows, range.start, range.end, 8);
+        THD.ui.renderLandingPages(landingCurrent);
+
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
             showTrendOverlay: THD.ui.getTrendOverlayState()
         });
@@ -239,8 +266,12 @@
             THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
             renderFilteredSourceTable();
         });
+        THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
-        THD.ui.wireThemeToggle(() => renderForRange(currentRange, currentCustomRange));
+        THD.ui.wireThemeToggle(() => {
+            renderForRange(currentRange, currentCustomRange);
+            renderNewRepeatChartForMetric();
+        });
         THD.ui.wireNotes();
         wireDateRange();
 
@@ -260,12 +291,10 @@
 
         dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows();
         sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
+        landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
-        const landingPages = liveLandingPages && liveLandingPages.length ? liveLandingPages : DUMMY_LANDING_PAGES;
 
         renderForRange(currentRange, currentCustomRange);
-
-        THD.ui.renderLandingPages(landingPages);
 
         // Business month = 21st of the previous calendar month
         // through the 20th of the named month (e.g. "Feb 2026" =
@@ -276,6 +305,11 @@
         THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
 
         THD.ui.renderNewRepeatTable(newRepeat);
+        // Table mirrors the full spreadsheet history; the chart stays
+        // capped to a recent window so it doesn't get crowded with
+        // 50+ bars once real data (which goes back to 2021) is wired in.
+        newRepeatRows = newRepeat.slice(-12);
+        renderNewRepeatChartForMetric();
 
         THD.ui.renderLastUpdate();
     }

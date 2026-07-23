@@ -55,8 +55,10 @@ window.THD = window.THD || {};
         if (!range) return;
         const curEl = document.getElementById("trafficPeriodCurrent");
         const prevEl = document.getElementById("trafficPeriodPrevious");
+        const landingEl = document.getElementById("landingPagesPeriod");
         if (curEl) curEl.textContent = `${fmtISODate(range.start)} – ${fmtISODate(range.end)}`;
         if (prevEl) prevEl.textContent = `${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}`;
+        if (landingEl) landingEl.textContent = `${fmtISODate(range.start)} – ${fmtISODate(range.end)}`;
     }
 
     /* ==========================================================
@@ -119,19 +121,29 @@ window.THD = window.THD || {};
         const container = document.getElementById("landingPages");
         if (!container) return;
 
+        if (!pages || !pages.length) {
+            container.innerHTML = `<p class="emptyRow">No landing page data for this period.</p>`;
+            return;
+        }
+
         const maxSessions = Math.max(...pages.map((p) => p.sessions));
 
-        container.innerHTML = pages.map((p) => `
-            <div class="landingItem">
-                <div class="landingItemTop">
-                    <span>${p.path}</span>
-                    <small>${fmtNumber(p.sessions)} sessions</small>
+        container.innerHTML = pages.map((p) => {
+            const stats = (p.revenue !== undefined)
+                ? `<small>${fmtNumber(p.sessions)} sessions · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} CVR</small>`
+                : `<small>${fmtNumber(p.sessions)} sessions</small>`;
+            return `
+                <div class="landingItem">
+                    <div class="landingItemTop">
+                        <span>${p.path}</span>
+                        ${stats}
+                    </div>
+                    <div class="landingBar">
+                        <div class="landingBarFill" style="width:${(p.sessions / maxSessions) * 100}%"></div>
+                    </div>
                 </div>
-                <div class="landingBar">
-                    <div class="landingBarFill" style="width:${(p.sessions / maxSessions) * 100}%"></div>
-                </div>
-            </div>
-        `).join("");
+            `;
+        }).join("");
     }
 
     /* ==========================================================
@@ -443,6 +455,21 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       New / Repeat Chart Metric Toggle (Orders vs Revenue)
+    ========================================================== */
+
+    function getNewRepeatMetric() {
+        const select = document.getElementById("newRepeatMetricSelect");
+        return select ? select.value : "orders";
+    }
+
+    function wireNewRepeatMetricToggle(onChange) {
+        const select = document.getElementById("newRepeatMetricSelect");
+        if (!select) return;
+        select.addEventListener("change", () => onChange(select.value));
+    }
+
+    /* ==========================================================
        New / Repeat Customer Table (spreadsheet)
     ========================================================== */
 
@@ -587,6 +614,8 @@ window.THD = window.THD || {};
         wireSourceTableToggle,
         renderMonthlyTable,
         renderNewRepeatTable,
+        getNewRepeatMetric,
+        wireNewRepeatMetricToggle,
         getCheckedMetrics,
         wireMetricToggles,
         getTrendOverlayState,
