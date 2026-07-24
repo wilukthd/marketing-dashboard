@@ -366,6 +366,20 @@ select:focus{
 
 }
 
+.sourceLink{
+
+    color:var(--primary);
+
+    text-decoration:underline;
+
+}
+
+.sourceLink:hover{
+
+    opacity:.75;
+
+}
+
 .center{
 
     text-align:center;

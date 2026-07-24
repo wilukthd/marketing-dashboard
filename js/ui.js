@@ -55,10 +55,8 @@ window.THD = window.THD || {};
         if (!range) return;
         const curEl = document.getElementById("trafficPeriodCurrent");
         const prevEl = document.getElementById("trafficPeriodPrevious");
-        const landingEl = document.getElementById("landingPagesPeriod");
         if (curEl) curEl.textContent = `${fmtISODate(range.start)} – ${fmtISODate(range.end)}`;
         if (prevEl) prevEl.textContent = `${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}`;
-        if (landingEl) landingEl.textContent = `${fmtISODate(range.start)} – ${fmtISODate(range.end)}`;
     }
 
     /* ==========================================================
@@ -115,6 +113,9 @@ window.THD = window.THD || {};
 
     /* ==========================================================
        Landing Pages
+       Fixed 30-day window (doesn't follow the date-range picker —
+       see aggregateLandingPages in data.js for why), with a PC /
+       Smartphone / All device filter.
     ========================================================== */
 
     function renderLandingPages(pages) {
@@ -122,20 +123,19 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!pages || !pages.length) {
-            container.innerHTML = `<p class="emptyRow">No landing page data for this period.</p>`;
+            container.innerHTML = `<p class="emptyRow">No landing page data for this window.</p>`;
             return;
         }
 
         const maxSessions = Math.max(...pages.map((p) => p.sessions));
 
         container.innerHTML = pages.map((p) => {
-            const stats = (p.revenue !== undefined)
-                ? `<small>${fmtNumber(p.sessions)} sessions · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} CVR</small>`
-                : `<small>${fmtNumber(p.sessions)} sessions</small>`;
+            const label = p.pageTitle || "(not set)";
+            const stats = `<small>${fmtNumber(p.sessions)} sessions · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} CVR</small>`;
             return `
                 <div class="landingItem">
                     <div class="landingItemTop">
-                        <span>${p.path}</span>
+                        <span>${label}</span>
                         ${stats}
                     </div>
                     <div class="landingBar">
@@ -144,6 +144,23 @@ window.THD = window.THD || {};
                 </div>
             `;
         }).join("");
+    }
+
+    function renderLandingPagesPeriodLabel(startStr, endStr) {
+        const el = document.getElementById("landingPagesPeriod");
+        if (!el) return;
+        el.textContent = startStr && endStr ? `Fixed 30-day window: ${startStr} – ${endStr}` : "";
+    }
+
+    function getLandingDevice() {
+        const select = document.getElementById("landingDeviceSelect");
+        return select ? select.value : "all";
+    }
+
+    function wireLandingDeviceToggle(onChange) {
+        const select = document.getElementById("landingDeviceSelect");
+        if (!select) return;
+        select.addEventListener("change", () => onChange(select.value));
     }
 
     /* ==========================================================
@@ -470,6 +487,22 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       New / Repeat Insights
+    ========================================================== */
+
+    function renderNewRepeatInsights(insights) {
+        const container = document.getElementById("newRepeatInsights");
+        if (!container) return;
+
+        if (!insights || !insights.length) {
+            container.innerHTML = `<li>Not enough history yet for a pattern here.</li>`;
+            return;
+        }
+
+        container.innerHTML = insights.map((text) => `<li>${text}</li>`).join("");
+    }
+
+    /* ==========================================================
        New / Repeat Customer Table (spreadsheet)
     ========================================================== */
 
@@ -604,6 +637,9 @@ window.THD = window.THD || {};
         renderRangeCompare,
         renderTrafficPeriodLabels,
         renderLandingPages,
+        renderLandingPagesPeriodLabel,
+        getLandingDevice,
+        wireLandingDeviceToggle,
         renderTrafficComparison,
         wireTrafficComparisonFilter,
         getTrafficGroupBy,
@@ -614,6 +650,7 @@ window.THD = window.THD || {};
         wireSourceTableToggle,
         renderMonthlyTable,
         renderNewRepeatTable,
+        renderNewRepeatInsights,
         getNewRepeatMetric,
         wireNewRepeatMetricToggle,
         getCheckedMetrics,

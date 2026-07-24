@@ -43,6 +43,17 @@
         THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric());
     }
 
+    // Top Landing Pages ignores the global date-range picker (fixed
+    // 30-day window instead — see aggregateLandingPages), so it only
+    // needs to re-render itself when the device filter changes.
+    function renderLandingPagesForDevice() {
+        const device = THD.ui.getLandingDevice();
+        const rows = THD.data.aggregateLandingPages(landingRows, device, 10);
+        THD.ui.renderLandingPages(rows);
+        const win = THD.data.resolveLast30DayWindow(landingRows);
+        if (win) THD.ui.renderLandingPagesPeriodLabel(win.startStr, win.endStr);
+    }
+
     /* ==========================================================
        Dummy Data (fallback when a live source isn't configured)
     ========================================================== */
@@ -122,26 +133,35 @@
         ];
     }
 
+    // Mix of PC and Smartphone (path prefixed "/smartphone/") pages,
+    // matching how the real export's device flag works.
     const LANDING_PAGE_POOL = [
-        "/", "/products/summer-sale", "/blog/style-guide-2026", "/products/new-arrivals",
-        "/about", "/products/best-sellers", "/campaign/lp-2026-spring", "/sale"
+        { landingPage: "/", pageTitle: "トップページ" },
+        { landingPage: "/smartphone/index.html", pageTitle: "トップページ（スマホ）" },
+        { landingPage: "/shopdetail/000000002741", pageTitle: "【オンライン学習】後藤 芳宏さん　植物さんとのコミュニ" },
+        { landingPage: "/smartphone/detail.html", pageTitle: "夏のセール限定 サマーケアセット" },
+        { landingPage: "/smartphone/detail.html", pageTitle: "モイストクリーム 100g【特典付き】" },
+        { landingPage: "/smartphone/page78.html", pageTitle: "トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/blog/style-guide-2026", pageTitle: "2026年 スタイルガイド ブログ" },
+        { landingPage: "/smartphone/detail.html", pageTitle: "オリジンウォーター 500ml【2本購入で特典付き】" }
     ];
 
-    function buildDummyLandingPagesDaily(days = 900) {
+    function buildDummyLandingPagesDaily(days = 45) {
         const rows = [];
         for (let i = 0; i < days; i++) {
             const d = new Date();
             d.setDate(d.getDate() - (days - 1 - i));
             const dateStr = d.toISOString().slice(0, 10);
 
-            LANDING_PAGE_POOL.forEach((path, idx) => {
+            LANDING_PAGE_POOL.forEach(({ landingPage, pageTitle }, idx) => {
                 // Rough relative popularity by pool position, so the
-                // top-8 ranking looks realistic instead of flat noise.
+                // top-N ranking looks realistic instead of flat noise.
                 const weight = 1 - idx * 0.1;
                 const sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
                 const purchases = Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0;
                 const revenue = purchases * (7000 + Math.random() * 6000);
-                rows.push({ path, date: dateStr, sessions, purchases, revenue });
+                const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
+                rows.push({ landingPage, pageTitle, device, date: dateStr, sessions, purchases, revenue });
             });
         }
         return rows;
@@ -171,9 +191,6 @@
         THD.ui.renderKpis(filtered.kpi);
         THD.ui.renderRangeCompare(range);
         THD.ui.renderTrafficPeriodLabels(range);
-
-        const landingCurrent = THD.data.filterLandingPagesByDates(landingRows, range.start, range.end, 8);
-        THD.ui.renderLandingPages(landingCurrent);
 
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
             showTrendOverlay: THD.ui.getTrendOverlayState()
@@ -267,6 +284,7 @@
             renderFilteredSourceTable();
         });
         THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
+        THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
             renderForRange(currentRange, currentCustomRange);
@@ -295,6 +313,7 @@
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
 
         renderForRange(currentRange, currentCustomRange);
+        renderLandingPagesForDevice();
 
         // Business month = 21st of the previous calendar month
         // through the 20th of the named month (e.g. "Feb 2026" =
@@ -304,12 +323,17 @@
         const businessMonths = THD.data.buildBusinessMonths(dailyRows, 12);
         THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
 
-        THD.ui.renderNewRepeatTable(newRepeat);
-        // Table mirrors the full spreadsheet history; the chart stays
-        // capped to a recent window so it doesn't get crowded with
-        // 50+ bars once real data (which goes back to 2021) is wired in.
-        newRepeatRows = newRepeat.slice(-12);
+        // Table and chart both stay capped to a recent window — full
+        // history (back to 2021) lives in the linked spreadsheet, and
+        // 50+ rows/bars stopped being readable in either view. The
+        // insights below run on the FULL history instead, since the
+        // year-over-year comparison needs to look back further than
+        // what's shown on screen.
+        const recentNewRepeat = newRepeat.slice(-12);
+        THD.ui.renderNewRepeatTable(recentNewRepeat);
+        newRepeatRows = recentNewRepeat;
         renderNewRepeatChartForMetric();
+        THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(newRepeat));
 
         THD.ui.renderLastUpdate();
     }

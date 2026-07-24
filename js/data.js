@@ -27,8 +27,16 @@ window.THD = window.THD || {};
         // GA4 acquisition breakdown: sourceMedium, sessions, users, purchases, revenue, channel
         GA4_SOURCES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=96802008&single=true&output=csv",
 
-        // GA4 landing page breakdown: date, path, sessions, purchases, revenue
-        GA4_LANDING_PAGES_CSV_URL: "",
+        // GA4 landing page breakdown — fixed 30-day rolling window
+        // (the underlying GA4 export is capped there; ~60k rows even
+        // at 30 days, so no more history is kept). Columns: date,
+        // landingPage, pageTitle, landingPagePlusQueryString, sessions,
+        // ecommercePurchases, totalRevenue. See loadLandingPages() —
+        // grouping uses pageTitle (readable) rather than landingPage,
+        // since landingPage is a generic template shared by hundreds of
+        // different product pages (the actual product only shows up in
+        // the query string / pageTitle).
+        GA4_LANDING_PAGES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=1176432957&single=true&output=csv",
 
         // Spreadsheet: WEB本店新規／リピータ — published as-is, raw
         // layout (two header rows, no need to restructure the sheet).
@@ -199,17 +207,31 @@ window.THD = window.THD || {};
         }
     }
 
+    // This site's mobile pages all live under a "/smartphone/" path
+    // prefix and PC pages don't — so device can be read straight off
+    // landingPage without GA4 needing a separate device dimension.
+    function classifyDevice(landingPage) {
+        if (!landingPage) return "Unknown";
+        return landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
+    }
+
     async function loadLandingPages() {
         try {
             const rows = await fetchCsv(CONFIG.GA4_LANDING_PAGES_CSV_URL);
             return rows
-                .filter((r) => r.path && r.date)
+                .filter((r) => r.date) // keep rows even when landingPage/pageTitle is blank — that's a real "(not set)" hit, not junk
                 .map((r) => ({
-                    path: r.path,
                     date: parseGA4Date(r.date),
+                    landingPage: r.landingPage || "",
+                    pageTitle: r.pageTitle || "(not set)",
+                    device: classifyDevice(r.landingPage),
                     sessions: Number(r.sessions) || 0,
-                    purchases: Number(r.purchases) || 0,
-                    revenue: Number(r.revenue) || 0
+                    // Column name confirmed from the sheet is truncated in
+                    // the UI preview ("ecommercePurc…") — covering the
+                    // likely full names defensively so this doesn't
+                    // silently read as 0 if the exact header differs.
+                    purchases: Number(r.ecommercePurchases ?? r.ecommercePurc ?? r.purchases) || 0,
+                    revenue: Number(r.totalRevenue) || 0
                 }));
         } catch (e) {
             console.warn("[THD.data] Landing pages CSV not available, using dummy data:", e.message);
@@ -552,6 +574,74 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       New / Repeat Insights
+       Runs on the FULL New/Repeat history (not just the 12 months
+       shown in the table), since the year-over-year and trend
+       comparisons below need to look back further than the visible
+       window.
+    ========================================================== */
+
+    function buildNewRepeatInsights(rows) {
+        const insights = [];
+        if (!rows || rows.length < 2) return insights;
+
+        const latest = rows[rows.length - 1];
+        const orderShare = (r) => (r.newOrders + r.repeatOrders)
+            ? (r.newOrders / (r.newOrders + r.repeatOrders)) * 100
+            : 0;
+        const latestShare = orderShare(latest);
+
+        // New customer share of orders, with YoY comparison once a
+        // full year of history is available.
+        if (rows.length > 12) {
+            const yearAgo = rows[rows.length - 13];
+            const diff = latestShare - orderShare(yearAgo);
+            const figure = highlight(`${Math.abs(diff).toFixed(1)} pts`, diff >= 0 ? "pos" : "neg");
+            insights.push(`New customers made up ${highlight(latestShare.toFixed(1) + "%", "neutral")} of orders in <strong>${latest.period}</strong>, ${diff >= 0 ? "up" : "down"} ${figure} year-over-year.`);
+        } else {
+            insights.push(`New customers made up ${highlight(latestShare.toFixed(1) + "%", "neutral")} of orders in <strong>${latest.period}</strong>.`);
+        }
+
+        // Repeat customers' share of revenue — often a different
+        // number than their share of orders, since basket sizes differ.
+        const repeatRevenueShare = latest.totalRevenue ? (latest.repeatRevenue / latest.totalRevenue) * 100 : 0;
+        insights.push(`Repeat customers generated ${highlight(repeatRevenueShare.toFixed(1) + "%", "neutral")} of total revenue in <strong>${latest.period}</strong>.`);
+
+        // AOV comparison between new and repeat customers this month.
+        const newAov = latest.newOrders ? latest.newRevenue / latest.newOrders : 0;
+        const repeatAov = latest.repeatOrders ? latest.repeatRevenue / latest.repeatOrders : 0;
+        if (newAov && repeatAov) {
+            const repeatHigher = repeatAov >= newAov;
+            const pctDiff = repeatHigher
+                ? ((repeatAov - newAov) / newAov) * 100
+                : ((newAov - repeatAov) / repeatAov) * 100;
+            const higherAov = Math.round(repeatHigher ? repeatAov : newAov).toLocaleString("en-US");
+            const lowerAov = Math.round(repeatHigher ? newAov : repeatAov).toLocaleString("en-US");
+            if (pctDiff < 2) {
+                insights.push(`New and repeat customers spent about the same per order this month (¥${higherAov} vs ¥${lowerAov}).`);
+            } else {
+                const figure = highlight(`${pctDiff.toFixed(1)}%`, "neutral");
+                insights.push(`${repeatHigher ? "Repeat" : "New"} customers spend ${figure} more per order than ${repeatHigher ? "new" : "repeat"} customers this month (¥${higherAov} vs ¥${lowerAov}).`);
+            }
+        }
+
+        // Recent direction: average new-customer share over the last
+        // 3 months vs the 3 months before that.
+        if (rows.length >= 6) {
+            const avgShare = (arr) => arr.reduce((sum, r) => sum + orderShare(r), 0) / arr.length;
+            const trendDiff = avgShare(rows.slice(-3)) - avgShare(rows.slice(-6, -3));
+            if (Math.abs(trendDiff) >= 1) {
+                const figure = highlight(`${Math.abs(trendDiff).toFixed(1)} pts`, trendDiff >= 0 ? "pos" : "neg");
+                const direction = trendDiff >= 0 ? "trending up" : "trending down";
+                const note = trendDiff >= 0 ? "acquisition is gaining ground" : "worth checking if acquisition channels have slowed";
+                insights.push(`New customer share has been ${direction} over the last 3 months (${figure} vs the prior 3) — ${note}.`);
+            }
+        }
+
+        return insights;
+    }
+
+    /* ==========================================================
        Anomaly Detection
        Flags any day within the selected range whose value sits
        far outside that same range's own average (z-score based,
@@ -686,15 +776,39 @@ window.THD = window.THD || {};
        always showing one fixed snapshot.
     ========================================================== */
 
-    function filterLandingPagesByDates(landingRows, start, end, limit = 8) {
-        const inWindow = landingRows.filter((r) => inRange(r.date, start, end));
+    // Top Landing Pages intentionally does NOT follow the dashboard's
+    // date-range picker — the underlying GA4 export only ever holds a
+    // trailing 30-day window (data volume gets too large otherwise),
+    // so this always aggregates the most recent 30 days available in
+    // whatever's loaded, regardless of what range is selected
+    // elsewhere. Grouped by pageTitle rather than landingPage, since
+    // landingPage is a generic template (e.g. "/smartphone/detail.html")
+    // shared by hundreds of different products — the actual page
+    // identity only shows up in pageTitle/the query string.
+    function resolveLast30DayWindow(landingRows) {
+        if (!landingRows || !landingRows.length) return null;
+        const maxDate = landingRows.reduce((max, r) => (r.date > max ? r.date : max), landingRows[0].date);
+        const end = new Date(maxDate);
+        const start = new Date(maxDate);
+        start.setDate(start.getDate() - 29);
+        return { start, end, startStr: start.toISOString().slice(0, 10), endStr: maxDate };
+    }
+
+    function aggregateLandingPages(landingRows, device = "all", limit = 10) {
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win) return [];
+
+        const inWindow = landingRows.filter((r) =>
+            r.date >= win.startStr && r.date <= win.endStr && (device === "all" || r.device === device)
+        );
 
         const totals = {};
         inWindow.forEach((r) => {
-            if (!totals[r.path]) {
-                totals[r.path] = { path: r.path, sessions: 0, purchases: 0, revenue: 0 };
+            const key = r.pageTitle || "(not set)";
+            if (!totals[key]) {
+                totals[key] = { pageTitle: key, landingPage: r.landingPage, sessions: 0, purchases: 0, revenue: 0 };
             }
-            const t = totals[r.path];
+            const t = totals[key];
             t.sessions += r.sessions;
             t.purchases += r.purchases;
             t.revenue += r.revenue;
@@ -822,13 +936,15 @@ window.THD = window.THD || {};
         classifyForGroupBy,
         deriveTrafficBreakdown,
         buildInsights,
+        buildNewRepeatInsights,
         detectAnomalies,
         buildAnomalyInsights,
         resolveRange,
         filterDailyRange,
         filterSourcesRange,
         filterSourcesByDates,
-        filterLandingPagesByDates,
+        resolveLast30DayWindow,
+        aggregateLandingPages,
         buildTrafficComparison,
         computeMovingAverage,
         buildBusinessMonths
