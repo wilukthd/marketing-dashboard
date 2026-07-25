@@ -51,6 +51,7 @@
 
     function renderNewRepeatChartForMetric() {
         THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric());
+        THD.charts.renderAovChart(newRepeatRows);
     }
 
     // Top Landing Pages ignores the global date-range picker (fixed
@@ -58,8 +59,10 @@
     // needs to re-render itself when the device filter changes.
     function renderLandingPagesForDevice() {
         const device = THD.ui.getLandingDevice();
-        const rows = THD.data.aggregateLandingPages(landingRows, device, 10);
+        const excludeSystem = THD.ui.getHideSystemPages();
+        const rows = THD.data.aggregateLandingPages(landingRows, device, 10, excludeSystem);
         THD.ui.renderLandingPages(rows);
+        THD.ui.renderLandingPageInsights(THD.data.buildLandingPageInsights(landingRows));
         const win = THD.data.resolveLast30DayWindow(landingRows);
         if (win) THD.ui.renderLandingPagesPeriodLabel(win.startStr, win.endStr);
     }
@@ -147,11 +150,13 @@
     // matching how the real export's device flag works.
     const LANDING_PAGE_POOL = [
         { landingPage: "/", pageTitle: "トップページ" },
-        { landingPage: "/smartphone/index.html", pageTitle: "トップページ（スマホ）" },
+        { landingPage: "/smartphone/index.html", pageTitle: "トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/smartphone/login.html", pageTitle: "会員ページログイン" },
+        { landingPage: "/smartphone/EntryOrderConfirm.html", pageTitle: "ご注文内容確認" },
         { landingPage: "/shopdetail/000000002741", pageTitle: "【オンライン学習】後藤 芳宏さん　植物さんとのコミュニ" },
         { landingPage: "/smartphone/detail.html", pageTitle: "夏のセール限定 サマーケアセット" },
         { landingPage: "/smartphone/detail.html", pageTitle: "モイストクリーム 100g【特典付き】" },
-        { landingPage: "/smartphone/page78.html", pageTitle: "トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/smartphone/page78.html", pageTitle: "商品一覧" },
         { landingPage: "/blog/style-guide-2026", pageTitle: "2026年 スタイルガイド ブログ" },
         { landingPage: "/smartphone/detail.html", pageTitle: "オリジンウォーター 500ml【2本購入で特典付き】" }
     ];
@@ -166,12 +171,18 @@
             LANDING_PAGE_POOL.forEach(({ landingPage, pageTitle }, idx) => {
                 // Rough relative popularity by pool position, so the
                 // top-N ranking looks realistic instead of flat noise.
-                const weight = 1 - idx * 0.1;
+                // System pages (login/order-confirm/home) get an extra
+                // traffic boost here on purpose, mirroring the real
+                // observation that these tend to dominate raw session
+                // counts — so the hide-system-pages toggle actually
+                // demonstrates something in demo mode.
+                const pageType = THD.data.classifyLandingPageType(landingPage, pageTitle);
+                const weight = (pageType === "system" ? 1.6 : 1) * (1 - idx * 0.08);
                 const sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
-                const purchases = Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0;
+                const purchases = pageType === "system" ? 0 : (Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0);
                 const revenue = purchases * (7000 + Math.random() * 6000);
                 const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
-                rows.push({ landingPage, pageTitle, device, date: dateStr, sessions, purchases, revenue });
+                rows.push({ landingPage, pageTitle, device, pageType, date: dateStr, sessions, purchases, revenue });
             });
         }
         return rows;
@@ -339,6 +350,7 @@
         });
         THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
+        THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
             renderForRange(currentRange, currentCustomRange);

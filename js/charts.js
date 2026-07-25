@@ -392,6 +392,117 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Average Order Value (AOV) Trend
+       Reuses the same monthly New/Repeat rows already loaded for
+       the chart above — revenue/orders per bucket, just divided
+       into three AOV lines (overall, new, repeat) instead of
+       stacked bars, so the pattern behind the AOV-comparison
+       insight ("repeat customers spend X% more per order") is
+       visible as a trend rather than a single-month snapshot.
+    ========================================================== */
+
+    let aovChartInstance = null;
+
+    const AOV_COLORS = {
+        overall: "#7C3AED",
+        newCustomer: "#2563EB",
+        repeatCustomer: "#94A3B8"
+    };
+
+    function renderAovChart(rows) {
+        const canvas = document.getElementById("aovChart");
+        if (!canvas) return;
+
+        const colors = getChartColors();
+
+        if (aovChartInstance) {
+            aovChartInstance.destroy();
+            aovChartInstance = null;
+        }
+
+        if (!rows || !rows.length) return;
+
+        const labels = rows.map((r) => r.period);
+        const overallAov = rows.map((r) => (r.totalOrders ? r.totalRevenue / r.totalOrders : 0));
+        const newAov = rows.map((r) => (r.newOrders ? r.newRevenue / r.newOrders : 0));
+        const repeatAov = rows.map((r) => (r.repeatOrders ? r.repeatRevenue / r.repeatOrders : 0));
+        const fmtYenShort = (v) => "¥" + Math.round(v).toLocaleString("en-US");
+
+        aovChartInstance = new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: window.I18N.t("aov.legendOverall"),
+                        data: overallAov,
+                        borderColor: AOV_COLORS.overall,
+                        backgroundColor: AOV_COLORS.overall,
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.35
+                    },
+                    {
+                        label: window.I18N.t("aov.legendNew"),
+                        data: newAov,
+                        borderColor: AOV_COLORS.newCustomer,
+                        backgroundColor: AOV_COLORS.newCustomer,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        borderDash: [5, 4],
+                        tension: 0.35
+                    },
+                    {
+                        label: window.I18N.t("aov.legendRepeat"),
+                        data: repeatAov,
+                        borderColor: AOV_COLORS.repeatCustomer,
+                        backgroundColor: AOV_COLORS.repeatCustomer,
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        borderDash: [5, 4],
+                        tension: 0.35
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
+                    },
+                    tooltip: {
+                        backgroundColor: "#111827",
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: (item) => `${item.dataset.label}: ${fmtYenShort(item.parsed.y)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: colors.textLight }
+                    },
+                    y: {
+                        grid: { color: colors.grid },
+                        border: { display: false },
+                        ticks: { callback: (v) => fmtYenShort(v), color: colors.textLight }
+                    }
+                }
+            }
+        });
+    }
+
     // Charts created while their tab is hidden (display:none) get stuck
     // at Chart.js's zero-size fallback, since nothing tells them to
     // remeasure once the container becomes visible again. Call this
@@ -399,6 +510,7 @@ window.THD = window.THD || {};
     function resizeCharts() {
         if (trendChartInstance) trendChartInstance.resize();
         if (newRepeatChartInstance) newRepeatChartInstance.resize();
+        if (aovChartInstance) aovChartInstance.resize();
         Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
@@ -406,6 +518,7 @@ window.THD = window.THD || {};
         renderTrendChart,
         renderTrafficChart,
         renderNewRepeatChart,
+        renderAovChart,
         resizeCharts
     };
 

@@ -108,6 +108,12 @@ window.I18N = (function () {
             "landing.fixedWindow": "Fixed 30-day window: {start} – {end}",
             "landing.sessionsUnit": "sessions",
             "landing.cvrUnit": "CVR",
+            "landing.hideSystem": "Hide login/checkout/system pages",
+
+            "landingInsight.systemShare": "{figure} of landing page sessions in the last 30 days went to login, checkout, or other non-content pages — hidden from the list below by default.",
+            "landingInsight.topPage": "{title} was the top content page with {sessions} sessions and {revenue} in revenue.",
+            "landingInsight.zeroConversion": "{count} pages got meaningful traffic but zero purchases — worth checking for pricing, stock, or checkout issues.",
+            "landingInsight.deviceSplit": "Smartphone accounted for {sp} of content-page sessions vs {pc} on PC.",
             "landing.empty": "No landing page data for this window.",
             "landing.notSet": "(not set)",
 
@@ -143,6 +149,12 @@ window.I18N = (function () {
             "newRepeat.legendNew": "New",
             "newRepeat.legendRepeat": "Repeat",
             "newRepeat.legendShare": "New Customer Share",
+
+            "aov.title": "Average Order Value Trend",
+            "aov.subtitle": "Overall vs. new vs. repeat customers, by business month",
+            "aov.legendOverall": "Overall AOV",
+            "aov.legendNew": "New Customer AOV",
+            "aov.legendRepeat": "Repeat Customer AOV",
 
             "newRepeatInsights.title": "New vs Repeat Insights",
             "newRepeatInsights.empty": "Not enough history yet for a pattern here.",
@@ -293,6 +305,12 @@ window.I18N = (function () {
             "landing.fixedWindow": "固定30日間：{start}～{end}",
             "landing.sessionsUnit": "セッション",
             "landing.cvrUnit": "CVR",
+            "landing.hideSystem": "ログイン・購入手続きなどのシステムページを非表示",
+
+            "landingInsight.systemShare": "過去30日間のランディングページセッションのうち{figure}はログインや購入手続きなど非コンテンツページへのアクセスでした — 以下のリストではデフォルトで非表示にしています。",
+            "landingInsight.topPage": "{title}が最もセッション数の多いコンテンツページで、{sessions}セッション・{revenue}の売上を記録しました。",
+            "landingInsight.zeroConversion": "一定量のアクセスがありながら購入が0件のページが{count}件あります — 価格・在庫・購入手続きに問題がないか確認する価値があります。",
+            "landingInsight.deviceSplit": "コンテンツページのセッションはスマートフォンが{sp}、PCが{pc}を占めています。",
             "landing.empty": "この期間のランディングページデータはありません。",
             "landing.notSet": "（未設定）",
 
@@ -328,6 +346,12 @@ window.I18N = (function () {
             "newRepeat.legendNew": "新規",
             "newRepeat.legendRepeat": "リピーター",
             "newRepeat.legendShare": "新規顧客比率",
+
+            "aov.title": "客単価（AOV）推移",
+            "aov.subtitle": "全体・新規顧客・リピーター顧客別、会計月ベース",
+            "aov.legendOverall": "全体客単価",
+            "aov.legendNew": "新規顧客客単価",
+            "aov.legendRepeat": "リピーター客単価",
 
             "newRepeatInsights.title": "新規・リピーター分析",
             "newRepeatInsights.empty": "傾向を判断するにはまだ履歴が不足しています。",

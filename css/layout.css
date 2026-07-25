@@ -406,6 +406,34 @@
 
 }
 
+.cvrFigure{
+
+    font-weight:700;
+
+}
+
+.miniInsights{
+
+    margin:0 0 16px 20px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+
+}
+
+.miniInsights li{
+
+    font-size:13px;
+
+    line-height:1.5;
+
+    color:var(--text-light);
+
+}
+
 .landingBar{
 
     height:6px;

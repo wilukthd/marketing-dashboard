@@ -215,24 +215,66 @@ window.THD = window.THD || {};
         return landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
     }
 
+    // Distinguishes actual content (products, blog posts) from the
+    // login/checkout/account/home "system" pages that technically
+    // count as landing pages in GA4 but carry no marketing signal —
+    // nobody clicks an ad to land on an order-confirmation screen.
+    // Path patterns are checked first since they're the most stable
+    // signal (template-based, matches the observation that "detail"
+    // in the path reliably means a real product page); page-title
+    // keywords catch the rest, since GA4 doesn't expose a page-type
+    // dimension directly.
+    const SYSTEM_TITLE_PATTERNS = [
+        /ログイン/, /マイページ/, /会員(登録|情報)?/, /新規会員登録/,
+        /送付先/, /決済.?配送方法/, /お客様情報/, /カート/, /パスワード/,
+        /ご注文(内容確認|完了|手続き)/
+    ];
+    // The shop's own name as the page title (with or without a stray
+    // leading slash some pages seem to pick up) means it's a generic
+    // home/placeholder page, not a specific product or article.
+    const HOME_TITLE_PATTERNS = [
+        /^\/?トータルヘルスデザイン公式ショップWEB本店$/,
+        /^トップページ/
+    ];
+
+    function classifyLandingPageType(landingPage, pageTitle) {
+        const path = String(landingPage || "");
+        const title = String(pageTitle || "");
+
+        // Product detail templates — kept regardless of title text.
+        if (/detail\.html/i.test(path) || /\/shopdetail\//i.test(path)) return "product";
+
+        if (!title || title === "(not set)") return "system";
+        if (/blog/i.test(path) || /ブログ/.test(title)) return "content";
+        if (HOME_TITLE_PATTERNS.some((re) => re.test(title))) return "system";
+        if (SYSTEM_TITLE_PATTERNS.some((re) => re.test(title))) return "system";
+
+        return "content"; // category/list pages, campaign landing pages, anything unclassified
+    }
+
     async function loadLandingPages() {
         try {
             const rows = await fetchCsv(CONFIG.GA4_LANDING_PAGES_CSV_URL);
             return rows
                 .filter((r) => r.date) // keep rows even when landingPage/pageTitle is blank — that's a real "(not set)" hit, not junk
-                .map((r) => ({
-                    date: parseGA4Date(r.date),
-                    landingPage: r.landingPage || "",
-                    pageTitle: r.pageTitle || "(not set)",
-                    device: classifyDevice(r.landingPage),
-                    sessions: Number(r.sessions) || 0,
-                    // Column name confirmed from the sheet is truncated in
-                    // the UI preview ("ecommercePurc…") — covering the
-                    // likely full names defensively so this doesn't
-                    // silently read as 0 if the exact header differs.
-                    purchases: Number(r.ecommercePurchases ?? r.ecommercePurc ?? r.purchases) || 0,
-                    revenue: Number(r.totalRevenue) || 0
-                }));
+                .map((r) => {
+                    const landingPage = r.landingPage || "";
+                    const pageTitle = r.pageTitle || "(not set)";
+                    return {
+                        date: parseGA4Date(r.date),
+                        landingPage,
+                        pageTitle,
+                        device: classifyDevice(landingPage),
+                        pageType: classifyLandingPageType(landingPage, pageTitle),
+                        sessions: Number(r.sessions) || 0,
+                        // Column name confirmed from the sheet is truncated in
+                        // the UI preview ("ecommercePurc…") — covering the
+                        // likely full names defensively so this doesn't
+                        // silently read as 0 if the exact header differs.
+                        purchases: Number(r.ecommercePurchases ?? r.ecommercePurc ?? r.purchases) || 0,
+                        revenue: Number(r.totalRevenue) || 0
+                    };
+                });
         } catch (e) {
             console.warn("[THD.data] Landing pages CSV not available, using dummy data:", e.message);
             return null;
@@ -841,19 +883,21 @@ window.THD = window.THD || {};
         return { start, end, startStr: start.toISOString().slice(0, 10), endStr: maxDate };
     }
 
-    function aggregateLandingPages(landingRows, device = "all", limit = 10) {
+    function aggregateLandingPages(landingRows, device = "all", limit = 10, excludeSystem = true) {
         const win = resolveLast30DayWindow(landingRows);
         if (!win) return [];
 
         const inWindow = landingRows.filter((r) =>
-            r.date >= win.startStr && r.date <= win.endStr && (device === "all" || r.device === device)
+            r.date >= win.startStr && r.date <= win.endStr &&
+            (device === "all" || r.device === device) &&
+            (!excludeSystem || r.pageType !== "system")
         );
 
         const totals = {};
         inWindow.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             if (!totals[key]) {
-                totals[key] = { pageTitle: key, landingPage: r.landingPage, sessions: 0, purchases: 0, revenue: 0 };
+                totals[key] = { pageTitle: key, landingPage: r.landingPage, pageType: r.pageType, sessions: 0, purchases: 0, revenue: 0 };
             }
             const t = totals[key];
             t.sessions += r.sessions;
@@ -865,6 +909,73 @@ window.THD = window.THD || {};
             .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
             .sort((a, b) => b.sessions - a.sessions)
             .slice(0, limit);
+    }
+
+    // Text insights for the Top Landing Pages card — runs on the
+    // FULL 30-day window (not just the top-N shown in the list),
+    // since the product-vs-system split needs every row to be
+    // meaningful, and always ignores the device filter so it reads
+    // as an overall summary regardless of which device view is open.
+    function buildLandingPageInsights(landingRows) {
+        const insights = [];
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win) return insights;
+
+        const inWindow = landingRows.filter((r) => r.date >= win.startStr && r.date <= win.endStr);
+        if (!inWindow.length) return insights;
+
+        const totalSessions = inWindow.reduce((sum, r) => sum + r.sessions, 0);
+        const systemSessions = inWindow.filter((r) => r.pageType === "system").reduce((sum, r) => sum + r.sessions, 0);
+        const systemShare = totalSessions ? (systemSessions / totalSessions) * 100 : 0;
+        if (systemShare >= 5) {
+            insights.push(window.I18N.t("landingInsight.systemShare", {
+                figure: highlight(systemShare.toFixed(0) + "%", "neutral")
+            }));
+        }
+
+        const contentRows = inWindow.filter((r) => r.pageType !== "system");
+        const byTitle = {};
+        contentRows.forEach((r) => {
+            const key = r.pageTitle || "(not set)";
+            if (!byTitle[key]) byTitle[key] = { pageTitle: key, sessions: 0, purchases: 0, revenue: 0 };
+            byTitle[key].sessions += r.sessions;
+            byTitle[key].purchases += r.purchases;
+            byTitle[key].revenue += r.revenue;
+        });
+        const ranked = Object.values(byTitle).sort((a, b) => b.sessions - a.sessions);
+
+        if (ranked.length) {
+            const top = ranked[0];
+            insights.push(window.I18N.t("landingInsight.topPage", {
+                title: `<strong>${top.pageTitle}</strong>`,
+                sessions: highlight(Math.round(top.sessions).toLocaleString("en-US"), "neutral"),
+                revenue: "¥" + Math.round(top.revenue).toLocaleString("en-US")
+            }));
+        }
+
+        // Pages getting meaningful traffic but zero purchases — worth
+        // a look (pricing, out of stock, broken add-to-cart, etc.).
+        const avgSessions = ranked.length ? ranked.reduce((s, r) => s + r.sessions, 0) / ranked.length : 0;
+        const noConversion = ranked.filter((r) => r.purchases === 0 && r.sessions >= Math.max(avgSessions, 10));
+        if (noConversion.length) {
+            insights.push(window.I18N.t("landingInsight.zeroConversion", {
+                count: highlight(String(noConversion.length), "neg")
+            }));
+        }
+
+        // Device split across all content (non-system) sessions.
+        const pcSessions = contentRows.filter((r) => r.device === "PC").reduce((s, r) => s + r.sessions, 0);
+        const spSessions = contentRows.filter((r) => r.device === "Smartphone").reduce((s, r) => s + r.sessions, 0);
+        const deviceTotal = pcSessions + spSessions;
+        if (deviceTotal > 0) {
+            const spShare = (spSessions / deviceTotal) * 100;
+            insights.push(window.I18N.t("landingInsight.deviceSplit", {
+                sp: highlight(spShare.toFixed(0) + "%", "neutral"),
+                pc: highlight((100 - spShare).toFixed(0) + "%", "neutral")
+            }));
+        }
+
+        return insights;
     }
 
     /* ==========================================================
@@ -993,7 +1104,9 @@ window.THD = window.THD || {};
         filterSourcesRange,
         filterSourcesByDates,
         resolveLast30DayWindow,
+        classifyLandingPageType,
         aggregateLandingPages,
+        buildLandingPageInsights,
         buildTrafficComparison,
         computeMovingAverage,
         buildBusinessMonths

@@ -677,6 +677,22 @@ MAIN
 
     </div>
 
+    <div class="trendOverlayRow">
+
+        <label class="trendOverlayToggle">
+
+            <input type="checkbox" id="landingHideSystemToggle" checked>
+
+            <span data-i18n="landing.hideSystem">Hide login/checkout/system pages</span>
+
+        </label>
+
+    </div>
+
+    <ul class="miniInsights" id="landingPageInsights">
+
+    </ul>
+
     <div id="landingPages">
 
     </div>
@@ -878,6 +894,40 @@ MAIN
     <div class="chartBody">
 
         <canvas id="newRepeatChart"></canvas>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================= AOV TREND ================= -->
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <div>
+
+            <h3 data-i18n="aov.title">
+
+                Average Order Value Trend
+
+            </h3>
+
+            <small data-i18n="aov.subtitle">
+
+                Overall vs. new vs. repeat customers, by business month
+
+            </small>
+
+        </div>
+
+    </div>
+
+    <div class="chartBody">
+
+        <canvas id="aovChart"></canvas>
 
     </div>
 

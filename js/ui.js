@@ -121,23 +121,49 @@ window.THD = window.THD || {};
             return;
         }
 
-        const maxSessions = Math.max(...pages.map((p) => p.sessions));
+        // A plain bar proportional to sessions just re-draws the
+        // session count already printed next to it. Instead, color
+        // the CVR figure relative to this list's own average — that's
+        // a second, genuinely different signal: which pages convert
+        // well vs which just draw traffic.
+        const avgCvr = pages.reduce((sum, p) => sum + p.cvr, 0) / pages.length;
 
         container.innerHTML = pages.map((p) => {
             const label = p.pageTitle || window.I18N.t("landing.notSet");
-            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")} · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} ${window.I18N.t("landing.cvrUnit")}</small>`;
+            const cvrClass = p.cvr > avgCvr * 1.1 ? "positive" : (p.cvr < avgCvr * 0.9 ? "negative" : "");
+            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")} · ${fmtYen(p.revenue)} · <span class="cvrFigure ${cvrClass}">${fmtPercent(p.cvr)} ${window.I18N.t("landing.cvrUnit")}</span></small>`;
             return `
                 <div class="landingItem">
                     <div class="landingItemTop">
                         <span>${label}</span>
                         ${stats}
                     </div>
-                    <div class="landingBar">
-                        <div class="landingBarFill" style="width:${(p.sessions / maxSessions) * 100}%"></div>
-                    </div>
                 </div>
             `;
         }).join("");
+    }
+
+    function renderLandingPageInsights(insights) {
+        const container = document.getElementById("landingPageInsights");
+        if (!container) return;
+        if (!insights || !insights.length) {
+            container.innerHTML = "";
+            container.style.display = "none";
+            return;
+        }
+        container.style.display = "";
+        container.innerHTML = insights.map((s) => `<li>${s}</li>`).join("");
+    }
+
+    function getHideSystemPages() {
+        const toggle = document.getElementById("landingHideSystemToggle");
+        return toggle ? toggle.checked : true;
+    }
+
+    function wireHideSystemToggle(onChange) {
+        const toggle = document.getElementById("landingHideSystemToggle");
+        if (!toggle) return;
+        toggle.addEventListener("change", () => onChange(toggle.checked));
     }
 
     function renderLandingPagesPeriodLabel(startStr, endStr) {
@@ -676,6 +702,9 @@ window.THD = window.THD || {};
         renderRangeCompare,
         renderTrafficPeriodLabels,
         renderLandingPages,
+        renderLandingPageInsights,
+        getHideSystemPages,
+        wireHideSystemToggle,
         renderLandingPagesPeriodLabel,
         getLandingDevice,
         wireLandingDeviceToggle,
