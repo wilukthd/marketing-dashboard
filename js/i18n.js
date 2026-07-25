@@ -32,7 +32,7 @@ window.I18N = (function () {
         en: {
             "doc.title": "THD Analytics Dashboard",
             "logo.subtitle": "Analytics",
-            "sidebar.version": "Version 0.1",
+            "sidebar.version": "Version 1.0",
 
             "nav.overview": "Overview",
             "nav.traffic": "Traffic",
@@ -229,7 +229,7 @@ window.I18N = (function () {
         ja: {
             "doc.title": "THDアナリティクス ダッシュボード",
             "logo.subtitle": "アナリティクス",
-            "sidebar.version": "バージョン 0.1",
+            "sidebar.version": "バージョン 1.0",
 
             "nav.overview": "概要",
             "nav.traffic": "トラフィック",

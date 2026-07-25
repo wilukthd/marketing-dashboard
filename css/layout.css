@@ -434,30 +434,6 @@
 
 }
 
-.landingBar{
-
-    height:6px;
-
-    background:#F1F5F9;
-
-    border-radius:10px;
-
-    overflow:hidden;
-
-}
-
-.landingBarFill{
-
-    height:100%;
-
-    background:var(--primary);
-
-    border-radius:10px;
-
-    transition:width .6s ease;
-
-}
-
 
 /* ==========================================================
    Insight
