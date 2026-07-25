@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 
 <head>
 
@@ -61,7 +61,7 @@ SIDEBAR
 
             <h1>THD</h1>
 
-            <span>Analytics</span>
+            <span data-i18n="logo.subtitle">Analytics</span>
 
         </div>
 
@@ -71,7 +71,7 @@ SIDEBAR
 
                 <i data-lucide="layout-dashboard"></i>
 
-                <span>Overview</span>
+                <span data-i18n="nav.overview">Overview</span>
 
             </a>
 
@@ -79,7 +79,7 @@ SIDEBAR
 
                 <i data-lucide="activity"></i>
 
-                <span>Traffic</span>
+                <span data-i18n="nav.traffic">Traffic</span>
 
             </a>
 
@@ -87,7 +87,7 @@ SIDEBAR
 
                 <i data-lucide="shopping-cart"></i>
 
-                <span>Sales</span>
+                <span data-i18n="nav.sales">Sales</span>
 
             </a>
 
@@ -95,7 +95,7 @@ SIDEBAR
 
                 <i data-lucide="sticky-note"></i>
 
-                <span>Notes</span>
+                <span data-i18n="nav.notes">Notes</span>
 
             </a>
 
@@ -103,7 +103,7 @@ SIDEBAR
 
                 <i data-lucide="settings"></i>
 
-                <span>Settings</span>
+                <span data-i18n="nav.settings">Settings</span>
 
             </a>
 
@@ -113,7 +113,7 @@ SIDEBAR
 
     <div class="sidebarBottom">
 
-        <div class="version">
+        <div class="version" data-i18n="sidebar.version">
 
             Version 0.1
 
@@ -155,7 +155,7 @@ MAIN
 
         <div class="updateCard">
 
-            <small>
+            <small data-i18n="header.lastUpdate">
 
                 Last Update
 
@@ -173,7 +173,7 @@ MAIN
 
             <i data-lucide="refresh-cw"></i>
 
-            Refresh
+            <span data-i18n="header.refresh">Refresh</span>
 
         </button>
 
@@ -189,25 +189,25 @@ MAIN
 
     <select id="dateRangeSelect">
 
-        <option value="7d">Last 7 Days</option>
+        <option value="7d" data-i18n="filter.7d">Last 7 Days</option>
 
-        <option value="14d">Last 14 Days</option>
+        <option value="14d" data-i18n="filter.14d">Last 14 Days</option>
 
-        <option value="30d">Last 30 Days</option>
+        <option value="30d" data-i18n="filter.30d">Last 30 Days</option>
 
-        <option value="month" selected>This Month</option>
+        <option value="month" selected data-i18n="filter.month">This Month</option>
 
-        <option value="lastMonth">Last Month</option>
+        <option value="lastMonth" data-i18n="filter.lastMonth">Last Month</option>
 
-        <option value="3m">3 Months</option>
+        <option value="3m" data-i18n="filter.3m">3 Months</option>
 
-        <option value="6m">6 Months</option>
+        <option value="6m" data-i18n="filter.6m">6 Months</option>
 
-        <option value="year">This Year</option>
+        <option value="year" data-i18n="filter.year">This Year</option>
 
-        <option value="lastYear">Last Year</option>
+        <option value="lastYear" data-i18n="filter.lastYear">Last Year</option>
 
-        <option value="custom">Custom Range</option>
+        <option value="custom" data-i18n="filter.custom">Custom Range</option>
 
     </select>
 
@@ -217,25 +217,19 @@ MAIN
 
         <input type="date" id="customEndDate">
 
-        <button class="secondaryButton" id="applyCustomRange">Apply</button>
+        <button class="secondaryButton" id="applyCustomRange" data-i18n="filter.apply">Apply</button>
 
     </div>
 
-    <select>
+    <select id="sourceFilterSelect">
 
-        <option>All Sources</option>
-
-    </select>
-
-    <select>
-
-        <option>All Stores</option>
+        <option value="all" data-i18n="filter.allSources">All Sources</option>
 
     </select>
 
     <select>
 
-        <option>Compare Previous</option>
+        <option data-i18n="filter.comparePrevious">Compare Previous</option>
 
     </select>
 
@@ -255,7 +249,7 @@ MAIN
 
         <div class="cardTop">
 
-            <span>Total Users</span>
+            <span data-i18n="kpi.totalUsers">Total Users</span>
 
             <i data-lucide="users"></i>
 
@@ -269,13 +263,13 @@ MAIN
 
                 <strong data-field="delta">--</strong>
 
-                <small>vs Previous Period</small>
+                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
 
             </div>
 
             <div>
 
-                <small>Avg / Day</small>
+                <small data-i18n="kpi.avgDay">Avg / Day</small>
 
                 <strong data-field="daily">--</strong>
 
@@ -291,7 +285,7 @@ MAIN
 
         <div class="cardTop">
 
-            <span>Sessions</span>
+            <span data-i18n="kpi.sessions">Sessions</span>
 
             <i data-lucide="activity"></i>
 
@@ -305,13 +299,13 @@ MAIN
 
                 <strong data-field="delta">--</strong>
 
-                <small>vs Previous Period</small>
+                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
 
             </div>
 
             <div>
 
-                <small>Avg / Day</small>
+                <small data-i18n="kpi.avgDay">Avg / Day</small>
 
                 <strong data-field="daily">--</strong>
 
@@ -327,7 +321,7 @@ MAIN
 
         <div class="cardTop">
 
-            <span>Ecommerce Purchases</span>
+            <span data-i18n="kpi.purchases">Ecommerce Purchases</span>
 
             <i data-lucide="shopping-cart"></i>
 
@@ -341,13 +335,13 @@ MAIN
 
                 <strong data-field="delta">--</strong>
 
-                <small>vs Previous Period</small>
+                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
 
             </div>
 
             <div>
 
-                <small>Daily Avg</small>
+                <small data-i18n="kpi.dailyAvg">Daily Avg</small>
 
                 <strong data-field="daily">--</strong>
 
@@ -363,7 +357,7 @@ MAIN
 
         <div class="cardTop">
 
-            <span>Total Revenue</span>
+            <span data-i18n="kpi.revenue">Total Revenue</span>
 
             <i data-lucide="wallet"></i>
 
@@ -377,13 +371,13 @@ MAIN
 
                 <strong data-field="delta">--</strong>
 
-                <small>vs Previous Period</small>
+                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
 
             </div>
 
             <div>
 
-                <small>Daily Avg</small>
+                <small data-i18n="kpi.dailyAvg">Daily Avg</small>
 
                 <strong data-field="daily">--</strong>
 
@@ -399,7 +393,7 @@ MAIN
 
         <div class="cardTop">
 
-            <span>CVR</span>
+            <span data-i18n="kpi.cvr">CVR</span>
 
             <i data-lucide="target"></i>
 
@@ -413,13 +407,13 @@ MAIN
 
                 <strong data-field="delta">--</strong>
 
-                <small>vs Previous Period</small>
+                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
 
             </div>
 
             <div>
 
-                <small>Goal</small>
+                <small data-i18n="kpi.goal">Goal</small>
 
                 <strong data-field="daily">--</strong>
 
@@ -441,13 +435,13 @@ MAIN
 
         <div>
 
-            <h3>
+            <h3 data-i18n="trend.title">
 
                 Metrics Trend
 
             </h3>
 
-            <small>
+            <small data-i18n="trend.subtitle">
 
                 Select a Date Range Above
 
@@ -463,7 +457,7 @@ MAIN
 
                 <span class="metricDot" style="background:#2563EB"></span>
 
-                Total Users
+                <span data-i18n="kpi.totalUsers">Total Users</span>
 
             </label>
 
@@ -473,7 +467,7 @@ MAIN
 
                 <span class="metricDot" style="background:#EA580C"></span>
 
-                Sessions
+                <span data-i18n="kpi.sessions">Sessions</span>
 
             </label>
 
@@ -483,7 +477,7 @@ MAIN
 
                 <span class="metricDot" style="background:#16A34A"></span>
 
-                Ecommerce Purchases
+                <span data-i18n="kpi.purchases">Ecommerce Purchases</span>
 
             </label>
 
@@ -493,7 +487,7 @@ MAIN
 
                 <span class="metricDot" style="background:#DB2777"></span>
 
-                Total Revenue
+                <span data-i18n="kpi.revenue">Total Revenue</span>
 
             </label>
 
@@ -503,7 +497,7 @@ MAIN
 
                 <span class="metricDot" style="background:#7C3AED"></span>
 
-                CVR
+                <span data-i18n="kpi.cvr">CVR</span>
 
             </label>
 
@@ -517,7 +511,7 @@ MAIN
 
             <input type="checkbox" id="movingAverageToggle">
 
-            <span>Show 7-day moving average</span>
+            <span data-i18n="trend.movingAvg">Show 7-day moving average</span>
 
         </label>
 
@@ -545,13 +539,13 @@ MAIN
 
         <div>
 
-            <h3>
+            <h3 data-i18n="traffic.title">
 
                 Traffic Sources
 
             </h3>
 
-            <small>
+            <small data-i18n="traffic.subtitle">
 
                 Selected period vs. the period before it, by ad platform
 
@@ -563,9 +557,9 @@ MAIN
 
             <select id="trafficGroupSelect">
 
-                <option value="platform" selected>By Ad Platform (Google, Meta, Yahoo, Criteo…)</option>
+                <option value="platform" selected data-i18n="traffic.byPlatform">By Ad Platform (Google, Meta, Yahoo, Criteo…)</option>
 
-                <option value="channel">By Channel (GA4 default grouping)</option>
+                <option value="channel" data-i18n="traffic.byChannel">By Channel (GA4 default grouping)</option>
 
             </select>
 
@@ -581,7 +575,7 @@ MAIN
 
                 <span class="trafficPeriodDot current"></span>
 
-                Selected period: <strong id="trafficPeriodCurrent">--</strong>
+                <span data-i18n="traffic.selectedPeriod">Selected period:</span> <strong id="trafficPeriodCurrent">--</strong>
 
             </div>
 
@@ -599,7 +593,7 @@ MAIN
 
                 <span class="trafficPeriodDot previous"></span>
 
-                Previous period: <strong id="trafficPeriodPrevious">--</strong>
+                <span data-i18n="traffic.previousPeriod">Previous period:</span> <strong id="trafficPeriodPrevious">--</strong>
 
             </div>
 
@@ -621,17 +615,17 @@ MAIN
 
                 <tr>
 
-                    <th>Source</th>
+                    <th data-i18n="th.source">Source</th>
 
-                    <th class="number">Sessions (Current)</th>
+                    <th class="number" data-i18n="th.sessionsCurrent">Sessions (Current)</th>
 
-                    <th class="number">Sessions (Previous)</th>
+                    <th class="number" data-i18n="th.sessionsPrevious">Sessions (Previous)</th>
 
-                    <th class="number">Δ vs Previous</th>
+                    <th class="number" data-i18n="th.deltaVsPrevious">Δ vs Previous</th>
 
-                    <th class="number">Revenue (Current)</th>
+                    <th class="number" data-i18n="th.revenueCurrent">Revenue (Current)</th>
 
-                    <th class="number">CVR (Current)</th>
+                    <th class="number" data-i18n="th.cvrCurrent">CVR (Current)</th>
 
                 </tr>
 
@@ -655,7 +649,7 @@ MAIN
 
         <div>
 
-            <h3>
+            <h3 data-i18n="landing.title">
 
                 Top Landing Pages
 
@@ -671,11 +665,11 @@ MAIN
 
             <select id="landingDeviceSelect">
 
-                <option value="all" selected>All Devices</option>
+                <option value="all" selected data-i18n="landing.allDevices">All Devices</option>
 
-                <option value="PC">PC</option>
+                <option value="PC" data-i18n="landing.pc">PC</option>
 
-                <option value="Smartphone">Smartphone</option>
+                <option value="Smartphone" data-i18n="landing.smartphone">Smartphone</option>
 
             </select>
 
@@ -701,7 +695,7 @@ MAIN
 
     <div class="sectionTitle">
 
-        <h3>
+        <h3 data-i18n="insights.title">
 
             Key Insights
 
@@ -729,7 +723,7 @@ MAIN
 
     <div class="tableHeader">
 
-        <h3>
+        <h3 data-i18n="source.title">
 
             Session Source / Medium
 
@@ -739,13 +733,13 @@ MAIN
 
             <div class="sourceFilterStatus" id="sourceFilterStatus" style="display:none;">
 
-                Filtered by <strong id="sourceFilterLabel"></strong>
+                <span data-i18n="source.filteredBy">Filtered by</span> <strong id="sourceFilterLabel"></strong>
 
-                <button class="clearFilterBtn" id="clearSourceFilterBtn" type="button">Clear</button>
+                <button class="clearFilterBtn" id="clearSourceFilterBtn" type="button" data-i18n="source.clear">Clear</button>
 
             </div>
 
-            <button class="secondaryButton" id="toggleSourcesBtn">
+            <button class="secondaryButton" id="toggleSourcesBtn" data-i18n="source.showAll">
 
                 Show All
 
@@ -763,17 +757,17 @@ MAIN
 
                 <tr>
 
-                    <th>Session Source / Medium</th>
+                    <th data-i18n="th.sourceMediumCol">Session Source / Medium</th>
 
-                    <th class="number">Sessions</th>
+                    <th class="number" data-i18n="th.sessions">Sessions</th>
 
-                    <th class="number">Total Users</th>
+                    <th class="number" data-i18n="th.totalUsers">Total Users</th>
 
-                    <th class="number">Ecommerce Purchases</th>
+                    <th class="number" data-i18n="th.ecommercePurchases">Ecommerce Purchases</th>
 
-                    <th class="number">Total Revenue</th>
+                    <th class="number" data-i18n="th.totalRevenue">Total Revenue</th>
 
-                    <th class="number">CVR</th>
+                    <th class="number" data-i18n="th.cvr">CVR</th>
 
                 </tr>
 
@@ -801,7 +795,7 @@ MAIN
 
     <div class="tableHeader">
 
-        <h3>
+        <h3 data-i18n="monthly.title">
 
             Monthly Business Performance
 
@@ -817,17 +811,17 @@ MAIN
 
                 <tr>
 
-                    <th>Month</th>
+                    <th data-i18n="th.month">Month</th>
 
-                    <th class="number">Revenue</th>
+                    <th class="number" data-i18n="th.revenue">Revenue</th>
 
-                    <th class="number">Orders</th>
+                    <th class="number" data-i18n="th.orders">Orders</th>
 
-                    <th class="number">Users</th>
+                    <th class="number" data-i18n="th.users">Users</th>
 
-                    <th class="number">CVR</th>
+                    <th class="number" data-i18n="th.cvr">CVR</th>
 
-                    <th>Trend</th>
+                    <th data-i18n="th.trend">Trend</th>
 
                 </tr>
 
@@ -853,13 +847,13 @@ MAIN
 
         <div>
 
-            <h3>
+            <h3 data-i18n="newRepeat.chartTitle">
 
                 New vs Repeat Customers
 
             </h3>
 
-            <small>
+            <small data-i18n="newRepeat.chartSubtitle">
 
                 WEB本店 新規／リピータ — by business month
 
@@ -871,9 +865,9 @@ MAIN
 
             <select id="newRepeatMetricSelect">
 
-                <option value="orders" selected>Orders</option>
+                <option value="orders" selected data-i18n="newRepeat.orders">Orders</option>
 
-                <option value="revenue">Revenue</option>
+                <option value="revenue" data-i18n="newRepeat.revenue">Revenue</option>
 
             </select>
 
@@ -897,7 +891,7 @@ MAIN
 
     <div class="sectionTitle">
 
-        <h3>
+        <h3 data-i18n="newRepeatInsights.title">
 
             New vs Repeat Insights
 
@@ -921,15 +915,13 @@ MAIN
 
     <div class="tableHeader">
 
-        <h3>
+        <h3 data-i18n="newRepeat.tableTitle">
 
             WEB本店 新規／リピータ
 
         </h3>
 
-        <small class="textLight">
-
-            Last 12 months — Source: <a class="sourceLink" href="https://docs.google.com/spreadsheets/d/18mnPzByMm0eyQ3Q7JJGeLG5lQHCNucu-mM3ylCdgav0" target="_blank" rel="noopener">Spreadsheet</a> for full history since 2021
+        <small class="textLight" id="newRepeatSourceNote">
 
         </small>
 
@@ -943,25 +935,25 @@ MAIN
 
                 <tr>
 
-                    <th>年度</th>
+                    <th data-i18n="th.year">年度</th>
 
-                    <th class="number">総合売上</th>
+                    <th class="number" data-i18n="th.overallRevenue">総合売上</th>
 
-                    <th class="number">総合受注件数</th>
+                    <th class="number" data-i18n="th.totalOrders">総合受注件数</th>
 
-                    <th class="number">新規売上</th>
+                    <th class="number" data-i18n="th.newRevenue">新規売上</th>
 
-                    <th class="number">新規受注件数</th>
+                    <th class="number" data-i18n="th.newOrders">新規受注件数</th>
 
-                    <th class="number">リピーター売上</th>
+                    <th class="number" data-i18n="th.repeatRevenue">リピーター売上</th>
 
-                    <th class="number">リピーター受注件数</th>
+                    <th class="number" data-i18n="th.repeatOrders">リピーター受注件数</th>
 
-                    <th class="number">訪問者数：PC</th>
+                    <th class="number" data-i18n="th.visitorsPc">訪問者数：PC</th>
 
-                    <th class="number">訪問者数：SP</th>
+                    <th class="number" data-i18n="th.visitorsSp">訪問者数：SP</th>
 
-                    <th class="number">訪問者数：合計</th>
+                    <th class="number" data-i18n="th.visitorsTotal">訪問者数：合計</th>
 
                 </tr>
 
@@ -989,17 +981,17 @@ MAIN
 
     <div class="chartHeader">
 
-        <h3>Team Notes</h3>
+        <h3 data-i18n="notes.title">Team Notes</h3>
 
     </div>
 
-    <p class="notesSubtitle">Jot down remarks from a discussion, a product observation, or anything worth remembering next time you're in the dashboard. Saved on this device.</p>
+    <p class="notesSubtitle" data-i18n="notes.subtitle">Jot down remarks from a discussion, a product observation, or anything worth remembering next time you're in the dashboard. Saved on this device.</p>
 
-    <textarea id="noteInput" class="noteInput" rows="3" placeholder="e.g. Discussed re-pricing the SP-14 bundle after the Q3 review — revisit next month."></textarea>
+    <textarea id="noteInput" class="noteInput" rows="3" placeholder="e.g. Discussed re-pricing the SP-14 bundle after the Q3 review — revisit next month." data-i18n-placeholder="notes.placeholder"></textarea>
 
     <div class="noteActions">
 
-        <button class="primaryButton" id="addNoteBtn">Add Note</button>
+        <button class="primaryButton" id="addNoteBtn" data-i18n="notes.addNote">Add Note</button>
 
     </div>
 
@@ -1009,7 +1001,7 @@ MAIN
 
     <div class="chartHeader">
 
-        <h3>History</h3>
+        <h3 data-i18n="notes.history">History</h3>
 
     </div>
 
@@ -1031,7 +1023,7 @@ MAIN
 
     <div class="chartHeader">
 
-        <h3>Appearance</h3>
+        <h3 data-i18n="settings.appearance">Appearance</h3>
 
     </div>
 
@@ -1039,9 +1031,9 @@ MAIN
 
         <div>
 
-            <div class="settingLabel">Dark theme</div>
+            <div class="settingLabel" data-i18n="settings.darkTheme">Dark theme</div>
 
-            <div class="settingDesc">Switch the dashboard to a dark color scheme. Saved on this device.</div>
+            <div class="settingDesc" data-i18n="settings.darkThemeDesc">Switch the dashboard to a dark color scheme. Saved on this device.</div>
 
         </div>
 
@@ -1055,6 +1047,26 @@ MAIN
 
     </div>
 
+    <div class="settingRow">
+
+        <div>
+
+            <div class="settingLabel" data-i18n="settings.language">Language</div>
+
+            <div class="settingDesc" data-i18n="settings.languageDesc">Choose the display language for the dashboard. Saved on this device.</div>
+
+        </div>
+
+        <select id="languageSelect">
+
+            <option value="ja">日本語</option>
+
+            <option value="en">English</option>
+
+        </select>
+
+    </div>
+
 </section>
 
 <section class="chartCard">
@@ -1063,9 +1075,9 @@ MAIN
 
         <i data-lucide="settings"></i>
 
-        <h3>More settings coming soon</h3>
+        <h3 data-i18n="settings.comingSoon">More settings coming soon</h3>
 
-        <p>Account, data source, and notification preferences will live here.</p>
+        <p data-i18n="settings.comingSoonDesc">Account, data source, and notification preferences will live here.</p>
 
     </div>
 
@@ -1083,6 +1095,7 @@ MAIN
 
 </script>
 
+<script src="js/i18n.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/data.js"></script>

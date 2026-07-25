@@ -336,6 +336,34 @@ window.THD = window.THD || {};
             : (row.channel || classifySourceChannel(row.sourceMedium));
     }
 
+    // Distinct channel values actually present in the data, used to
+    // populate the "All Sources" filter dropdown with real options
+    // instead of a hardcoded list that might not match what's there.
+    function listAvailableChannels(sourceRows, groupBy = "channel") {
+        const set = new Set();
+        (sourceRows || []).forEach((r) => set.add(classifyForGroupBy(r, groupBy)));
+        return Array.from(set).sort();
+    }
+
+    // Collapses per-day-per-source rows (already filtered down to one
+    // channel by the caller) into one row per date, in the same shape
+    // as the daily GA4 rollup — lets the "All Sources" filter reuse
+    // filterDailyRange/buildBusinessMonths/the trend chart exactly as
+    // they already work, just fed a source-scoped daily series instead
+    // of the full-property one.
+    function buildDailyRowsFromSources(sourceRows) {
+        const byDate = {};
+        (sourceRows || []).forEach((r) => {
+            if (!byDate[r.date]) byDate[r.date] = { date: r.date, users: 0, sessions: 0, purchases: 0, revenue: 0 };
+            const d = byDate[r.date];
+            d.users += r.users;
+            d.sessions += r.sessions;
+            d.purchases += r.purchases;
+            d.revenue += r.revenue;
+        });
+        return Object.values(byDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
     function deriveTrafficBreakdown(sourceRows, groupBy) {
         const totals = {};
         let totalSessions = 0;
@@ -485,7 +513,7 @@ window.THD = window.THD || {};
         const dayCount = current.length || 1;
 
         return {
-            labels: current.map((r) => new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })),
+            labels: current.map((r) => window.I18N.formatDayLabel(r.date)),
             series: {
                 users: current.map((r) => r.users),
                 sessions: current.map((r) => r.sessions),
@@ -527,14 +555,16 @@ window.THD = window.THD || {};
         if (kpi && kpi.revenue) {
             const d = kpi.revenue.delta;
             const figure = highlight(`${Math.abs(d).toFixed(1)}%`, d >= 0 ? "pos" : "neg");
-            insights.push(`Revenue ${d >= 0 ? "increased" : "decreased"} by ${figure} compared to the previous period.`);
+            const direction = window.I18N.t(d >= 0 ? "insight.increased" : "insight.decreased");
+            insights.push(window.I18N.t("insight.revenueChange", { direction, figure }));
         }
 
         if (channels && channels.length) {
             const totalRevenue = channels.reduce((sum, c) => sum + c.revenue, 0);
             const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
             const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
-            insights.push(`<strong>${topByRevenue.label}</strong> generated ${highlight(share + "%", "neutral")} of total revenue.`);
+            const label = `<strong>${window.I18N.channelLabel(topByRevenue.label)}</strong>`;
+            insights.push(window.I18N.t("insight.topChannelRevenue", { label, figure: highlight(share + "%", "neutral") }));
 
             const notSet = channels.find((c) => c.label === "(not set)");
             if (notSet) {
@@ -542,32 +572,35 @@ window.THD = window.THD || {};
                 const notSetShare = totalSessions ? Math.round((notSet.sessions / totalSessions) * 100) : 0;
                 if (notSetShare >= 5) {
                     const figure = highlight(notSetShare + "%", "neg");
-                    insights.push(`${figure} of sessions have no attribution data (<strong>(not set)</strong>) — worth checking GA4 tagging/UTM setup, since this may be skewing channel-level numbers.`);
+                    const notSetLabel = `<strong>${window.I18N.channelLabel("(not set)")}</strong>`;
+                    insights.push(window.I18N.t("insight.notSetShare", { figure, notSet: notSetLabel }));
                 }
             }
         }
 
         if (kpi) {
             const movers = [
-                { key: "users", label: "User traffic" },
-                { key: "sessions", label: "Session traffic" },
-                { key: "purchases", label: "Purchases" }
+                { key: "users", labelKey: "insight.mover.users" },
+                { key: "sessions", labelKey: "insight.mover.sessions" },
+                { key: "purchases", labelKey: "insight.mover.purchases" }
             ];
             let biggest = null;
-            movers.forEach(({ key, label }) => {
+            movers.forEach(({ key, labelKey }) => {
                 const d = kpi[key] ? kpi[key].delta : 0;
-                if (!biggest || Math.abs(d) > Math.abs(biggest.delta)) biggest = { label, delta: d };
+                if (!biggest || Math.abs(d) > Math.abs(biggest.delta)) biggest = { labelKey, delta: d };
             });
             if (biggest) {
                 const figure = highlight(`${Math.abs(biggest.delta).toFixed(1)}%`, biggest.delta >= 0 ? "pos" : "neg");
-                insights.push(`${biggest.label} ${biggest.delta >= 0 ? "increased" : "decreased"} by ${figure}.`);
+                const direction = window.I18N.t(biggest.delta >= 0 ? "insight.increased" : "insight.decreased");
+                insights.push(window.I18N.t("insight.moverChange", { label: window.I18N.t(biggest.labelKey), direction, figure }));
             }
         }
 
         if (kpi && kpi.cvr) {
             const d = kpi.cvr.delta;
             const figure = highlight(`${kpi.cvr.value.toFixed(2)}%`, d >= 0 ? "pos" : "neg");
-            insights.push(`Conversion rate ${d >= 0 ? "improved" : "declined"} to ${figure} this period.`);
+            const direction = window.I18N.t(d >= 0 ? "insight.cvrImproved" : "insight.cvrDeclined");
+            insights.push(window.I18N.t("insight.cvrChange", { direction, figure }));
         }
 
         return insights;
@@ -590,22 +623,28 @@ window.THD = window.THD || {};
             ? (r.newOrders / (r.newOrders + r.repeatOrders)) * 100
             : 0;
         const latestShare = orderShare(latest);
+        const period = `<strong>${latest.period}</strong>`;
+        const shareText = highlight(latestShare.toFixed(1) + "%", "neutral");
 
         // New customer share of orders, with YoY comparison once a
         // full year of history is available.
         if (rows.length > 12) {
             const yearAgo = rows[rows.length - 13];
             const diff = latestShare - orderShare(yearAgo);
-            const figure = highlight(`${Math.abs(diff).toFixed(1)} pts`, diff >= 0 ? "pos" : "neg");
-            insights.push(`New customers made up ${highlight(latestShare.toFixed(1) + "%", "neutral")} of orders in <strong>${latest.period}</strong>, ${diff >= 0 ? "up" : "down"} ${figure} year-over-year.`);
+            const figure = highlight(`${Math.abs(diff).toFixed(1)} ${window.I18N.t("unit.pts")}`, diff >= 0 ? "pos" : "neg");
+            const direction = window.I18N.t(diff >= 0 ? "newRepeatInsight.up" : "newRepeatInsight.down");
+            insights.push(window.I18N.t("newRepeatInsight.newShareYoy", { share: shareText, period, direction, figure }));
         } else {
-            insights.push(`New customers made up ${highlight(latestShare.toFixed(1) + "%", "neutral")} of orders in <strong>${latest.period}</strong>.`);
+            insights.push(window.I18N.t("newRepeatInsight.newShare", { share: shareText, period }));
         }
 
         // Repeat customers' share of revenue — often a different
         // number than their share of orders, since basket sizes differ.
         const repeatRevenueShare = latest.totalRevenue ? (latest.repeatRevenue / latest.totalRevenue) * 100 : 0;
-        insights.push(`Repeat customers generated ${highlight(repeatRevenueShare.toFixed(1) + "%", "neutral")} of total revenue in <strong>${latest.period}</strong>.`);
+        insights.push(window.I18N.t("newRepeatInsight.repeatRevenueShare", {
+            figure: highlight(repeatRevenueShare.toFixed(1) + "%", "neutral"),
+            period
+        }));
 
         // AOV comparison between new and repeat customers this month.
         const newAov = latest.newOrders ? latest.newRevenue / latest.newOrders : 0;
@@ -615,13 +654,15 @@ window.THD = window.THD || {};
             const pctDiff = repeatHigher
                 ? ((repeatAov - newAov) / newAov) * 100
                 : ((newAov - repeatAov) / repeatAov) * 100;
-            const higherAov = Math.round(repeatHigher ? repeatAov : newAov).toLocaleString("en-US");
-            const lowerAov = Math.round(repeatHigher ? newAov : repeatAov).toLocaleString("en-US");
+            const higher = Math.round(repeatHigher ? repeatAov : newAov).toLocaleString("en-US");
+            const lower = Math.round(repeatHigher ? newAov : repeatAov).toLocaleString("en-US");
             if (pctDiff < 2) {
-                insights.push(`New and repeat customers spent about the same per order this month (¥${higherAov} vs ¥${lowerAov}).`);
+                insights.push(window.I18N.t("newRepeatInsight.aovSame", { higher, lower }));
             } else {
                 const figure = highlight(`${pctDiff.toFixed(1)}%`, "neutral");
-                insights.push(`${repeatHigher ? "Repeat" : "New"} customers spend ${figure} more per order than ${repeatHigher ? "new" : "repeat"} customers this month (¥${higherAov} vs ¥${lowerAov}).`);
+                const who = window.I18N.t(repeatHigher ? "newRepeatInsight.repeat" : "newRepeatInsight.new");
+                const otherWho = window.I18N.t(repeatHigher ? "newRepeatInsight.newLower" : "newRepeatInsight.repeatLower");
+                insights.push(window.I18N.t("newRepeatInsight.aovDiff", { who, otherWho, figure, higher, lower }));
             }
         }
 
@@ -631,10 +672,10 @@ window.THD = window.THD || {};
             const avgShare = (arr) => arr.reduce((sum, r) => sum + orderShare(r), 0) / arr.length;
             const trendDiff = avgShare(rows.slice(-3)) - avgShare(rows.slice(-6, -3));
             if (Math.abs(trendDiff) >= 1) {
-                const figure = highlight(`${Math.abs(trendDiff).toFixed(1)} pts`, trendDiff >= 0 ? "pos" : "neg");
-                const direction = trendDiff >= 0 ? "trending up" : "trending down";
-                const note = trendDiff >= 0 ? "acquisition is gaining ground" : "worth checking if acquisition channels have slowed";
-                insights.push(`New customer share has been ${direction} over the last 3 months (${figure} vs the prior 3) — ${note}.`);
+                const figure = highlight(`${Math.abs(trendDiff).toFixed(1)} ${window.I18N.t("unit.pts")}`, trendDiff >= 0 ? "pos" : "neg");
+                const direction = window.I18N.t(trendDiff >= 0 ? "newRepeatInsight.trendingUp" : "newRepeatInsight.trendingDown");
+                const note = window.I18N.t(trendDiff >= 0 ? "newRepeatInsight.trendUpNote" : "newRepeatInsight.trendDownNote");
+                insights.push(window.I18N.t("newRepeatInsight.trend", { direction, figure, note }));
             }
         }
 
@@ -653,12 +694,12 @@ window.THD = window.THD || {};
     const ANOMALY_Z_THRESHOLD = 2;
     const ANOMALY_MIN_DAYS = 5;
 
-    const ANOMALY_METRIC_LABELS = {
-        users: "Total Users",
-        sessions: "Sessions",
-        purchases: "Ecommerce Purchases",
-        revenue: "Revenue",
-        cvr: "CVR"
+    const ANOMALY_METRIC_I18N_KEYS = {
+        users: "kpi.totalUsers",
+        sessions: "kpi.sessions",
+        purchases: "kpi.purchases",
+        revenue: "kpi.revenue",
+        cvr: "kpi.cvr"
     };
 
     const ANOMALY_FORMATTERS = {
@@ -675,7 +716,7 @@ window.THD = window.THD || {};
     // still include today, since "This Month" etc. should naturally
     // include today-so-far like any other dashboard.
     function excludeToday(labels, series) {
-        const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const todayLabel = window.I18N.formatDayLabel(new Date());
         if (!labels.length || labels[labels.length - 1] !== todayLabel) {
             return { labels, series };
         }
@@ -705,7 +746,7 @@ window.THD = window.THD || {};
                 const z = (v - mean) / stdDev;
                 if (Math.abs(z) >= ANOMALY_Z_THRESHOLD) {
                     anomalies.push({
-                        metric: ANOMALY_METRIC_LABELS[key] || key,
+                        metric: window.I18N.t(ANOMALY_METRIC_I18N_KEYS[key] || key),
                         date: labels[i],
                         valueText: format(v),
                         meanText: format(mean),
@@ -725,9 +766,15 @@ window.THD = window.THD || {};
         return detectAnomalies(trimmed.labels, trimmed.series)
             .slice(0, 2)
             .map((a) => {
-                const verb = a.direction === "spike" ? "spiked" : "dropped";
+                const verb = window.I18N.t(a.direction === "spike" ? "anomaly.spike" : "anomaly.drop");
                 const figure = highlight(a.valueText, a.direction === "spike" ? "pos" : "neg");
-                return `${a.metric} ${verb} on ${a.date} (${figure} vs a typical ${a.meanText} for this period) — there might have been an external event, promotion, or outage around that date worth checking.`;
+                return window.I18N.t("anomaly.sentence", {
+                    metric: a.metric,
+                    verb,
+                    date: a.date,
+                    figure,
+                    mean: a.meanText
+                });
             });
     }
 
@@ -868,7 +915,7 @@ window.THD = window.THD || {};
     }
 
     function businessMonthLabel(year, month) {
-        return new Date(year, month, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        return window.I18N.formatMonth(year, month);
     }
 
     function buildBusinessMonths(dailyRows, monthsToShow = 12) {
@@ -934,6 +981,8 @@ window.THD = window.THD || {};
         classifySourceChannel,
         classifyPlatform,
         classifyForGroupBy,
+        listAvailableChannels,
+        buildDailyRowsFromSources,
         deriveTrafficBreakdown,
         buildInsights,
         buildNewRepeatInsights,

@@ -66,13 +66,7 @@ window.THD = window.THD || {};
     function renderLastUpdate() {
         const el = document.getElementById("lastUpdate");
         if (!el) return;
-        const now = new Date();
-        el.textContent = now.toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        });
+        el.textContent = window.I18N.formatDateTime(new Date());
     }
 
     /* ==========================================================
@@ -123,15 +117,15 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!pages || !pages.length) {
-            container.innerHTML = `<p class="emptyRow">No landing page data for this window.</p>`;
+            container.innerHTML = `<p class="emptyRow">${window.I18N.t("landing.empty")}</p>`;
             return;
         }
 
         const maxSessions = Math.max(...pages.map((p) => p.sessions));
 
         container.innerHTML = pages.map((p) => {
-            const label = p.pageTitle || "(not set)";
-            const stats = `<small>${fmtNumber(p.sessions)} sessions · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} CVR</small>`;
+            const label = p.pageTitle || window.I18N.t("landing.notSet");
+            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")} · ${fmtYen(p.revenue)} · ${fmtPercent(p.cvr)} ${window.I18N.t("landing.cvrUnit")}</small>`;
             return `
                 <div class="landingItem">
                     <div class="landingItemTop">
@@ -149,7 +143,7 @@ window.THD = window.THD || {};
     function renderLandingPagesPeriodLabel(startStr, endStr) {
         const el = document.getElementById("landingPagesPeriod");
         if (!el) return;
-        el.textContent = startStr && endStr ? `Fixed 30-day window: ${startStr} – ${endStr}` : "";
+        el.textContent = startStr && endStr ? window.I18N.t("landing.fixedWindow", { start: startStr, end: endStr }) : "";
     }
 
     function getLandingDevice() {
@@ -172,7 +166,7 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!insights || !insights.length) {
-            container.innerHTML = `<li>Not enough data yet to generate insights for this period.</li>`;
+            container.innerHTML = `<li>${window.I18N.t("insights.empty")}</li>`;
             return;
         }
 
@@ -235,17 +229,17 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!notes.length) {
-            container.innerHTML = `<p class="notesEmpty">No notes yet — add one above.</p>`;
+            container.innerHTML = `<p class="notesEmpty">${window.I18N.t("notes.empty")}</p>`;
             return;
         }
 
         container.innerHTML = notes.map((n) => `
             <div class="noteItem" data-id="${n.id}">
                 <div class="noteItemBody">
-                    <div class="noteItemDate">${new Date(n.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                    <div class="noteItemDate">${window.I18N.formatDateTimeFull(n.createdAt)}</div>
                     <div class="noteItemText"></div>
                 </div>
-                <button class="noteDeleteBtn" data-id="${n.id}" title="Delete note">
+                <button class="noteDeleteBtn" data-id="${n.id}" title="${window.I18N.t("notes.deleteTitle")}">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -261,6 +255,10 @@ window.THD = window.THD || {};
         });
 
         if (window.lucide) lucide.createIcons();
+    }
+
+    function refreshNotesList() {
+        renderNotesList(loadNotes());
     }
 
     function wireNotes() {
@@ -305,21 +303,22 @@ window.THD = window.THD || {};
         const prevSessions = prev ? prev.sessions : 0;
         const color = (cur && cur.color) || (prev && prev.color) || "#94A3B8";
         const isActive = !!activeLabel && activeLabel === row.label;
+        const displayLabel = window.I18N.channelLabel(row.label);
 
         let deltaHtml = "—";
         if (prevSessions > 0) {
             const delta = ((curSessions - prevSessions) / prevSessions) * 100;
             deltaHtml = `<span class="deltaBadge ${delta >= 0 ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
         } else if (curSessions > 0) {
-            deltaHtml = `<span class="deltaBadge positive">New</span>`;
+            deltaHtml = `<span class="deltaBadge positive">${window.I18N.t("traffic.new")}</span>`;
         }
 
         return `
-            <tr class="tcRow${isActive ? " active" : ""}" data-label="${row.label}" title="Click to see the sources behind ${row.label} below">
+            <tr class="tcRow${isActive ? " active" : ""}" data-label="${row.label}" title="${window.I18N.t("traffic.clickHint", { label: displayLabel })}">
                 <td class="tcSource">
                     <span class="tcSourceInner">
                         <span class="legendColor" style="background:${color}"></span>
-                        ${row.label}
+                        ${displayLabel}
                     </span>
                 </td>
                 <td class="number">${cur ? fmtNumber(cur.sessions) : "—"}</td>
@@ -336,7 +335,7 @@ window.THD = window.THD || {};
         if (!tbody) return;
 
         if (!rows || !rows.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">No traffic data for this period.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("traffic.empty")}</td></tr>`;
             return;
         }
 
@@ -356,6 +355,36 @@ window.THD = window.THD || {};
             if (!row) return;
             onRowClick(row.dataset.label);
         });
+    }
+
+    /* ==========================================================
+       All Sources Filter (Overview/Sales-wide channel scope)
+       Populated from whatever channels actually appear in the
+       data, rather than a hardcoded list — options and their
+       translated labels are rebuilt on load and again on a
+       language change.
+    ========================================================== */
+
+    function populateSourceFilterOptions(channels) {
+        const select = document.getElementById("sourceFilterSelect");
+        if (!select) return;
+        const current = select.value;
+        const optionsHtml = (channels || [])
+            .map((c) => `<option value="${c}">${window.I18N.channelLabel(c)}</option>`)
+            .join("");
+        select.innerHTML = `<option value="all" data-i18n="filter.allSources">${window.I18N.t("filter.allSources")}</option>${optionsHtml}`;
+        if (channels && channels.includes(current)) select.value = current;
+    }
+
+    function getSourceFilterChannel() {
+        const select = document.getElementById("sourceFilterSelect");
+        return select ? select.value : "all";
+    }
+
+    function wireSourceFilterToggle(onChange) {
+        const select = document.getElementById("sourceFilterSelect");
+        if (!select) return;
+        select.addEventListener("change", () => onChange(select.value));
     }
 
     /* ==========================================================
@@ -400,7 +429,7 @@ window.THD = window.THD || {};
         if (!tbody) return;
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">No sources match this filter for the selected period.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("source.emptyFilter")}</td></tr>`;
             const btn = document.getElementById("toggleSourcesBtn");
             if (btn) btn.style.display = "none";
             return;
@@ -413,8 +442,8 @@ window.THD = window.THD || {};
         if (btn) {
             btn.style.display = "";
             btn.textContent = sourcesExpanded
-                ? "Show Less"
-                : `Show All (${allSourceRows.length})`;
+                ? window.I18N.t("source.showLess")
+                : window.I18N.t("source.showAllCount", { n: allSourceRows.length });
         }
     }
 
@@ -425,7 +454,7 @@ window.THD = window.THD || {};
         const labelEl = document.getElementById("sourceFilterLabel");
         if (!status || !labelEl) return;
         if (label) {
-            labelEl.textContent = label;
+            labelEl.textContent = window.I18N.channelLabel(label);
             status.style.display = "flex";
         } else {
             status.style.display = "none";
@@ -593,20 +622,34 @@ window.THD = window.THD || {};
        Traffic sections but belongs to Overview).
     ========================================================== */
 
+    const HEADER_KEYS = {
+        overview: ["header.overview.title", "header.overview.subtitle"],
+        traffic: ["header.traffic.title", "header.traffic.subtitle"],
+        sales: ["header.sales.title", "header.sales.subtitle"],
+        notes: ["header.notes.title", "header.notes.subtitle"],
+        settings: ["header.settings.title", "header.settings.subtitle"]
+    };
+
+    function applyHeaderText(target) {
+        const keys = HEADER_KEYS[target];
+        if (!keys) return;
+        const titleEl = document.getElementById("pageTitle");
+        const subtitleEl = document.getElementById("pageSubtitle");
+        if (titleEl) titleEl.textContent = window.I18N.t(keys[0]);
+        if (subtitleEl) subtitleEl.textContent = window.I18N.t(keys[1]);
+    }
+
+    // Re-applies the header text for whichever tab is currently active —
+    // used after a language change, since that isn't a nav click.
+    function refreshActiveHeader() {
+        const active = document.querySelector(".sidebarMenu a[data-view].active");
+        if (active) applyHeaderText(active.dataset.view);
+    }
+
     function wireSidebarNav(onSwitch) {
         const links = document.querySelectorAll(".sidebarMenu a[data-view]");
         const views = document.querySelectorAll(".dashboardView");
         if (!links.length || !views.length) return;
-
-        const HEADER_TEXT = {
-            overview: ["Dashboard Overview", "Marketing performance at a glance"],
-            traffic: ["Traffic", "Where sessions are coming from"],
-            sales: ["Sales", "Revenue, orders, and repeat purchase performance"],
-            notes: ["Notes", "Remarks and discussion history"],
-            settings: ["Settings", "Dashboard preferences"]
-        };
-        const titleEl = document.getElementById("pageTitle");
-        const subtitleEl = document.getElementById("pageSubtitle");
 
         links.forEach((link) => {
             link.addEventListener("click", (e) => {
@@ -616,11 +659,7 @@ window.THD = window.THD || {};
                 links.forEach((l) => l.classList.toggle("active", l === link));
                 views.forEach((v) => v.classList.toggle("viewHidden", v.dataset.view !== target));
 
-                const text = HEADER_TEXT[target];
-                if (text) {
-                    if (titleEl) titleEl.textContent = text[0];
-                    if (subtitleEl) subtitleEl.textContent = text[1];
-                }
+                applyHeaderText(target);
 
                 // Charts inside the newly-shown view were sized while
                 // hidden and need a beat for layout to settle before
@@ -642,6 +681,9 @@ window.THD = window.THD || {};
         wireLandingDeviceToggle,
         renderTrafficComparison,
         wireTrafficComparisonFilter,
+        populateSourceFilterOptions,
+        getSourceFilterChannel,
+        wireSourceFilterToggle,
         getTrafficGroupBy,
         wireTrafficGroupToggle,
         renderSourceTable,
@@ -659,8 +701,10 @@ window.THD = window.THD || {};
         wireTrendOverlayToggle,
         wireRefreshButton,
         wireSidebarNav,
+        refreshActiveHeader,
         wireThemeToggle,
-        wireNotes
+        wireNotes,
+        refreshNotesList
     };
 
 })(window.THD);

@@ -29,7 +29,17 @@
     let activeSourceFilter = null;
     let sourcesCurrentForFilter = [];
     let lastTrafficComparisonRows = [];
-    let newRepeatRows = []; // last-loaded new/repeat rows, kept so the Orders/Revenue toggle can re-render without re-fetching
+    let sourceFilterChannel = "all"; // "All Sources" dropdown selection
+    let availableChannels = []; // cached channel list, so a language change can repopulate translated option labels without recomputing
+    let newRepeatRows = []; // last-loaded new/repeat rows (sliced to 12), kept so the Orders/Revenue toggle can re-render without re-fetching
+    let fullNewRepeatRows = []; // full history (unsliced) — needed to rebuild New/Repeat insights on a language change without re-fetching
+
+    function renderNewRepeatSourceNote() {
+        const el = document.getElementById("newRepeatSourceNote");
+        if (!el) return;
+        const link = `<a class="sourceLink" href="https://docs.google.com/spreadsheets/d/18mnPzByMm0eyQ3Q7JJGeLG5lQHCNucu-mM3ylCdgav0" target="_blank" rel="noopener">${window.I18N.t("newRepeat.sourceLinkText")}</a>`;
+        el.innerHTML = window.I18N.t("newRepeat.source", { link });
+    }
 
     function renderFilteredSourceTable() {
         const rows = activeSourceFilter
@@ -187,7 +197,19 @@
 
         const range = THD.data.resolveRange(rangeKey, currentCustomRange);
 
-        const filtered = THD.data.filterDailyRange(dailyRows, rangeKey, currentCustomRange);
+        // "All Sources" filter: when a specific channel is chosen,
+        // everything below is scoped to just that channel's rows —
+        // derived from sourceRows (the only feed with a channel
+        // dimension) rather than the separate dailyRows rollup.
+        // Left at "all", nothing changes from before this feature.
+        const effectiveSourceRows = sourceFilterChannel === "all"
+            ? sourceRows
+            : sourceRows.filter((r) => THD.data.classifyForGroupBy(r, "channel") === sourceFilterChannel);
+        const effectiveDailyRows = sourceFilterChannel === "all"
+            ? dailyRows
+            : THD.data.buildDailyRowsFromSources(effectiveSourceRows);
+
+        const filtered = THD.data.filterDailyRange(effectiveDailyRows, rangeKey, currentCustomRange);
         THD.ui.renderKpis(filtered.kpi);
         THD.ui.renderRangeCompare(range);
         THD.ui.renderTrafficPeriodLabels(range);
@@ -197,13 +219,13 @@
         });
 
         // Session Source table stays on the current period only.
-        const sourcesCurrent = THD.data.filterSourcesByDates(sourceRows, range.start, range.end);
+        const sourcesCurrent = THD.data.filterSourcesByDates(effectiveSourceRows, range.start, range.end);
         sourcesCurrentForFilter = sourcesCurrent;
         renderFilteredSourceTable();
 
         // Traffic Sources doughnuts: same current window, plus the
         // matching previous window, both grouped the same way.
-        const sourcesPrevious = THD.data.filterSourcesByDates(sourceRows, range.prevStart, range.prevEnd);
+        const sourcesPrevious = THD.data.filterSourcesByDates(effectiveSourceRows, range.prevStart, range.prevEnd);
         const groupBy = THD.ui.getTrafficGroupBy();
         const trafficCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, groupBy);
         const trafficPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, groupBy);
@@ -218,6 +240,13 @@
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
             ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
         ]);
+
+        // Monthly Business Performance recomputed here too (rather
+        // than only once at load) so it stays in sync with the
+        // source filter and with language changes, both of which
+        // call renderForRange.
+        const businessMonths = THD.data.buildBusinessMonths(effectiveDailyRows, 12);
+        THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
     }
 
     function renderTrendOnly() {
@@ -258,17 +287,42 @@
         }
     }
 
+    // Re-renders every piece of JS-generated text (chart legends/
+    // tooltips, insight sentences, table rows, the active tab's
+    // header) in the newly-selected language, using data already in
+    // memory — no re-fetch needed. I18N.wireLanguageToggle() already
+    // re-applies [data-i18n] static text before calling this.
+    function onLanguageChange() {
+        THD.ui.refreshActiveHeader();
+        THD.ui.populateSourceFilterOptions(availableChannels);
+        renderForRange(currentRange, currentCustomRange);
+        renderLandingPagesForDevice();
+        renderNewRepeatChartForMetric();
+        THD.ui.renderNewRepeatTable(newRepeatRows);
+        THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(fullNewRepeatRows));
+        renderNewRepeatSourceNote();
+        THD.ui.refreshNotesList();
+    }
+
     /* ==========================================================
        Init
     ========================================================== */
 
     async function init() {
 
+        window.I18N.applyStatic();
+        window.I18N.wireLanguageToggle(onLanguageChange);
+
         THD.ui.renderLastUpdate();
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
         THD.ui.wireTrendOverlayToggle(renderTrendOnly);
+        THD.ui.wireSourceFilterToggle((channel) => {
+            sourceFilterChannel = channel;
+            activeSourceFilter = null;
+            renderForRange(currentRange, currentCustomRange);
+        });
         THD.ui.wireTrafficGroupToggle(() => {
             activeSourceFilter = null;
             renderForRange(currentRange, currentCustomRange);
@@ -312,16 +366,11 @@
         landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
 
+        availableChannels = THD.data.listAvailableChannels(sourceRows, "channel");
+        THD.ui.populateSourceFilterOptions(availableChannels);
+
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();
-
-        // Business month = 21st of the previous calendar month
-        // through the 20th of the named month (e.g. "Feb 2026" =
-        // 2026-01-21 ~ 2026-02-20). Built from whatever's in
-        // dailyRows (live GA4 if configured, dummy otherwise), so
-        // it's real data as soon as GA4_DAILY_CSV_URL is live.
-        const businessMonths = THD.data.buildBusinessMonths(dailyRows, 12);
-        THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
 
         // Table and chart both stay capped to a recent window — full
         // history (back to 2021) lives in the linked spreadsheet, and
@@ -332,8 +381,10 @@
         const recentNewRepeat = newRepeat.slice(-12);
         THD.ui.renderNewRepeatTable(recentNewRepeat);
         newRepeatRows = recentNewRepeat;
+        fullNewRepeatRows = newRepeat;
         renderNewRepeatChartForMetric();
         THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(newRepeat));
+        renderNewRepeatSourceNote();
 
         THD.ui.renderLastUpdate();
     }

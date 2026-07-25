@@ -30,12 +30,26 @@ window.THD = window.THD || {};
     // magenta / purple) so no two lines read as "the same color family"
     // when several are stacked together — unlike the old cyan+blue pair.
     const METRIC_CONFIG = {
-        users: { label: "Total Users", color: "#2563EB", format: (v) => Math.round(v).toLocaleString("en-US") },
-        sessions: { label: "Sessions", color: "#EA580C", format: (v) => Math.round(v).toLocaleString("en-US") },
-        purchases: { label: "Ecommerce Purchases", color: "#16A34A", format: (v) => Math.round(v).toLocaleString("en-US") },
-        revenue: { label: "Total Revenue", color: "#DB2777", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
-        cvr: { label: "CVR", color: "#7C3AED", format: (v) => v.toFixed(2) + "%" }
+        users: { color: "#2563EB", format: (v) => Math.round(v).toLocaleString("en-US") },
+        sessions: { color: "#EA580C", format: (v) => Math.round(v).toLocaleString("en-US") },
+        purchases: { color: "#16A34A", format: (v) => Math.round(v).toLocaleString("en-US") },
+        revenue: { color: "#DB2777", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
+        cvr: { color: "#7C3AED", format: (v) => v.toFixed(2) + "%" }
     };
+
+    // Reuses the same dictionary keys as the KPI cards, so a metric's
+    // name never drifts between the cards and the chart that plots it.
+    const METRIC_LABEL_KEYS = {
+        users: "kpi.totalUsers",
+        sessions: "kpi.sessions",
+        purchases: "kpi.purchases",
+        revenue: "kpi.revenue",
+        cvr: "kpi.cvr"
+    };
+
+    function metricLabel(key) {
+        return window.I18N.t(METRIC_LABEL_KEYS[key] || key);
+    }
 
     Chart.defaults.font.family = "'Inter', sans-serif";
 
@@ -71,7 +85,7 @@ window.THD = window.THD || {};
         visibleMetrics.forEach((key) => {
             const cfg = METRIC_CONFIG[key];
             datasets.push({
-                label: cfg.label,
+                label: metricLabel(key),
                 data: series[key],
                 borderColor: cfg.color,
                 backgroundColor: cfg.color,
@@ -89,7 +103,7 @@ window.THD = window.THD || {};
 
             if (showTrendOverlay && THD.data && THD.data.computeMovingAverage) {
                 datasets.push({
-                    label: `${cfg.label} · 7-day avg`,
+                    label: `${metricLabel(key)}${window.I18N.t("trend.movingAvgSuffix")}`,
                     data: THD.data.computeMovingAverage(series[key], 7),
                     borderColor: cfg.color,
                     backgroundColor: "transparent",
@@ -140,8 +154,8 @@ window.THD = window.THD || {};
                             label: (item) => {
                                 const key = item.dataset.metricKey;
                                 const cfg = METRIC_CONFIG[key];
-                                const suffix = item.dataset.isTrendline ? " (7-day avg)" : "";
-                                return `${cfg.label}${suffix}: ${cfg.format(item.parsed.y)}`;
+                                const suffix = item.dataset.isTrendline ? window.I18N.t("trend.movingAvgSuffix") : "";
+                                return `${metricLabel(key)}${suffix}: ${cfg.format(item.parsed.y)}`;
                             }
                         }
                     }
@@ -178,9 +192,10 @@ window.THD = window.THD || {};
         const canvas = document.getElementById(canvasId);
         if (!canvas) return [];
 
-        const labels = channels.map((c) => c.label);
+        const rawLabels = channels.map((c) => c.label);
+        const displayLabels = rawLabels.map((l) => window.I18N.channelLabel(l));
         const values = channels.map((c) => c.percent);
-        const palette = labels.map(colorForLabel);
+        const palette = rawLabels.map(colorForLabel);
         const colors = getChartColors();
 
         if (trafficChartInstances[canvasId]) {
@@ -205,7 +220,7 @@ window.THD = window.THD || {};
                 ctx.fillText(Math.round(totalSessions || 0).toLocaleString("en-US"), cx, cy - 10);
                 ctx.fillStyle = colors.textLight;
                 ctx.font = "500 12px 'Inter', sans-serif";
-                ctx.fillText("Sessions", cx, cy + 12);
+                ctx.fillText(window.I18N.t("traffic.centerLabel"), cx, cy + 12);
                 ctx.restore();
             }
         };
@@ -213,7 +228,7 @@ window.THD = window.THD || {};
         trafficChartInstances[canvasId] = new Chart(canvas.getContext("2d"), {
             type: "doughnut",
             data: {
-                labels: labels,
+                labels: displayLabels,
                 datasets: [{
                     data: values,
                     backgroundColor: palette,
@@ -296,7 +311,7 @@ window.THD = window.THD || {};
                 datasets: [
                     {
                         type: "bar",
-                        label: "New",
+                        label: window.I18N.t("newRepeat.legendNew"),
                         data: newValues,
                         backgroundColor: NEW_REPEAT_COLORS.newBar,
                         stack: "total",
@@ -306,7 +321,7 @@ window.THD = window.THD || {};
                     },
                     {
                         type: "bar",
-                        label: "Repeat",
+                        label: window.I18N.t("newRepeat.legendRepeat"),
                         data: repeatValues,
                         backgroundColor: NEW_REPEAT_COLORS.repeatBar,
                         stack: "total",
@@ -316,7 +331,7 @@ window.THD = window.THD || {};
                     },
                     {
                         type: "line",
-                        label: "New Customer Share",
+                        label: window.I18N.t("newRepeat.legendShare"),
                         data: newShare,
                         borderColor: NEW_REPEAT_COLORS.pctLine,
                         backgroundColor: NEW_REPEAT_COLORS.pctLine,
