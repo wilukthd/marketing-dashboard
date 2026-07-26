@@ -406,15 +406,39 @@
 
 }
 
-.cvrFigure{
+.landingInsightsCard{
+
+    background:var(--primary-light);
+
+    border-radius:12px;
+
+    padding:14px 18px;
+
+    margin-bottom:20px;
+
+}
+
+.landingInsightsCard h4{
+
+    font-size:12px;
 
     font-weight:700;
+
+    text-transform:uppercase;
+
+    letter-spacing:.03em;
+
+    color:var(--primary);
+
+    margin:0 0 8px;
 
 }
 
 .miniInsights{
 
-    margin:0 0 16px 20px;
+    margin:0;
+
+    list-style:none;
 
     display:flex;
 

@@ -945,18 +945,23 @@ window.THD = window.THD || {};
             const top = ranked[0];
             insights.push(window.I18N.t("landingInsight.topPage", {
                 title: `<strong>${top.pageTitle}</strong>`,
-                sessions: highlight(Math.round(top.sessions).toLocaleString("en-US"), "neutral"),
-                revenue: "¥" + Math.round(top.revenue).toLocaleString("en-US")
+                sessions: highlight(Math.round(top.sessions).toLocaleString("en-US"), "neutral")
             }));
         }
 
-        // Pages getting meaningful traffic but zero purchases — worth
-        // a look (pricing, out of stock, broken add-to-cart, etc.).
-        const avgSessions = ranked.length ? ranked.reduce((s, r) => s + r.sessions, 0) / ranked.length : 0;
-        const noConversion = ranked.filter((r) => r.purchases === 0 && r.sessions >= Math.max(avgSessions, 10));
-        if (noConversion.length) {
-            insights.push(window.I18N.t("landingInsight.zeroConversion", {
-                count: highlight(String(noConversion.length), "neg")
+        // How concentrated content traffic is in a handful of pages
+        // vs. spread across a long tail — session-based only, since
+        // per-page revenue/purchases aren't reliable here (GA4 tends
+        // to attribute a purchase to whichever page started the
+        // session, and a session-boundary reset mid-checkout can land
+        // that "start" on the order-confirmation page itself rather
+        // than the page that actually drove the sale).
+        if (ranked.length >= 3) {
+            const contentTotalSessions = ranked.reduce((s, r) => s + r.sessions, 0);
+            const top3Sessions = ranked.slice(0, 3).reduce((s, r) => s + r.sessions, 0);
+            const share = contentTotalSessions ? (top3Sessions / contentTotalSessions) * 100 : 0;
+            insights.push(window.I18N.t("landingInsight.concentration", {
+                figure: highlight(share.toFixed(0) + "%", "neutral")
             }));
         }
 

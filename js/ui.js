@@ -121,17 +121,16 @@ window.THD = window.THD || {};
             return;
         }
 
-        // A plain bar proportional to sessions just re-draws the
-        // session count already printed next to it. Instead, color
-        // the CVR figure relative to this list's own average — that's
-        // a second, genuinely different signal: which pages convert
-        // well vs which just draw traffic.
-        const avgCvr = pages.reduce((sum, p) => sum + p.cvr, 0) / pages.length;
-
+        // Revenue/CVR intentionally aren't shown per page: GA4
+        // attributes a purchase to whichever page started the
+        // session, and a session-boundary reset mid-checkout can
+        // land that "start" on the order-confirmation page itself —
+        // so revenue/CVR broken out by landing page isn't reliably
+        // attributable to the page that actually earned it. Sessions
+        // aren't affected by that same issue, so that's what stays.
         container.innerHTML = pages.map((p) => {
             const label = p.pageTitle || window.I18N.t("landing.notSet");
-            const cvrClass = p.cvr > avgCvr * 1.1 ? "positive" : (p.cvr < avgCvr * 0.9 ? "negative" : "");
-            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")} · ${fmtYen(p.revenue)} · <span class="cvrFigure ${cvrClass}">${fmtPercent(p.cvr)} ${window.I18N.t("landing.cvrUnit")}</span></small>`;
+            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")}</small>`;
             return `
                 <div class="landingItem">
                     <div class="landingItemTop">
@@ -144,14 +143,15 @@ window.THD = window.THD || {};
     }
 
     function renderLandingPageInsights(insights) {
+        const card = document.getElementById("landingInsightsCard");
         const container = document.getElementById("landingPageInsights");
-        if (!container) return;
+        if (!container || !card) return;
         if (!insights || !insights.length) {
             container.innerHTML = "";
-            container.style.display = "none";
+            card.style.display = "none";
             return;
         }
-        container.style.display = "";
+        card.style.display = "";
         container.innerHTML = insights.map((s) => `<li>${s}</li>`).join("");
     }
 
