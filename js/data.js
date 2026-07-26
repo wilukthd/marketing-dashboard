@@ -219,37 +219,34 @@ window.THD = window.THD || {};
     // login/checkout/account/home "system" pages that technically
     // count as landing pages in GA4 but carry no marketing signal —
     // nobody clicks an ad to land on an order-confirmation screen.
-    // Path patterns are checked first since they're the most stable
-    // signal (template-based, matches the observation that "detail"
-    // in the path reliably means a real product page); page-title
-    // keywords catch the rest, since GA4 doesn't expose a page-type
-    // dimension directly.
-    const SYSTEM_TITLE_PATTERNS = [
-        /ログイン/, /マイページ/, /会員(登録|情報)?/, /新規会員登録/,
-        /送付先/, /決済.?配送方法/, /お客様情報/, /カート/, /パスワード/,
-        /ご注文(内容確認|完了|手続き)/
-    ];
-    // The shop's own name as the page title (with or without a stray
-    // leading slash some pages seem to pick up) means it's a generic
-    // home/placeholder page, not a specific product or article.
-    const HOME_TITLE_PATTERNS = [
-        /^\/?トータルヘルスデザイン公式ショップWEB本店$/,
-        /^トップページ/
-    ];
-
+    //
+    // This site's own title template turns out to be the reliable
+    // signal: product/content pages are titled "{item name}｜{shop
+    // name}" (a pipe — either the full-width｜or a plain ASCII | shows
+    // up in the data), while every system/navigational page either
+    // shows just the shop name alone, joins it with a different
+    // separator ("-", "/"), or has no shop-name suffix at all
+    // (the checkout-flow steps). Checking for that pipe is a single
+    // rule that covers every case observed so far, and — unlike an
+    // enumerated keyword blocklist — doesn't need updating if a new
+    // system page shows up later using text we haven't seen yet.
+    //
+    // An earlier version of this function prioritized the landingPage
+    // path (e.g. detail.html/shopdetail/ => "product") over the title.
+    // That was wrong: a handful of rows had one of those paths paired
+    // with a generic title (an unresolved/broken product hit), and the
+    // path check overrode the title, wrongly keeping them as "product".
+    // Title wins now — if the title itself doesn't look like a real
+    // item, the path it happened to load on doesn't matter.
     function classifyLandingPageType(landingPage, pageTitle) {
         const path = String(landingPage || "");
         const title = String(pageTitle || "");
 
-        // Product detail templates — kept regardless of title text.
-        if (/detail\.html/i.test(path) || /\/shopdetail\//i.test(path)) return "product";
-
         if (!title || title === "(not set)") return "system";
+        if (/[｜|]/.test(title)) return "content";
         if (/blog/i.test(path) || /ブログ/.test(title)) return "content";
-        if (HOME_TITLE_PATTERNS.some((re) => re.test(title))) return "system";
-        if (SYSTEM_TITLE_PATTERNS.some((re) => re.test(title))) return "system";
 
-        return "content"; // category/list pages, campaign landing pages, anything unclassified
+        return "system";
     }
 
     async function loadLandingPages() {

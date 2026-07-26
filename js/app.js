@@ -153,12 +153,12 @@
         { landingPage: "/smartphone/index.html", pageTitle: "トータルヘルスデザイン公式ショップWEB本店" },
         { landingPage: "/smartphone/login.html", pageTitle: "会員ページログイン" },
         { landingPage: "/smartphone/EntryOrderConfirm.html", pageTitle: "ご注文内容確認" },
-        { landingPage: "/shopdetail/000000002741", pageTitle: "【オンライン学習】後藤 芳宏さん　植物さんとのコミュニ" },
-        { landingPage: "/smartphone/detail.html", pageTitle: "夏のセール限定 サマーケアセット" },
-        { landingPage: "/smartphone/detail.html", pageTitle: "モイストクリーム 100g【特典付き】" },
-        { landingPage: "/smartphone/page78.html", pageTitle: "商品一覧" },
+        { landingPage: "/shopdetail/000000002741", pageTitle: "【オンライン学習】後藤 芳宏さん　植物さんとのコミュニ｜トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/smartphone/detail.html", pageTitle: "夏のセール限定 サマーケアセット｜トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/smartphone/detail.html", pageTitle: "モイストクリーム 100g【特典付き】｜トータルヘルスデザイン公式ショップWEB本店" },
+        { landingPage: "/smartphone/page78.html", pageTitle: "商品一覧 / トータルヘルスデザイン公式ショップWEB本店" },
         { landingPage: "/blog/style-guide-2026", pageTitle: "2026年 スタイルガイド ブログ" },
-        { landingPage: "/smartphone/detail.html", pageTitle: "オリジンウォーター 500ml【2本購入で特典付き】" }
+        { landingPage: "/smartphone/detail.html", pageTitle: "オリジンウォーター 500ml【2本購入で特典付き】｜トータルヘルスデザイン公式ショップWEB本店" }
     ];
 
     function buildDummyLandingPagesDaily(days = 45) {
