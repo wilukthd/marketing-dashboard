@@ -921,59 +921,82 @@ window.THD = window.THD || {};
         const inWindow = landingRows.filter((r) => r.date >= win.startStr && r.date <= win.endStr);
         if (!inWindow.length) return insights;
 
-        const totalSessions = inWindow.reduce((sum, r) => sum + r.sessions, 0);
-        const systemSessions = inWindow.filter((r) => r.pageType === "system").reduce((sum, r) => sum + r.sessions, 0);
-        const systemShare = totalSessions ? (systemSessions / totalSessions) * 100 : 0;
-        if (systemShare >= 5) {
-            insights.push(window.I18N.t("landingInsight.systemShare", {
-                figure: highlight(systemShare.toFixed(0) + "%", "neutral")
-            }));
-        }
-
         const contentRows = inWindow.filter((r) => r.pageType !== "system");
+
         const byTitle = {};
         contentRows.forEach((r) => {
             const key = r.pageTitle || "(not set)";
-            if (!byTitle[key]) byTitle[key] = { pageTitle: key, sessions: 0, purchases: 0, revenue: 0 };
-            byTitle[key].sessions += r.sessions;
-            byTitle[key].purchases += r.purchases;
-            byTitle[key].revenue += r.revenue;
+            if (!byTitle[key]) byTitle[key] = { pageTitle: key, sessions: 0, pc: 0, sp: 0 };
+            const t = byTitle[key];
+            t.sessions += r.sessions;
+            if (r.device === "PC") t.pc += r.sessions;
+            if (r.device === "Smartphone") t.sp += r.sessions;
         });
         const ranked = Object.values(byTitle).sort((a, b) => b.sessions - a.sessions);
+        if (!ranked.length) return insights;
 
-        if (ranked.length) {
-            const top = ranked[0];
-            insights.push(window.I18N.t("landingInsight.topPage", {
-                title: `<strong>${top.pageTitle}</strong>`,
-                sessions: highlight(Math.round(top.sessions).toLocaleString("en-US"), "neutral")
+        // Only look among pages with real traffic — the long tail of
+        // one-session hits would just add noise to both signals below.
+        const candidates = ranked.slice(0, 10);
+
+        // 1. Momentum: split the 30-day window in half by date and
+        // compare each candidate page's sessions, second half vs
+        // first. Surfaces whether a page is still gaining traction or
+        // fading — something to actually act on (keep pushing it, or
+        // go find out why interest dropped), unlike a static "here's
+        // your top page" fact.
+        const allDates = Array.from(new Set(inWindow.map((r) => r.date))).sort();
+        const midIdx = Math.floor(allDates.length / 2);
+        const firstHalfDates = new Set(allDates.slice(0, midIdx));
+        const secondHalfDates = new Set(allDates.slice(midIdx));
+
+        let biggestMover = null;
+        candidates.forEach((p) => {
+            const rows = contentRows.filter((r) => (r.pageTitle || "(not set)") === p.pageTitle);
+            const firstHalf = rows.filter((r) => firstHalfDates.has(r.date)).reduce((s, r) => s + r.sessions, 0);
+            const secondHalf = rows.filter((r) => secondHalfDates.has(r.date)).reduce((s, r) => s + r.sessions, 0);
+            if (firstHalf < 5) return; // too small a base for a % swing to mean anything
+            const change = ((secondHalf - firstHalf) / firstHalf) * 100;
+            if (!biggestMover || Math.abs(change) > Math.abs(biggestMover.change)) {
+                biggestMover = { pageTitle: p.pageTitle, change };
+            }
+        });
+        if (biggestMover && Math.abs(biggestMover.change) >= 20) {
+            const key = biggestMover.change >= 0 ? "landingInsight.rising" : "landingInsight.cooling";
+            insights.push(window.I18N.t(key, {
+                title: `<strong>${biggestMover.pageTitle}</strong>`,
+                figure: highlight(Math.abs(biggestMover.change).toFixed(0) + "%", biggestMover.change >= 0 ? "pos" : "neg")
             }));
         }
 
-        // How concentrated content traffic is in a handful of pages
-        // vs. spread across a long tail — session-based only, since
-        // per-page revenue/purchases aren't reliable here (GA4 tends
-        // to attribute a purchase to whichever page started the
-        // session, and a session-boundary reset mid-checkout can land
-        // that "start" on the order-confirmation page itself rather
-        // than the page that actually drove the sale).
-        if (ranked.length >= 3) {
-            const contentTotalSessions = ranked.reduce((s, r) => s + r.sessions, 0);
-            const top3Sessions = ranked.slice(0, 3).reduce((s, r) => s + r.sessions, 0);
-            const share = contentTotalSessions ? (top3Sessions / contentTotalSessions) * 100 : 0;
-            insights.push(window.I18N.t("landingInsight.concentration", {
-                figure: highlight(share.toFixed(0) + "%", "neutral")
-            }));
-        }
+        // 2. Device mismatch: among the same candidates, flag one whose
+        // PC/Smartphone split is meaningfully more lopsided than the
+        // overall content-traffic split — a concrete "go check how
+        // this looks on the other device" candidate, rather than a
+        // generic overall split nobody can act on.
+        const totalPc = contentRows.filter((r) => r.device === "PC").reduce((s, r) => s + r.sessions, 0);
+        const totalSp = contentRows.filter((r) => r.device === "Smartphone").reduce((s, r) => s + r.sessions, 0);
+        const overallSpShare = (totalPc + totalSp) ? (totalSp / (totalPc + totalSp)) * 100 : 0;
 
-        // Device split across all content (non-system) sessions.
-        const pcSessions = contentRows.filter((r) => r.device === "PC").reduce((s, r) => s + r.sessions, 0);
-        const spSessions = contentRows.filter((r) => r.device === "Smartphone").reduce((s, r) => s + r.sessions, 0);
-        const deviceTotal = pcSessions + spSessions;
-        if (deviceTotal > 0) {
-            const spShare = (spSessions / deviceTotal) * 100;
-            insights.push(window.I18N.t("landingInsight.deviceSplit", {
-                sp: highlight(spShare.toFixed(0) + "%", "neutral"),
-                pc: highlight((100 - spShare).toFixed(0) + "%", "neutral")
+        let biggestMismatch = null;
+        candidates.forEach((p) => {
+            const total = p.pc + p.sp;
+            if (total < 20) return; // needs enough volume for the split to be meaningful
+            const spShare = (p.sp / total) * 100;
+            const diff = Math.abs(spShare - overallSpShare);
+            if (!biggestMismatch || diff > biggestMismatch.diff) {
+                biggestMismatch = { pageTitle: p.pageTitle, spShare, diff };
+            }
+        });
+        if (biggestMismatch && biggestMismatch.diff >= 25) {
+            const deviceLabel = biggestMismatch.spShare > overallSpShare
+                ? window.I18N.t("landing.smartphone")
+                : window.I18N.t("landing.pc");
+            const figure = Math.max(biggestMismatch.spShare, 100 - biggestMismatch.spShare);
+            insights.push(window.I18N.t("landingInsight.deviceMismatch", {
+                title: `<strong>${biggestMismatch.pageTitle}</strong>`,
+                device: deviceLabel,
+                figure: highlight(figure.toFixed(0) + "%", "neutral")
             }));
         }
 

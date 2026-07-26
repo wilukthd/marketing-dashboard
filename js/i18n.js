@@ -110,10 +110,9 @@ window.I18N = (function () {
             "landing.hideSystem": "Hide login/checkout/system pages",
             "landingInsights.heading": "Insights",
 
-            "landingInsight.systemShare": "{figure} of landing page sessions in the last 30 days went to login, checkout, or other non-content pages — hidden from the list below by default.",
-            "landingInsight.topPage": "{title} was the top content page with {sessions} sessions.",
-            "landingInsight.concentration": "The top 3 content pages accounted for {figure} of all content-page sessions.",
-            "landingInsight.deviceSplit": "Smartphone accounted for {sp} of content-page sessions vs {pc} on PC.",
+            "landingInsight.rising": "{title}'s sessions grew {figure} in the second half of the last 30 days vs. the first half — still gaining traction.",
+            "landingInsight.cooling": "{title}'s sessions dropped {figure} in the second half of the last 30 days vs. the first half — worth checking if interest is fading.",
+            "landingInsight.deviceMismatch": "{title} skews heavily toward {device} ({figure} of its sessions) — worth checking how it looks on the other device.",
             "landing.empty": "No landing page data for this window.",
             "landing.notSet": "(not set)",
 
@@ -307,10 +306,9 @@ window.I18N = (function () {
             "landing.hideSystem": "ログイン・購入手続きなどのシステムページを非表示",
             "landingInsights.heading": "インサイト",
 
-            "landingInsight.systemShare": "過去30日間のランディングページセッションのうち{figure}はログインや購入手続きなど非コンテンツページへのアクセスでした — 以下のリストではデフォルトで非表示にしています。",
-            "landingInsight.topPage": "{title}が最もセッション数の多いコンテンツページで、{sessions}セッションを記録しました。",
-            "landingInsight.concentration": "上位3件のコンテンツページで、コンテンツページ全体のセッションの{figure}を占めています。",
-            "landingInsight.deviceSplit": "コンテンツページのセッションはスマートフォンが{sp}、PCが{pc}を占めています。",
+            "landingInsight.rising": "{title}のセッションは直近30日間の後半で前半比{figure}増加しました — まだ勢いが続いています。",
+            "landingInsight.cooling": "{title}のセッションは直近30日間の後半で前半比{figure}減少しました — 関心が薄れていないか確認する価値があります。",
+            "landingInsight.deviceMismatch": "{title}は{device}に大きく偏っています（セッションの{figure}）— もう一方のデバイスでの見え方を確認する価値があります。",
             "landing.empty": "この期間のランディングページデータはありません。",
             "landing.notSet": "（未設定）",
 
