@@ -270,6 +270,48 @@
 
 
 /* ==========================================================
+   Data Source Warning
+   Shown whenever one or more live data feeds failed to load
+   and the dashboard fell back to generated demo data — so
+   nobody mistakes those numbers for real ones.
+========================================================== */
+
+.dataSourceWarning{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    background:var(--warning-light);
+
+    color:var(--warning);
+
+    font-size:13px;
+
+    font-weight:600;
+
+    padding:12px 20px;
+
+    border-radius:12px;
+
+    margin-bottom:20px;
+
+}
+
+.dataSourceWarning i{
+
+    width:16px;
+
+    height:16px;
+
+    flex-shrink:0;
+
+}
+
+
+/* ==========================================================
    Section Title
 ========================================================== */
 

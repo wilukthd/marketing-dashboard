@@ -33,6 +33,7 @@
     let availableChannels = []; // cached channel list, so a language change can repopulate translated option labels without recomputing
     let newRepeatRows = []; // last-loaded new/repeat rows (sliced to 12), kept so the Orders/Revenue toggle can re-render without re-fetching
     let fullNewRepeatRows = []; // full history (unsliced) — needed to rebuild New/Repeat insights on a language change without re-fetching
+    let dataSourceStatus = { daily: true, sources: true, landingPages: true, newRepeat: true }; // true = live data loaded successfully; false = fell back to demo data
 
     function renderNewRepeatSourceNote() {
         const el = document.getElementById("newRepeatSourceNote");
@@ -306,6 +307,7 @@
     function onLanguageChange() {
         THD.ui.refreshActiveHeader();
         THD.ui.populateSourceFilterOptions(availableChannels);
+        THD.ui.renderDataSourceWarning(dataSourceStatus);
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();
         renderNewRepeatChartForMetric();
@@ -377,6 +379,14 @@
         sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
         landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
+
+        dataSourceStatus = {
+            daily: !!(liveDaily && liveDaily.length),
+            sources: !!(liveSources && liveSources.length),
+            landingPages: !!(liveLandingPages && liveLandingPages.length),
+            newRepeat: !!(liveNewRepeat && liveNewRepeat.length)
+        };
+        THD.ui.renderDataSourceWarning(dataSourceStatus);
 
         availableChannels = THD.data.listAvailableChannels(sourceRows, "channel");
         THD.ui.populateSourceFilterOptions(availableChannels);

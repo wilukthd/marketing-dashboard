@@ -45,6 +45,36 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Data Source Warning
+       Shown whenever one or more live feeds failed to load and
+       the dashboard fell back to generated demo data for that
+       section — so nobody mistakes those numbers for real ones.
+    ========================================================== */
+
+    function renderDataSourceWarning(status) {
+        const el = document.getElementById("dataSourceWarning");
+        const textEl = document.getElementById("dataSourceWarningText");
+        if (!el || !textEl || !status) return;
+
+        const keys = [];
+        if (!status.daily) keys.push("dataWarning.daily");
+        if (!status.sources) keys.push("dataWarning.sources");
+        if (!status.landingPages) keys.push("dataWarning.landingPages");
+        if (!status.newRepeat) keys.push("dataWarning.newRepeat");
+
+        if (!keys.length) {
+            el.style.display = "none";
+            return;
+        }
+
+        const separator = window.I18N.getLang() === "ja" ? "、" : ", ";
+        const list = keys.map((k) => window.I18N.t(k)).join(separator);
+        textEl.textContent = window.I18N.t("dataWarning.prefix", { list });
+        el.style.display = "flex";
+        if (window.lucide) lucide.createIcons();
+    }
+
+    /* ==========================================================
        Traffic Doughnut Period Labels
        Spells out the exact dates behind "selected period" and
        "previous period" next to each doughnut, same idea as
@@ -700,6 +730,7 @@ window.THD = window.THD || {};
         renderKpis,
         renderInsights,
         renderRangeCompare,
+        renderDataSourceWarning,
         renderTrafficPeriodLabels,
         renderLandingPages,
         renderLandingPageInsights,

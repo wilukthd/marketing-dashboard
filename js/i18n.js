@@ -110,9 +110,10 @@ window.I18N = (function () {
             "landing.hideSystem": "Hide login/checkout/system pages",
             "landingInsights.heading": "Insights",
 
-            "landingInsight.rising": "{title}'s sessions grew {figure} in the second half of the last 30 days vs. the first half — still gaining traction.",
-            "landingInsight.cooling": "{title}'s sessions dropped {figure} in the second half of the last 30 days vs. the first half — worth checking if interest is fading.",
-            "landingInsight.deviceMismatch": "{title} skews heavily toward {device} ({figure} of its sessions) — worth checking how it looks on the other device.",
+            "landingInsight.rising": "{title}'s sessions grew {figure} in the second half of the last 30 days vs. the first half.",
+            "landingInsight.cooling": "{title}'s sessions dropped {figure} in the second half of the last 30 days vs. the first half.",
+            "landingInsight.deviceMismatch": "{title} skews heavily toward {device} ({figure} of its sessions).",
+            "landingInsight.spike": "{title} had an unusually high {figure} sessions on {date}, compared to its typical {mean} per day.",
             "landing.empty": "No landing page data for this window.",
             "landing.notSet": "(not set)",
 
@@ -187,6 +188,12 @@ window.I18N = (function () {
             "settings.comingSoon": "More settings coming soon",
             "settings.comingSoonDesc": "Account, data source, and notification preferences will live here.",
 
+            "dataWarning.prefix": "Showing demo data for: {list} — the live data source(s) didn't load. Numbers in these sections aren't real.",
+            "dataWarning.daily": "Overview & Monthly Performance",
+            "dataWarning.sources": "Traffic Sources",
+            "dataWarning.landingPages": "Top Landing Pages",
+            "dataWarning.newRepeat": "New vs Repeat & AOV",
+
             "th.overallRevenue": "Total Revenue",
 
             "unit.pts": "pts",
@@ -195,7 +202,7 @@ window.I18N = (function () {
             "insight.increased": "increased",
             "insight.decreased": "decreased",
             "insight.topChannelRevenue": "{label} generated {figure} of total revenue.",
-            "insight.notSetShare": "{figure} of sessions have no attribution data {notSet} — worth checking GA4 tagging/UTM setup, since this may be skewing channel-level numbers.",
+            "insight.notSetShare": "{figure} of sessions have no attribution data {notSet}.",
             "insight.moverChange": "{label} {direction} by {figure}.",
             "insight.cvrChange": "Conversion rate {direction} to {figure} this period.",
             "insight.cvrImproved": "improved",
@@ -215,15 +222,13 @@ window.I18N = (function () {
             "newRepeatInsight.new": "New",
             "newRepeatInsight.repeatLower": "repeat",
             "newRepeatInsight.newLower": "new",
-            "newRepeatInsight.trend": "New customer share has been {direction} over the last 3 months ({figure} vs the prior 3) — {note}.",
+            "newRepeatInsight.trend": "New customer share has been {direction} over the last 3 months ({figure} vs the prior 3).",
             "newRepeatInsight.trendingUp": "trending up",
             "newRepeatInsight.trendingDown": "trending down",
-            "newRepeatInsight.trendUpNote": "acquisition is gaining ground",
-            "newRepeatInsight.trendDownNote": "worth checking if acquisition channels have slowed",
 
             "anomaly.spike": "spiked",
             "anomaly.drop": "dropped",
-            "anomaly.sentence": "{metric} {verb} on {date} ({figure} vs a typical {mean} for this period) — there might have been an external event, promotion, or outage around that date worth checking."
+            "anomaly.sentence": "{metric} {verb} on {date} ({figure} vs a typical {mean} for this period)."
         },
         ja: {
             "doc.title": "THDアナリティクス ダッシュボード",
@@ -306,9 +311,10 @@ window.I18N = (function () {
             "landing.hideSystem": "ログイン・購入手続きなどのシステムページを非表示",
             "landingInsights.heading": "インサイト",
 
-            "landingInsight.rising": "{title}のセッションは直近30日間の後半で前半比{figure}増加しました — まだ勢いが続いています。",
-            "landingInsight.cooling": "{title}のセッションは直近30日間の後半で前半比{figure}減少しました — 関心が薄れていないか確認する価値があります。",
-            "landingInsight.deviceMismatch": "{title}は{device}に大きく偏っています（セッションの{figure}）— もう一方のデバイスでの見え方を確認する価値があります。",
+            "landingInsight.rising": "{title}のセッションは直近30日間の後半で前半比{figure}増加しました。",
+            "landingInsight.cooling": "{title}のセッションは直近30日間の後半で前半比{figure}減少しました。",
+            "landingInsight.deviceMismatch": "{title}は{device}に大きく偏っています（セッションの{figure}）。",
+            "landingInsight.spike": "{title}は{date}に{figure}セッションと、通常の1日あたり{mean}セッションに比べて突出して多くなりました。",
             "landing.empty": "この期間のランディングページデータはありません。",
             "landing.notSet": "（未設定）",
 
@@ -383,6 +389,12 @@ window.I18N = (function () {
             "settings.comingSoon": "その他の設定は近日公開予定",
             "settings.comingSoonDesc": "アカウント・データソース・通知に関する設定を今後追加予定です。",
 
+            "dataWarning.prefix": "以下はデモデータを表示しています：{list} — 実データの読み込みに失敗しました。この区画の数値は実際のものではありません。",
+            "dataWarning.daily": "概要・月次業績",
+            "dataWarning.sources": "流入元データ",
+            "dataWarning.landingPages": "ランディングページ",
+            "dataWarning.newRepeat": "新規／リピーター・客単価",
+
             "th.overallRevenue": "総合売上",
 
             "unit.pts": "pt",
@@ -391,7 +403,7 @@ window.I18N = (function () {
             "insight.increased": "増加",
             "insight.decreased": "減少",
             "insight.topChannelRevenue": "{label}が総売上の{figure}を占めました。",
-            "insight.notSetShare": "セッションの{figure}が参照元不明{notSet}です。GA4のタグ設定やUTMパラメータを見直す価値があります — チャネル別の数値に影響している可能性があります。",
+            "insight.notSetShare": "セッションの{figure}が参照元不明{notSet}です。",
             "insight.moverChange": "{label}は{figure}{direction}しました。",
             "insight.cvrChange": "コンバージョン率（CVR）はこの期間で{figure}に{direction}しました。",
             "insight.cvrImproved": "改善",
@@ -411,15 +423,13 @@ window.I18N = (function () {
             "newRepeatInsight.new": "新規",
             "newRepeatInsight.repeatLower": "リピーター",
             "newRepeatInsight.newLower": "新規",
-            "newRepeatInsight.trend": "新規顧客比率はここ3ヶ月{direction}傾向です（直近3ヶ月とその前の3ヶ月の差は{figure}）— {note}。",
+            "newRepeatInsight.trend": "新規顧客比率はここ3ヶ月{direction}傾向です（直近3ヶ月とその前の3ヶ月の差は{figure}）。",
             "newRepeatInsight.trendingUp": "上昇",
             "newRepeatInsight.trendingDown": "下降",
-            "newRepeatInsight.trendUpNote": "新規獲得が伸びている状況です",
-            "newRepeatInsight.trendDownNote": "新規獲得チャネルの動きが鈍化していないか確認する価値があります",
 
             "anomaly.spike": "急増",
             "anomaly.drop": "急減",
-            "anomaly.sentence": "{date}に{metric}が{verb}しました（この期間の平均{mean}に対して{figure}）— この日付前後に外部要因・施策・システム障害などがなかったか確認する価値があります。"
+            "anomaly.sentence": "{date}に{metric}が{verb}しました（この期間の平均{mean}に対して{figure}）。"
         }
     };
 

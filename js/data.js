@@ -713,8 +713,7 @@ window.THD = window.THD || {};
             if (Math.abs(trendDiff) >= 1) {
                 const figure = highlight(`${Math.abs(trendDiff).toFixed(1)} ${window.I18N.t("unit.pts")}`, trendDiff >= 0 ? "pos" : "neg");
                 const direction = window.I18N.t(trendDiff >= 0 ? "newRepeatInsight.trendingUp" : "newRepeatInsight.trendingDown");
-                const note = window.I18N.t(trendDiff >= 0 ? "newRepeatInsight.trendUpNote" : "newRepeatInsight.trendDownNote");
-                insights.push(window.I18N.t("newRepeatInsight.trend", { direction, figure, note }));
+                insights.push(window.I18N.t("newRepeatInsight.trend", { direction, figure }));
             }
         }
 
@@ -997,6 +996,50 @@ window.THD = window.THD || {};
                 title: `<strong>${biggestMismatch.pageTitle}</strong>`,
                 device: deviceLabel,
                 figure: highlight(figure.toFixed(0) + "%", "neutral")
+            }));
+        }
+
+        // 3. Single-day spike: for each candidate page, build its own
+        // daily session series across the window and flag a day that's
+        // abnormal relative to THAT PAGE's own typical day (z-score
+        // against its own mean/stdDev) — same method as the daily
+        // KPI anomaly detector, just scoped per page instead of per
+        // metric. This is a different question from the momentum
+        // signal above: momentum looks for a sustained shift over two
+        // weeks, this looks for one unusual day (a press mention, a
+        // social share, a flash sale) that a half-window comparison
+        // could easily wash out or miss entirely.
+        let biggestSpike = null;
+        candidates.forEach((p) => {
+            const byDate = {};
+            contentRows
+                .filter((r) => (r.pageTitle || "(not set)") === p.pageTitle)
+                .forEach((r) => { byDate[r.date] = (byDate[r.date] || 0) + r.sessions; });
+
+            const values = allDates.map((d) => byDate[d] || 0);
+            const n = values.length;
+            if (n < 5) return;
+
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            if (mean < 3) return; // needs a real baseline — not near-zero noise
+
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            if (!stdDev) return;
+
+            values.forEach((v, i) => {
+                const z = (v - mean) / stdDev;
+                if (z >= 2 && (!biggestSpike || z > biggestSpike.z)) {
+                    biggestSpike = { pageTitle: p.pageTitle, date: allDates[i], value: v, mean, z };
+                }
+            });
+        });
+        if (biggestSpike) {
+            insights.push(window.I18N.t("landingInsight.spike", {
+                title: `<strong>${biggestSpike.pageTitle}</strong>`,
+                date: biggestSpike.date,
+                figure: highlight(Math.round(biggestSpike.value).toLocaleString("en-US"), "pos"),
+                mean: Math.round(biggestSpike.mean).toLocaleString("en-US")
             }));
         }
 
