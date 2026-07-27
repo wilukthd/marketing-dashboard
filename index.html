@@ -651,103 +651,7 @@ MAIN
 
 
 
-<section class="chartCard">
-
-    <div class="chartHeader">
-
-        <div>
-
-            <h3 data-i18n="landing.title">
-
-                Top Landing Pages
-
-            </h3>
-
-            <small id="landingPagesPeriod">
-
-            </small>
-
-        </div>
-
-        <div class="chartTools">
-
-            <select id="landingDeviceSelect">
-
-                <option value="all" selected data-i18n="landing.allDevices">All Devices</option>
-
-                <option value="PC" data-i18n="landing.pc">PC</option>
-
-                <option value="Smartphone" data-i18n="landing.smartphone">Smartphone</option>
-
-            </select>
-
-        </div>
-
-    </div>
-
-    <div class="trendOverlayRow">
-
-        <label class="trendOverlayToggle">
-
-            <input type="checkbox" id="landingHideSystemToggle" checked>
-
-            <span data-i18n="landing.hideSystem">Hide login/checkout/system pages</span>
-
-        </label>
-
-    </div>
-
-    <div class="landingInsightsCard" id="landingInsightsCard">
-
-        <h4 data-i18n="landingInsights.heading">Insights</h4>
-
-        <ul class="miniInsights" id="landingPageInsights">
-
-        </ul>
-
-    </div>
-
-    <div id="landingPages">
-
-    </div>
-
-</section>
-
-</div>
-
-
-
-<!-- ================= INSIGHTS ================= -->
-
-<div class="dashboardView" data-view="overview">
-
-<section class="insightCard">
-
-    <div class="sectionTitle">
-
-        <h3 data-i18n="insights.title">
-
-            Key Insights
-
-        </h3>
-
-    </div>
-
-    <ul>
-
-        <li>Loading insights…</li>
-
-    </ul>
-
-</section>
-
-</div>
-
-
-
 <!-- ================= SESSION SOURCE TABLE ================= -->
-
-<div class="dashboardView viewHidden" data-view="traffic">
 
 <section class="tableCard">
 
@@ -817,6 +721,110 @@ MAIN
 
 
 
+<!-- ================= INSIGHTS ================= -->
+
+<div class="dashboardView" data-view="overview">
+
+<section class="insightCard">
+
+    <div class="sectionTitle">
+
+        <h3 data-i18n="insights.title">
+
+            Key Insights
+
+        </h3>
+
+    </div>
+
+    <ul>
+
+        <li>Loading insights…</li>
+
+    </ul>
+
+</section>
+
+</div>
+
+
+
+<!-- ================= TOP LANDING PAGES ================= -->
+
+<div class="dashboardView viewHidden" data-view="traffic">
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <div>
+
+            <h3 data-i18n="landing.title">
+
+                Top Landing Pages
+
+            </h3>
+
+            <small id="landingPagesPeriod">
+
+            </small>
+
+        </div>
+
+        <div class="chartTools">
+
+            <select id="landingDeviceSelect">
+
+                <option value="all" selected data-i18n="landing.allDevices">All Devices</option>
+
+                <option value="PC" data-i18n="landing.pc">PC</option>
+
+                <option value="Smartphone" data-i18n="landing.smartphone">Smartphone</option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div class="trendOverlayRow">
+
+        <label class="trendOverlayToggle">
+
+            <input type="checkbox" id="landingHideSystemToggle" checked>
+
+            <span data-i18n="landing.hideSystem">Hide login/checkout/system pages</span>
+
+        </label>
+
+    </div>
+
+    <div class="landingInsightsCard" id="landingInsightsCard">
+
+        <h4 data-i18n="landingInsights.heading">Insights</h4>
+
+        <ul class="miniInsights" id="landingPageInsights">
+
+        </ul>
+
+    </div>
+
+    <div id="landingPages">
+
+    </div>
+
+    <button class="secondaryButton landingShowAllBtn" id="toggleLandingPagesBtn" data-i18n="source.showAll">
+
+        Show All
+
+    </button>
+
+</section>
+
+</div>
+
+
+
 <!-- ================= TABLE ================= -->
 
 <div class="dashboardView viewHidden" data-view="sales">
@@ -869,52 +877,6 @@ MAIN
 
 
 
-<!-- ================= NEW / REPEAT CHART ================= -->
-
-<section class="chartCard">
-
-    <div class="chartHeader">
-
-        <div>
-
-            <h3 data-i18n="newRepeat.chartTitle">
-
-                New vs Repeat Customers
-
-            </h3>
-
-            <small data-i18n="newRepeat.chartSubtitle">
-
-                WEB本店 新規／リピータ — by business month
-
-            </small>
-
-        </div>
-
-        <div class="chartTools">
-
-            <select id="newRepeatMetricSelect">
-
-                <option value="orders" selected data-i18n="newRepeat.orders">Orders</option>
-
-                <option value="revenue" data-i18n="newRepeat.revenue">Revenue</option>
-
-            </select>
-
-        </div>
-
-    </div>
-
-    <div class="chartBody">
-
-        <canvas id="newRepeatChart"></canvas>
-
-    </div>
-
-</section>
-
-
-
 <!-- ================= AOV TREND ================= -->
 
 <section class="chartCard">
@@ -944,30 +906,6 @@ MAIN
         <canvas id="aovChart"></canvas>
 
     </div>
-
-</section>
-
-
-
-<!-- ================= NEW / REPEAT INSIGHTS ================= -->
-
-<section class="insightCard">
-
-    <div class="sectionTitle">
-
-        <h3 data-i18n="newRepeatInsights.title">
-
-            New vs Repeat Insights
-
-        </h3>
-
-    </div>
-
-    <ul id="newRepeatInsights">
-
-        <li>Loading insights…</li>
-
-    </ul>
 
 </section>
 
@@ -1034,6 +972,76 @@ MAIN
 </section>
 
 </div>
+
+
+
+<!-- ================= NEW / REPEAT CHART ================= -->
+
+<section class="chartCard">
+
+    <div class="chartHeader">
+
+        <div>
+
+            <h3 data-i18n="newRepeat.chartTitle">
+
+                New vs Repeat Customers
+
+            </h3>
+
+            <small data-i18n="newRepeat.chartSubtitle">
+
+                WEB本店 新規／リピータ — by business month
+
+            </small>
+
+        </div>
+
+        <div class="chartTools">
+
+            <select id="newRepeatMetricSelect">
+
+                <option value="orders" selected data-i18n="newRepeat.orders">Orders</option>
+
+                <option value="revenue" data-i18n="newRepeat.revenue">Revenue</option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+    <div class="chartBody">
+
+        <canvas id="newRepeatChart"></canvas>
+
+    </div>
+
+</section>
+
+
+
+<!-- ================= NEW / REPEAT INSIGHTS ================= -->
+
+<section class="insightCard">
+
+    <div class="sectionTitle">
+
+        <h3 data-i18n="newRepeatInsights.title">
+
+            New vs Repeat Insights
+
+        </h3>
+
+    </div>
+
+    <ul id="newRepeatInsights">
+
+        <li>Loading insights…</li>
+
+    </ul>
+
+</section>
 
 
 

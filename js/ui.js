@@ -142,34 +142,66 @@ window.THD = window.THD || {};
        Smartphone / All device filter.
     ========================================================== */
 
+    let allLandingPages = [];
+    let landingPagesExpanded = false;
+    const COLLAPSED_LANDING_COUNT = 10;
+
+    function landingItemHtml(p) {
+        const label = p.pageTitle || window.I18N.t("landing.notSet");
+        let trendHtml = "";
+        if (p.trend !== null && p.trend !== undefined) {
+            const cls = p.trend >= 0 ? "positive" : "negative";
+            trendHtml = ` · <span class="deltaBadge ${cls}">${fmtDelta(p.trend)}</span>`;
+        }
+        const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")}${trendHtml}</small>`;
+        return `
+            <div class="landingItem">
+                <div class="landingItemTop">
+                    <span>${label}</span>
+                    ${stats}
+                </div>
+            </div>
+        `;
+    }
+
+    // Revenue/CVR intentionally aren't shown per page: GA4 attributes
+    // a purchase to whichever page started the session, and a
+    // session-boundary reset mid-checkout can land that "start" on
+    // the order-confirmation page itself — so revenue/CVR broken out
+    // by landing page isn't reliably attributable to the page that
+    // actually earned it. Sessions (and the trend badge derived from
+    // them) aren't affected by that same issue, so that's what stays.
     function renderLandingPages(pages) {
+        allLandingPages = pages || [];
         const container = document.getElementById("landingPages");
         if (!container) return;
 
-        if (!pages || !pages.length) {
+        if (!allLandingPages.length) {
             container.innerHTML = `<p class="emptyRow">${window.I18N.t("landing.empty")}</p>`;
+            const btn = document.getElementById("toggleLandingPagesBtn");
+            if (btn) btn.style.display = "none";
             return;
         }
 
-        // Revenue/CVR intentionally aren't shown per page: GA4
-        // attributes a purchase to whichever page started the
-        // session, and a session-boundary reset mid-checkout can
-        // land that "start" on the order-confirmation page itself —
-        // so revenue/CVR broken out by landing page isn't reliably
-        // attributable to the page that actually earned it. Sessions
-        // aren't affected by that same issue, so that's what stays.
-        container.innerHTML = pages.map((p) => {
-            const label = p.pageTitle || window.I18N.t("landing.notSet");
-            const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")}</small>`;
-            return `
-                <div class="landingItem">
-                    <div class="landingItemTop">
-                        <span>${label}</span>
-                        ${stats}
-                    </div>
-                </div>
-            `;
-        }).join("");
+        const visible = landingPagesExpanded ? allLandingPages : allLandingPages.slice(0, COLLAPSED_LANDING_COUNT);
+        container.innerHTML = visible.map(landingItemHtml).join("");
+
+        const btn = document.getElementById("toggleLandingPagesBtn");
+        if (btn) {
+            btn.style.display = allLandingPages.length > COLLAPSED_LANDING_COUNT ? "" : "none";
+            btn.textContent = landingPagesExpanded
+                ? window.I18N.t("source.showLess")
+                : window.I18N.t("source.showAllCount", { n: allLandingPages.length });
+        }
+    }
+
+    function wireLandingPagesToggle() {
+        const btn = document.getElementById("toggleLandingPagesBtn");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+            landingPagesExpanded = !landingPagesExpanded;
+            renderLandingPages(allLandingPages);
+        });
     }
 
     function renderLandingPageInsights(insights) {
@@ -733,6 +765,7 @@ window.THD = window.THD || {};
         renderDataSourceWarning,
         renderTrafficPeriodLabels,
         renderLandingPages,
+        wireLandingPagesToggle,
         renderLandingPageInsights,
         getHideSystemPages,
         wireHideSystemToggle,

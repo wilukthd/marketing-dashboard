@@ -889,20 +889,40 @@ window.THD = window.THD || {};
             (!excludeSystem || r.pageType !== "system")
         );
 
+        // Same first-half/second-half split used by the momentum
+        // insight, computed once here so every row in the list can
+        // show its own trend badge, not just whichever single page
+        // moved the most.
+        const allDates = Array.from(new Set(inWindow.map((r) => r.date))).sort();
+        const midIdx = Math.floor(allDates.length / 2);
+        const firstHalfDates = new Set(allDates.slice(0, midIdx));
+        const secondHalfDates = new Set(allDates.slice(midIdx));
+
         const totals = {};
         inWindow.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             if (!totals[key]) {
-                totals[key] = { pageTitle: key, landingPage: r.landingPage, pageType: r.pageType, sessions: 0, purchases: 0, revenue: 0 };
+                totals[key] = { pageTitle: key, landingPage: r.landingPage, pageType: r.pageType, sessions: 0, purchases: 0, revenue: 0, firstHalfSessions: 0, secondHalfSessions: 0 };
             }
             const t = totals[key];
             t.sessions += r.sessions;
             t.purchases += r.purchases;
             t.revenue += r.revenue;
+            if (firstHalfDates.has(r.date)) t.firstHalfSessions += r.sessions;
+            if (secondHalfDates.has(r.date)) t.secondHalfSessions += r.sessions;
         });
 
         return Object.values(totals)
-            .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
+            .map((t) => {
+                // Null (not just 0%) when there isn't enough of a first-half
+                // base to make a % change meaningful — the UI skips the
+                // badge entirely in that case rather than showing a
+                // misleadingly precise number off a tiny denominator.
+                const trend = t.firstHalfSessions >= 5
+                    ? ((t.secondHalfSessions - t.firstHalfSessions) / t.firstHalfSessions) * 100
+                    : null;
+                return { ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0, trend };
+            })
             .sort((a, b) => b.sessions - a.sessions)
             .slice(0, limit);
     }

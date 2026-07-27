@@ -61,7 +61,7 @@
     function renderLandingPagesForDevice() {
         const device = THD.ui.getLandingDevice();
         const excludeSystem = THD.ui.getHideSystemPages();
-        const rows = THD.data.aggregateLandingPages(landingRows, device, 10, excludeSystem);
+        const rows = THD.data.aggregateLandingPages(landingRows, device, 50, excludeSystem);
         THD.ui.renderLandingPages(rows);
         THD.ui.renderLandingPageInsights(THD.data.buildLandingPageInsights(landingRows));
         const win = THD.data.resolveLast30DayWindow(landingRows);
@@ -353,6 +353,7 @@
         THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
+        THD.ui.wireLandingPagesToggle();
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
             renderForRange(currentRange, currentCustomRange);
