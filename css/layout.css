@@ -402,7 +402,7 @@
 
     flex-direction:column;
 
-    gap:16px;
+    gap:2px;
 
 }
 
@@ -413,6 +413,18 @@
     flex-direction:column;
 
     gap:8px;
+
+    padding:8px 10px;
+
+    border-radius:10px;
+
+    transition:background .15s ease;
+
+}
+
+.landingItem:hover{
+
+    background:var(--primary-light);
 
 }
 
