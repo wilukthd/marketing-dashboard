@@ -289,42 +289,45 @@ window.THD = window.THD || {};
 
     /* ==========================================================
        Notes
-       A simple dated remarks log, kept in localStorage since
-       there's no backend — meant for things like "discussed
-       re-pricing X after the Q3 review" rather than analytics.
+       Synced across devices/teammates via Firestore (see
+       js/notes.js) — this section only handles rendering and
+       wiring the composer; THD.notes owns the actual data.
     ========================================================== */
 
-    const NOTES_KEY = "thd-notes";
+    const NOTE_CATEGORY_KEYS = {
+        general: "notes.catGeneral",
+        traffic: "notes.catTraffic",
+        sales: "notes.catSales",
+        product: "notes.catProduct",
+        bug: "notes.catBug",
+        idea: "notes.catIdea"
+    };
 
-    function loadNotes() {
-        try {
-            return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]");
-        } catch (e) {
-            return [];
-        }
+    function noteCategoryLabel(category) {
+        return window.I18N.t(NOTE_CATEGORY_KEYS[category] || "notes.catGeneral");
     }
 
-    function saveNotes(notes) {
-        try {
-            localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-        } catch (e) {
-            // Private browsing / storage disabled — notes just won't persist across reloads.
-        }
-    }
+    let currentNotes = []; // cached from the last Firestore snapshot, so a language change can re-render without re-subscribing
 
     function renderNotesList(notes) {
+        currentNotes = notes || [];
         const container = document.getElementById("notesList");
         if (!container) return;
 
-        if (!notes.length) {
-            container.innerHTML = `<p class="notesEmpty">${window.I18N.t("notes.empty")}</p>`;
+        if (!currentNotes.length) {
+            const key = window.THD.notes && window.THD.notes.isConfigured() ? "notes.empty" : "notes.notConfigured";
+            container.innerHTML = `<p class="notesEmpty">${window.I18N.t(key)}</p>`;
             return;
         }
 
-        container.innerHTML = notes.map((n) => `
+        container.innerHTML = currentNotes.map((n) => `
             <div class="noteItem" data-id="${n.id}">
                 <div class="noteItemBody">
-                    <div class="noteItemDate">${window.I18N.formatDateTimeFull(n.createdAt)}</div>
+                    <div class="noteItemMeta">
+                        <span class="noteCategoryBadge cat-${n.category}">${noteCategoryLabel(n.category)}</span>
+                        <span class="noteItemAuthor"></span>
+                        <span class="noteItemDate">${window.I18N.formatDateTimeFull(n.createdAt)}</span>
+                    </div>
                     <div class="noteItemText"></div>
                 </div>
                 <button class="noteDeleteBtn" data-id="${n.id}" title="${window.I18N.t("notes.deleteTitle")}">
@@ -333,46 +336,63 @@ window.THD = window.THD || {};
             </div>
         `).join("");
 
-        // Set text via textContent (not template interpolation) so a
-        // note containing HTML-looking text can't inject markup.
+        // Text and author set via textContent (not template
+        // interpolation) so free-typed note/author text containing
+        // HTML-looking characters can't inject markup.
         container.querySelectorAll(".noteItem").forEach((el) => {
             const id = el.dataset.id;
-            const note = notes.find((n) => String(n.id) === id);
+            const note = currentNotes.find((n) => String(n.id) === id);
+            if (!note) return;
             const textEl = el.querySelector(".noteItemText");
-            if (note && textEl) textEl.textContent = note.text;
+            const authorEl = el.querySelector(".noteItemAuthor");
+            if (textEl) textEl.textContent = note.text;
+            if (authorEl) authorEl.textContent = note.author || window.I18N.t("notes.anonymous");
         });
 
         if (window.lucide) lucide.createIcons();
     }
 
     function refreshNotesList() {
-        renderNotesList(loadNotes());
+        renderNotesList(currentNotes);
     }
 
     function wireNotes() {
         const input = document.getElementById("noteInput");
         const addBtn = document.getElementById("addNoteBtn");
         const list = document.getElementById("notesList");
+        const authorInput = document.getElementById("noteAuthorInput");
+        const categorySelect = document.getElementById("noteCategorySelect");
         if (!input || !addBtn || !list) return;
 
-        let notes = loadNotes();
-        renderNotesList(notes);
+        if (authorInput && window.THD.notes) {
+            authorInput.value = window.THD.notes.getAuthorName();
+            authorInput.addEventListener("change", () => {
+                window.THD.notes.setAuthorName(authorInput.value.trim());
+            });
+        }
+
+        if (window.THD.notes) {
+            window.THD.notes.subscribe(renderNotesList);
+        }
 
         addBtn.addEventListener("click", () => {
             const text = input.value.trim();
-            if (!text) return;
-            notes = [{ id: Date.now(), text, createdAt: Date.now() }, ...notes];
-            saveNotes(notes);
-            renderNotesList(notes);
+            if (!text || !window.THD.notes) return;
+            const author = authorInput ? authorInput.value.trim() : "";
+            const category = categorySelect ? categorySelect.value : "general";
+            if (authorInput) window.THD.notes.setAuthorName(author);
+            window.THD.notes.add({ text, author, category }).catch((e) => {
+                console.warn("[THD.ui] Failed to add note:", e.message);
+            });
             input.value = "";
         });
 
         list.addEventListener("click", (e) => {
             const btn = e.target.closest(".noteDeleteBtn");
-            if (!btn) return;
-            notes = notes.filter((n) => String(n.id) !== btn.dataset.id);
-            saveNotes(notes);
-            renderNotesList(notes);
+            if (!btn || !window.THD.notes) return;
+            window.THD.notes.remove(btn.dataset.id).catch((err) => {
+                console.warn("[THD.ui] Failed to delete note:", err.message);
+            });
         });
     }
 

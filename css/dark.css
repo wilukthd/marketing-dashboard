@@ -102,3 +102,10 @@
     border-color:var(--border);
 
 }
+
+[data-theme="dark"] .noteCategoryBadge.cat-product{
+
+    background:#2E1F4D;
+    color:#C4B5FD;
+
+}

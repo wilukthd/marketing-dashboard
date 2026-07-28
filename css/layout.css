@@ -914,6 +914,62 @@
 
 }
 
+.noteMetaRow{
+
+    display:flex;
+
+    gap:10px;
+
+    margin-bottom:10px;
+
+}
+
+.noteAuthorInput{
+
+    flex:1;
+
+    border:1px solid var(--border);
+
+    border-radius:10px;
+
+    padding:8px 12px;
+
+    font-family:inherit;
+
+    font-size:13px;
+
+    color:var(--text);
+
+    background:var(--surface);
+
+}
+
+.noteAuthorInput:focus{
+
+    outline:none;
+
+    border-color:var(--primary);
+
+}
+
+.noteCategorySelect{
+
+    border:1px solid var(--border);
+
+    border-radius:10px;
+
+    padding:8px 12px;
+
+    font-family:inherit;
+
+    font-size:13px;
+
+    color:var(--text);
+
+    background:var(--surface);
+
+}
+
 .noteActions{
 
     display:flex;
@@ -960,15 +1016,67 @@
 
 }
 
+.noteItemMeta{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    flex-wrap:wrap;
+
+    margin-bottom:4px;
+
+}
+
+.noteItemAuthor{
+
+    color:var(--text-light);
+
+    font-size:12.5px;
+
+    font-weight:600;
+
+}
+
 .noteItemDate{
 
     color:var(--text-light);
 
     font-size:12.5px;
 
-    margin-bottom:4px;
+}
+
+.noteCategoryBadge{
+
+    display:inline-block;
+
+    font-size:11px;
+
+    font-weight:700;
+
+    padding:2px 9px;
+
+    border-radius:6px;
+
+    text-transform:uppercase;
+
+    letter-spacing:.02em;
 
 }
+
+.noteCategoryBadge.cat-general{ background:var(--border); color:var(--text-light); }
+
+.noteCategoryBadge.cat-traffic{ background:var(--primary-light); color:var(--primary); }
+
+.noteCategoryBadge.cat-sales{ background:var(--success-light); color:var(--success); }
+
+.noteCategoryBadge.cat-product{ background:#EDE9FE; color:#7C3AED; }
+
+.noteCategoryBadge.cat-bug{ background:var(--danger-light); color:var(--danger); }
+
+.noteCategoryBadge.cat-idea{ background:var(--warning-light); color:var(--warning); }
 
 .noteItemText{
 

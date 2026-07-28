@@ -1057,7 +1057,29 @@ MAIN
 
     </div>
 
-    <p class="notesSubtitle" data-i18n="notes.subtitle">Jot down remarks from a discussion, a product observation, or anything worth remembering next time you're in the dashboard. Saved on this device.</p>
+    <p class="notesSubtitle" data-i18n="notes.subtitle">Jot down remarks from a discussion, a product observation, or anything worth remembering — visible to the whole team, synced across devices.</p>
+
+    <div class="noteMetaRow">
+
+        <input type="text" id="noteAuthorInput" class="noteAuthorInput" placeholder="Your name" data-i18n-placeholder="notes.yourName">
+
+        <select id="noteCategorySelect" class="noteCategorySelect">
+
+            <option value="general" data-i18n="notes.catGeneral">General</option>
+
+            <option value="traffic" data-i18n="notes.catTraffic">Traffic</option>
+
+            <option value="sales" data-i18n="notes.catSales">Sales</option>
+
+            <option value="product" data-i18n="notes.catProduct">Product</option>
+
+            <option value="bug" data-i18n="notes.catBug">Bug</option>
+
+            <option value="idea" data-i18n="notes.catIdea">Idea</option>
+
+        </select>
+
+    </div>
 
     <textarea id="noteInput" class="noteInput" rows="3" placeholder="e.g. Discussed re-pricing the SP-14 bundle after the Q3 review — revisit next month." data-i18n-placeholder="notes.placeholder"></textarea>
 
@@ -1171,6 +1193,9 @@ MAIN
 <script src="js/charts.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/data.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="js/notes.js"></script>
 <script src="js/app.js"></script>
 
 </body>
