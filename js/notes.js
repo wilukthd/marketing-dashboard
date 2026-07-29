@@ -73,6 +73,11 @@ window.THD = window.THD || {};
     // function (not currently used elsewhere, but good practice to
     // expose it). If Firebase isn't configured yet, calls back once
     // with an empty array so the UI still renders sensibly.
+    //
+    // Archived notes are included here too (not filtered out) — the
+    // UI splits active vs. archived locally, same as how Top Landing
+    // Pages/Session Source do their own local slicing rather than
+    // running two separate queries.
     function subscribe(onChange) {
         if (!init()) {
             onChange([]);
@@ -89,6 +94,7 @@ window.THD = window.THD || {};
                             text: d.text || "",
                             author: d.author || "",
                             category: d.category || "general",
+                            archived: !!d.archived,
                             // createdAt is a Firestore server timestamp once it
                             // round-trips; it can briefly be null for a note
                             // this same client just added, before the server
@@ -111,11 +117,30 @@ window.THD = window.THD || {};
             text,
             author: author || "",
             category: category || "general",
+            archived: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
     }
 
-    function remove(id) {
+    // Archiving just hides a note from the main list (archived: true)
+    // — nothing is destroyed, so this needs no confirmation and is
+    // always reversible via restore(). This is deliberately the only
+    // action the main note list exposes; actual deletion only lives
+    // in the archived view (see removeForever below).
+    function archive(id) {
+        if (!init()) return Promise.reject(new Error("Firebase not configured"));
+        return db.collection(NOTES_COLLECTION).doc(id).update({ archived: true });
+    }
+
+    function restore(id) {
+        if (!init()) return Promise.reject(new Error("Firebase not configured"));
+        return db.collection(NOTES_COLLECTION).doc(id).update({ archived: false });
+    }
+
+    // The one genuinely destructive action — permanently deletes the
+    // Firestore document. Only reachable from the archived view, and
+    // the UI is expected to confirm before calling this.
+    function removeForever(id) {
         if (!init()) return Promise.reject(new Error("Firebase not configured"));
         return db.collection(NOTES_COLLECTION).doc(id).delete();
     }
@@ -146,7 +171,9 @@ window.THD = window.THD || {};
     THD.notes = {
         subscribe,
         add,
-        remove,
+        archive,
+        restore,
+        removeForever,
         getAuthorName,
         setAuthorName,
         isConfigured

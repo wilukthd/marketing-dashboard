@@ -463,6 +463,8 @@ window.THD = window.THD || {};
     }
 
     const RANGE_DEFS = {
+        "today": () => ({ start: startOfDay(new Date()), end: startOfDay(new Date()) }),
+        "yesterday": () => ({ start: daysAgo(1), end: daysAgo(1) }),
         "7d": () => ({ start: daysAgo(6), end: startOfDay(new Date()) }),
         "14d": () => ({ start: daysAgo(13), end: startOfDay(new Date()) }),
         "30d": () => ({ start: daysAgo(29), end: startOfDay(new Date()) }),

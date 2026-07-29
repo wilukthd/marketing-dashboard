@@ -1102,7 +1102,19 @@
 
 }
 
-.noteDeleteBtn{
+.noteItemActions{
+
+    display:flex;
+
+    gap:2px;
+
+    flex-shrink:0;
+
+}
+
+.noteArchiveBtn,
+.noteRestoreBtn,
+.noteDeleteForeverBtn{
 
     background:none;
 
@@ -1122,7 +1134,23 @@
 
 }
 
-.noteDeleteBtn:hover{
+.noteArchiveBtn:hover{
+
+    background:var(--warning-light);
+
+    color:var(--warning);
+
+}
+
+.noteRestoreBtn:hover{
+
+    background:var(--success-light);
+
+    color:var(--success);
+
+}
+
+.noteDeleteForeverBtn:hover{
 
     background:var(--danger-light);
 
@@ -1130,7 +1158,9 @@
 
 }
 
-.noteDeleteBtn svg{
+.noteArchiveBtn svg,
+.noteRestoreBtn svg,
+.noteDeleteForeverBtn svg{
 
     width:16px;
 

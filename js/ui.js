@@ -292,6 +292,14 @@ window.THD = window.THD || {};
        Synced across devices/teammates via Firestore (see
        js/notes.js) — this section only handles rendering and
        wiring the composer; THD.notes owns the actual data.
+
+       Deleting a note is a genuinely riskier action here than in a
+       normal single-user app, since the Firestore rules are open —
+       anyone with the dashboard link could delete anyone else's
+       note. So the main list only ever "archives" (reversible, no
+       confirmation needed since nothing is destroyed); permanent
+       deletion only exists inside the archived view, and does get
+       a confirmation there.
     ========================================================== */
 
     const NOTE_CATEGORY_KEYS = {
@@ -308,19 +316,25 @@ window.THD = window.THD || {};
     }
 
     let currentNotes = []; // cached from the last Firestore snapshot, so a language change can re-render without re-subscribing
+    let notesArchivedView = false; // false = showing active notes, true = showing the archived list
 
-    function renderNotesList(notes) {
-        currentNotes = notes || [];
-        const container = document.getElementById("notesList");
-        if (!container) return;
+    function noteItemHtml(n, archivedView) {
+        const actionBtn = archivedView
+            ? `
+                <button class="noteRestoreBtn" data-id="${n.id}" title="${window.I18N.t("notes.restoreTitle")}">
+                    <i data-lucide="rotate-ccw"></i>
+                </button>
+                <button class="noteDeleteForeverBtn" data-id="${n.id}" title="${window.I18N.t("notes.deleteForeverTitle")}">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            `
+            : `
+                <button class="noteArchiveBtn" data-id="${n.id}" title="${window.I18N.t("notes.archiveTitle")}">
+                    <i data-lucide="archive"></i>
+                </button>
+            `;
 
-        if (!currentNotes.length) {
-            const key = window.THD.notes && window.THD.notes.isConfigured() ? "notes.empty" : "notes.notConfigured";
-            container.innerHTML = `<p class="notesEmpty">${window.I18N.t(key)}</p>`;
-            return;
-        }
-
-        container.innerHTML = currentNotes.map((n) => `
+        return `
             <div class="noteItem" data-id="${n.id}">
                 <div class="noteItemBody">
                     <div class="noteItemMeta">
@@ -330,18 +344,50 @@ window.THD = window.THD || {};
                     </div>
                     <div class="noteItemText"></div>
                 </div>
-                <button class="noteDeleteBtn" data-id="${n.id}" title="${window.I18N.t("notes.deleteTitle")}">
-                    <i data-lucide="x"></i>
-                </button>
+                <div class="noteItemActions">
+                    ${actionBtn}
+                </div>
             </div>
-        `).join("");
+        `;
+    }
+
+    function renderNotesList(notes) {
+        currentNotes = notes || [];
+        const container = document.getElementById("notesList");
+        const historyTitle = document.getElementById("notesHistoryTitle");
+        const archiveBtn = document.getElementById("notesArchiveToggleBtn");
+        if (!container) return;
+
+        const active = currentNotes.filter((n) => !n.archived);
+        const archived = currentNotes.filter((n) => n.archived);
+        const visible = notesArchivedView ? archived : active;
+
+        if (historyTitle) {
+            historyTitle.textContent = window.I18N.t(notesArchivedView ? "notes.archivedTitle" : "notes.history");
+        }
+        if (archiveBtn) {
+            archiveBtn.textContent = notesArchivedView
+                ? window.I18N.t("notes.backToNotes")
+                : window.I18N.t("notes.showArchivedCount", { n: archived.length });
+            archiveBtn.style.display = (!notesArchivedView && archived.length === 0) ? "none" : "";
+        }
+
+        if (!visible.length) {
+            const key = !window.THD.notes || !window.THD.notes.isConfigured()
+                ? "notes.notConfigured"
+                : (notesArchivedView ? "notes.archivedEmpty" : "notes.empty");
+            container.innerHTML = `<p class="notesEmpty">${window.I18N.t(key)}</p>`;
+            return;
+        }
+
+        container.innerHTML = visible.map((n) => noteItemHtml(n, notesArchivedView)).join("");
 
         // Text and author set via textContent (not template
         // interpolation) so free-typed note/author text containing
         // HTML-looking characters can't inject markup.
         container.querySelectorAll(".noteItem").forEach((el) => {
             const id = el.dataset.id;
-            const note = currentNotes.find((n) => String(n.id) === id);
+            const note = visible.find((n) => String(n.id) === id);
             if (!note) return;
             const textEl = el.querySelector(".noteItemText");
             const authorEl = el.querySelector(".noteItemAuthor");
@@ -362,6 +408,7 @@ window.THD = window.THD || {};
         const list = document.getElementById("notesList");
         const authorInput = document.getElementById("noteAuthorInput");
         const categorySelect = document.getElementById("noteCategorySelect");
+        const archiveToggleBtn = document.getElementById("notesArchiveToggleBtn");
         if (!input || !addBtn || !list) return;
 
         if (authorInput && window.THD.notes) {
@@ -387,12 +434,41 @@ window.THD = window.THD || {};
             input.value = "";
         });
 
-        list.addEventListener("click", (e) => {
-            const btn = e.target.closest(".noteDeleteBtn");
-            if (!btn || !window.THD.notes) return;
-            window.THD.notes.remove(btn.dataset.id).catch((err) => {
-                console.warn("[THD.ui] Failed to delete note:", err.message);
+        if (archiveToggleBtn) {
+            archiveToggleBtn.addEventListener("click", () => {
+                notesArchivedView = !notesArchivedView;
+                renderNotesList(currentNotes);
             });
+        }
+
+        list.addEventListener("click", (e) => {
+            if (!window.THD.notes) return;
+
+            const archiveBtn = e.target.closest(".noteArchiveBtn");
+            if (archiveBtn) {
+                // Reversible — no confirmation needed, nothing is destroyed.
+                window.THD.notes.archive(archiveBtn.dataset.id).catch((err) => {
+                    console.warn("[THD.ui] Failed to archive note:", err.message);
+                });
+                return;
+            }
+
+            const restoreBtn = e.target.closest(".noteRestoreBtn");
+            if (restoreBtn) {
+                window.THD.notes.restore(restoreBtn.dataset.id).catch((err) => {
+                    console.warn("[THD.ui] Failed to restore note:", err.message);
+                });
+                return;
+            }
+
+            const deleteForeverBtn = e.target.closest(".noteDeleteForeverBtn");
+            if (deleteForeverBtn) {
+                // The one genuinely destructive action left — confirm.
+                if (!window.confirm(window.I18N.t("notes.deleteForeverConfirm"))) return;
+                window.THD.notes.removeForever(deleteForeverBtn.dataset.id).catch((err) => {
+                    console.warn("[THD.ui] Failed to permanently delete note:", err.message);
+                });
+            }
         });
     }
 
