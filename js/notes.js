@@ -39,12 +39,12 @@ window.THD = window.THD || {};
 
     // ---- REPLACE THESE WITH YOUR REAL FIREBASE CONFIG VALUES ----
     const FIREBASE_CONFIG = {
-        apiKey: "REPLACE_ME",
-        authDomain: "REPLACE_ME.firebaseapp.com",
-        projectId: "REPLACE_ME",
-        storageBucket: "REPLACE_ME.appspot.com",
-        messagingSenderId: "REPLACE_ME",
-        appId: "REPLACE_ME"
+        apiKey: "AIzaSyDZytEwyva5w6v85NiJZMNYfHVumCsiYWQ",
+        authDomain: "thd-dashboard-note.firebaseapp.com",
+        projectId: "thd-dashboard-note",
+        storageBucket: "thd-dashboard-note.firebasestorage.app",
+        messagingSenderId: "447126017532",
+        appId: "1:447126017532:web:7eb56b0405927af0cd8e79"
     };
 
     const NOTES_COLLECTION = "notes";
