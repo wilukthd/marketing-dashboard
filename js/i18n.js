@@ -1,7 +1,7 @@
 /* ==========================================================
    THD Analytics
    i18n (English / 日本語)
-   Version 0.1
+   Version 1.0
 
    Loaded before every other script (see index.html) since
    ui.js/data.js/charts.js/app.js all read window.I18N at
@@ -32,6 +32,10 @@ window.I18N = (function () {
         en: {
             "doc.title": "THD Analytics Dashboard",
             "logo.subtitle": "Analytics",
+            "gate.label": "Enter passcode to continue",
+            "gate.submit": "Unlock",
+            "gate.error": "Incorrect passcode — try again.",
+            "gate.errorNoCrypto": "Can't verify the passcode here — this page needs to be opened over HTTPS or localhost, not as a local file.",
             "sidebar.version": "Version 1.0",
 
             "nav.overview": "Overview",
@@ -90,6 +94,7 @@ window.I18N = (function () {
             "traffic.byPlatform": "By Ad Platform (Google, Meta, Yahoo, Criteo…)",
             "traffic.byChannel": "By Channel (GA4 default grouping)",
             "traffic.selectedPeriod": "Selected period:",
+            "traffic.backToOverview": "Back to Overview",
             "traffic.previousPeriod": "Previous period:",
             "traffic.centerLabel": "Sessions",
             "traffic.clickHint": "Click to see the sources behind {label} below",
@@ -252,6 +257,10 @@ window.I18N = (function () {
         ja: {
             "doc.title": "THDアナリティクス ダッシュボード",
             "logo.subtitle": "アナリティクス",
+            "gate.label": "パスコードを入力してください",
+            "gate.submit": "開く",
+            "gate.error": "パスコードが正しくありません。もう一度お試しください。",
+            "gate.errorNoCrypto": "この環境ではパスコードを確認できません — このページはローカルファイルではなく、HTTPSまたはlocalhost経由で開く必要があります。",
             "sidebar.version": "バージョン 1.0",
 
             "nav.overview": "概要",
@@ -310,6 +319,7 @@ window.I18N = (function () {
             "traffic.byPlatform": "広告プラットフォーム別（Google、Meta、Yahoo、Criteoなど）",
             "traffic.byChannel": "チャネル別（GA4デフォルトのグループ化）",
             "traffic.selectedPeriod": "選択期間：",
+            "traffic.backToOverview": "概要に戻る",
             "traffic.previousPeriod": "前期間：",
             "traffic.centerLabel": "セッション",
             "traffic.clickHint": "{label}の内訳をクリックして下に表示",

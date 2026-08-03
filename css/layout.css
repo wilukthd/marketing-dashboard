@@ -1167,3 +1167,106 @@
     height:16px;
 
 }
+
+/* ==========================================================
+   Passcode Gate
+========================================================== */
+
+.passcodeGate{
+
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--bg);
+    padding:20px;
+
+}
+
+body.gate-active{
+
+    overflow:hidden;
+
+}
+
+.passcodeCard{
+
+    width:100%;
+    max-width:360px;
+    padding:36px 32px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:18px;
+    text-align:center;
+    box-shadow:0 20px 40px rgba(0,0,0,.08);
+
+}
+
+.passcodeLogo h1{
+
+    font-size:26px;
+    font-weight:800;
+    color:var(--text);
+    margin:0;
+    letter-spacing:-.02em;
+
+}
+
+.passcodeLogo span{
+
+    color:var(--text-light);
+    font-size:13px;
+    display:block;
+    margin-bottom:26px;
+
+}
+
+#passcodeForm label{
+
+    display:block;
+    font-size:13px;
+    color:var(--text-light);
+    margin-bottom:10px;
+
+}
+
+#passcodeInput{
+
+    width:100%;
+    padding:12px 14px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--bg);
+    color:var(--text);
+    font-size:16px;
+    text-align:center;
+    letter-spacing:3px;
+    margin-bottom:16px;
+    font-family:inherit;
+    box-sizing:border-box;
+
+}
+
+#passcodeInput:focus{
+
+    outline:none;
+    border-color:var(--primary);
+
+}
+
+#passcodeForm .primaryButton{
+
+    width:100%;
+    justify-content:center;
+
+}
+
+.passcodeError{
+
+    color:var(--danger);
+    font-size:13px;
+    margin:14px 0 0;
+
+}
