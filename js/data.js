@@ -1,7 +1,7 @@
 /* ==========================================================
    THD Analytics
    Live Data Layer
-   Version 0.1
+   Version 1.0
 
    Fetches published Google Sheets CSVs and shapes them into
    the same structures the UI/chart layers expect. Falls back
@@ -401,6 +401,17 @@ window.THD = window.THD || {};
             d.revenue += r.revenue;
         });
         return Object.values(byDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    // Daily series for one specific channel/platform within a date
+    // window — powers the "click a channel to see its trend instead
+    // of the doughnut" view. Just filters down to that one channel's
+    // rows first, then reuses the same daily aggregator above.
+    function buildChannelDailySeries(sourceRows, channel, groupBy, start, end) {
+        const filtered = (sourceRows || []).filter((r) =>
+            classifyForGroupBy(r, groupBy) === channel && inRange(r.date, start, end)
+        );
+        return buildDailyRowsFromSources(filtered);
     }
 
     function deriveTrafficBreakdown(sourceRows, groupBy) {
@@ -1093,6 +1104,67 @@ window.THD = window.THD || {};
         });
     }
 
+    // Builds a merged current-vs-previous daily trend for one
+    // channel/platform, for the doughnut-click drill-down. The two
+    // windows are aligned by DAY OFFSET within their own period (day
+    // 1 of current next to day 1 of previous), not by calendar date —
+    // since "This Month" vs "Last Month" cover different calendar
+    // days entirely, aligning by offset is what makes the two lines
+    // actually comparable side by side, same idea GA4's own
+    // date-range-comparison charts use.
+    function buildChannelTrend(sourceRows, channelKey, groupBy, range) {
+        const filtered = sourceRows.filter((r) => classifyForGroupBy(r, groupBy) === channelKey);
+
+        const byDate = {};
+        filtered.forEach((r) => {
+            if (!byDate[r.date]) byDate[r.date] = { users: 0, sessions: 0, purchases: 0, revenue: 0 };
+            const d = byDate[r.date];
+            d.users += r.users;
+            d.sessions += r.sessions;
+            d.purchases += r.purchases;
+            d.revenue += r.revenue;
+        });
+
+        const spanDays = Math.round((range.end - range.start) / 86400000) + 1;
+        const labels = [];
+        const previousLabels = [];
+        const series = {
+            users: { current: [], previous: [] },
+            sessions: { current: [], previous: [] },
+            purchases: { current: [], previous: [] },
+            revenue: { current: [], previous: [] },
+            cvr: { current: [], previous: [] }
+        };
+
+        for (let i = 0; i < spanDays; i++) {
+            const curDate = new Date(range.start);
+            curDate.setDate(curDate.getDate() + i);
+            const prevDate = new Date(range.prevStart);
+            prevDate.setDate(prevDate.getDate() + i);
+
+            const curKey = curDate.toISOString().slice(0, 10);
+            const prevKey = prevDate.toISOString().slice(0, 10);
+            const cur = byDate[curKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
+            const prev = byDate[prevKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
+
+            labels.push(window.I18N.formatDayLabel(curDate));
+            previousLabels.push(window.I18N.formatDayLabel(prevDate));
+
+            series.users.current.push(cur.users);
+            series.users.previous.push(prev.users);
+            series.sessions.current.push(cur.sessions);
+            series.sessions.previous.push(prev.sessions);
+            series.purchases.current.push(cur.purchases);
+            series.purchases.previous.push(prev.purchases);
+            series.revenue.current.push(cur.revenue);
+            series.revenue.previous.push(prev.revenue);
+            series.cvr.current.push(cur.sessions ? (cur.purchases / cur.sessions) * 100 : 0);
+            series.cvr.previous.push(prev.sessions ? (prev.purchases / prev.sessions) * 100 : 0);
+        }
+
+        return { labels, previousLabels, series };
+    }
+
     /* ==========================================================
        Monthly Business Performance
        Company's fiscal "month" runs 21st of the previous calendar
@@ -1184,6 +1256,7 @@ window.THD = window.THD || {};
         classifyForGroupBy,
         listAvailableChannels,
         buildDailyRowsFromSources,
+        buildChannelDailySeries,
         deriveTrafficBreakdown,
         buildInsights,
         buildNewRepeatInsights,
@@ -1198,6 +1271,7 @@ window.THD = window.THD || {};
         aggregateLandingPages,
         buildLandingPageInsights,
         buildTrafficComparison,
+        buildChannelTrend,
         computeMovingAverage,
         buildBusinessMonths
     };
