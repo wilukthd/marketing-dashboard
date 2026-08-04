@@ -1,7 +1,7 @@
 /* ==========================================================
    THD Analytics
    UI Rendering & Interactions
-   Version 1.0
+   Version 0.2
 ========================================================== */
 
 window.THD = window.THD || {};
@@ -542,46 +542,6 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
-       Channel Trend View (doughnut click drill-down)
-       Swaps the current/previous doughnut pair for one merged
-       line chart scoped to whichever channel was clicked in the
-       Traffic Comparison table.
-    ========================================================== */
-
-    function showChannelTrendMode(channelLabel) {
-        const doughnuts = document.getElementById("trafficDoughnutRow");
-        const trendWrap = document.getElementById("trafficChannelTrendWrap");
-        const title = document.getElementById("trafficChannelTrendTitle");
-        if (doughnuts) doughnuts.style.display = "none";
-        if (trendWrap) trendWrap.style.display = "";
-        if (title) title.textContent = window.I18N.channelLabel(channelLabel);
-    }
-
-    function hideChannelTrendMode() {
-        const doughnuts = document.getElementById("trafficDoughnutRow");
-        const trendWrap = document.getElementById("trafficChannelTrendWrap");
-        if (doughnuts) doughnuts.style.display = "";
-        if (trendWrap) trendWrap.style.display = "none";
-    }
-
-    function getChannelTrendMetric() {
-        const select = document.getElementById("trafficChannelMetricSelect");
-        return select ? select.value : "sessions";
-    }
-
-    function wireChannelTrendMetricToggle(onChange) {
-        const select = document.getElementById("trafficChannelMetricSelect");
-        if (!select) return;
-        select.addEventListener("change", () => onChange(select.value));
-    }
-
-    function wireChannelTrendCloseButton(onClose) {
-        const btn = document.getElementById("trafficChannelTrendCloseBtn");
-        if (!btn) return;
-        btn.addEventListener("click", onClose);
-    }
-
-    /* ==========================================================
        All Sources Filter (Overview/Sales-wide channel scope)
        Populated from whatever channels actually appear in the
        data, rather than a hardcoded list — options and their
@@ -748,7 +708,7 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!insights || !insights.length) {
-            container.innerHTML = `<li>${window.I18N.t("newRepeatInsights.empty")}</li>`;
+            container.innerHTML = `<li>Not enough history yet for a pattern here.</li>`;
             return;
         }
 
@@ -910,11 +870,6 @@ window.THD = window.THD || {};
         wireLandingDeviceToggle,
         renderTrafficComparison,
         wireTrafficComparisonFilter,
-        showChannelTrendMode,
-        hideChannelTrendMode,
-        getChannelTrendMetric,
-        wireChannelTrendMetricToggle,
-        wireChannelTrendCloseButton,
         populateSourceFilterOptions,
         getSourceFilterChannel,
         wireSourceFilterToggle,
