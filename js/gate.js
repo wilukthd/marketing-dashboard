@@ -36,7 +36,7 @@
 (function () {
     "use strict";
 
-    const PASSCODE_HASH = "7c74142155dbe5a34d1914fa5ce5e48fada03c25f953099df559ab0834d8aa05";
+    const PASSCODE_HASH = "REPLACE_ME";
     const UNLOCK_KEY = "thd-dashboard-unlocked";
 
     async function sha256Hex(text) {
@@ -59,13 +59,10 @@
         document.body.classList.remove("gate-active");
     }
 
-    function showError(messageKey) {
+    function showError() {
         const error = document.getElementById("passcodeError");
         const input = document.getElementById("passcodeInput");
-        if (error) {
-            error.textContent = window.I18N ? window.I18N.t(messageKey || "gate.error") : "Incorrect passcode — try again.";
-            error.style.display = "block";
-        }
+        if (error) error.style.display = "block";
         if (input) {
             input.value = "";
             input.focus();
@@ -97,10 +94,6 @@
 
         form.addEventListener("submit", (e) => {
             e.preventDefault();
-            if (!window.crypto || !window.crypto.subtle) {
-                showError("gate.errorNoCrypto");
-                return;
-            }
             sha256Hex((input.value || "").trim()).then((hash) => {
                 if (hash === PASSCODE_HASH) {
                     try {
@@ -112,11 +105,6 @@
                 } else {
                     showError();
                 }
-            }).catch(() => {
-                // crypto.subtle threw (e.g. still somehow reached this
-                // point in an insecure context) rather than just being
-                // absent — same message either way.
-                showError("gate.errorNoCrypto");
             });
         });
     }
