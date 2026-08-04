@@ -609,7 +609,7 @@ MAIN
 
     </div>
 
-    <div class="trafficDoughnutRow">
+    <div class="trafficDoughnutRow" id="trafficDoughnutRow">
 
         <div class="trafficDoughnutCol">
 
@@ -644,6 +644,90 @@ MAIN
                 <canvas id="trafficChartPrevious"></canvas>
 
             </div>
+
+        </div>
+
+    </div>
+
+    <div class="trafficChannelTrendWrap" id="trafficChannelTrendWrap" style="display:none;">
+
+        <div class="trafficChannelTrendHeader">
+
+            <div>
+
+                <span class="trafficPeriodDot current"></span>
+
+                <strong id="trafficChannelTrendTitle">--</strong>
+
+            </div>
+
+            <div class="chartTools">
+
+                <select id="trafficChannelMetricSelect">
+
+                    <option value="sessions" selected data-i18n="kpi.sessions">Sessions</option>
+
+                    <option value="users" data-i18n="kpi.totalUsers">Total Users</option>
+
+                    <option value="purchases" data-i18n="kpi.purchases">Ecommerce Purchases</option>
+
+                    <option value="revenue" data-i18n="kpi.revenue">Total Revenue</option>
+
+                    <option value="cvr" data-i18n="kpi.cvr">CVR</option>
+
+                </select>
+
+                <button class="secondaryButton" id="trafficChannelTrendCloseBtn" data-i18n="traffic.backToOverview">Back to Overview</button>
+
+            </div>
+
+        </div>
+
+        <div class="chartBody">
+
+            <canvas id="trafficChannelTrendChart"></canvas>
+
+        </div>
+
+    </div>
+
+    <div class="trafficTrendDrill" id="trafficTrendDrill" style="display:none;">
+
+        <div class="chartHeader">
+
+            <div>
+
+                <span class="trafficDrillLabel" data-i18n="traffic.drillPrefix">Trend for</span>
+
+                <strong id="trafficDrillChannelName">--</strong>
+
+            </div>
+
+            <div class="chartTools">
+
+                <select id="trafficDrillMetricSelect">
+
+                    <option value="sessions" selected data-i18n="kpi.sessions">Sessions</option>
+
+                    <option value="users" data-i18n="kpi.totalUsers">Total Users</option>
+
+                    <option value="purchases" data-i18n="kpi.purchases">Ecommerce Purchases</option>
+
+                    <option value="revenue" data-i18n="kpi.revenue">Total Revenue</option>
+
+                    <option value="cvr" data-i18n="kpi.cvr">CVR</option>
+
+                </select>
+
+                <button class="secondaryButton" id="trafficDrillCloseBtn" data-i18n="traffic.drillClose">Back to Overview</button>
+
+            </div>
+
+        </div>
+
+        <div class="chartBody">
+
+            <canvas id="trafficDrillChart"></canvas>
 
         </div>
 

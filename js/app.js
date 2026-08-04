@@ -33,6 +33,23 @@
     let availableChannels = []; // cached channel list, so a language change can repopulate translated option labels without recomputing
     let newRepeatRows = []; // last-loaded new/repeat rows (sliced to 12), kept so the Orders/Revenue toggle can re-render without re-fetching
     let fullNewRepeatRows = []; // full history (unsliced) — needed to rebuild New/Repeat insights on a language change without re-fetching
+
+    // Cached from the last renderForRange call so the channel-trend
+    // click handler / metric toggle can recompute without redoing the
+    // whole period's work.
+    let currentRangeObj = null;
+    let currentEffectiveSourceRows = [];
+    let currentGroupBy = "platform";
+
+    function renderChannelTrendOrDoughnuts() {
+        if (!activeSourceFilter) {
+            THD.ui.hideChannelTrendMode();
+            return;
+        }
+        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, activeSourceFilter, currentGroupBy, currentRangeObj);
+        THD.ui.showChannelTrendMode(activeSourceFilter);
+        THD.charts.renderChannelTrendChart("trafficChannelTrendChart", activeSourceFilter, trendData, THD.ui.getChannelTrendMetric());
+    }
     let dataSourceStatus = { daily: true, sources: true, landingPages: true, newRepeat: true }; // true = live data loaded successfully; false = fell back to demo data
 
     function renderNewRepeatSourceNote() {
@@ -239,6 +256,9 @@
         // matching previous window, both grouped the same way.
         const sourcesPrevious = THD.data.filterSourcesByDates(effectiveSourceRows, range.prevStart, range.prevEnd);
         const groupBy = THD.ui.getTrafficGroupBy();
+        currentRangeObj = range;
+        currentEffectiveSourceRows = effectiveSourceRows;
+        currentGroupBy = groupBy;
         const trafficCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, groupBy);
         const trafficPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, groupBy);
 
@@ -247,6 +267,7 @@
 
         lastTrafficComparisonRows = THD.data.buildTrafficComparison(currentChannels, previousChannels);
         THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
+        renderChannelTrendOrDoughnuts();
 
         THD.ui.renderInsights([
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
@@ -344,11 +365,20 @@
             activeSourceFilter = (activeSourceFilter === label) ? null : label;
             THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
             renderFilteredSourceTable();
+            renderChannelTrendOrDoughnuts();
         });
         THD.ui.wireClearSourceFilter(() => {
             activeSourceFilter = null;
             THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
             renderFilteredSourceTable();
+            renderChannelTrendOrDoughnuts();
+        });
+        THD.ui.wireChannelTrendMetricToggle(renderChannelTrendOrDoughnuts);
+        THD.ui.wireChannelTrendCloseButton(() => {
+            activeSourceFilter = null;
+            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
+            renderFilteredSourceTable();
+            renderChannelTrendOrDoughnuts();
         });
         THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
