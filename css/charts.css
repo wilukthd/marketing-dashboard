@@ -350,48 +350,6 @@
 
 }
 
-.trafficChannelTrendWrap{
-
-    margin-bottom:28px;
-
-}
-
-.trafficChannelTrendHeader{
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:space-between;
-
-    gap:16px;
-
-    margin-bottom:16px;
-
-    flex-wrap:wrap;
-
-}
-
-.trafficChannelTrendHeader > div:first-child{
-
-    display:flex;
-
-    align-items:center;
-
-    gap:8px;
-
-    font-size:14px;
-
-}
-
-.trafficChannelTrendHeader strong{
-
-    color:var(--text);
-
-    font-size:15px;
-
-}
-
 .trafficPeriodDot{
 
     width:10px;
