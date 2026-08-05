@@ -36,16 +36,46 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/cards.css">
-    <link rel="stylesheet" href="css/charts.css">
-    <link rel="stylesheet" href="css/tables.css">
-    <link rel="stylesheet" href="css/dark.css">
+    <link rel="stylesheet" href="css/main.css?v=2">
+    <link rel="stylesheet" href="css/layout.css?v=2">
+    <link rel="stylesheet" href="css/cards.css?v=2">
+    <link rel="stylesheet" href="css/charts.css?v=2">
+    <link rel="stylesheet" href="css/tables.css?v=2">
+    <link rel="stylesheet" href="css/dark.css?v=2">
 
 </head>
 
 <body>
+
+<!-- ================= PASSCODE GATE ================= -->
+
+<div class="passcodeGate" id="passcodeGate">
+
+    <div class="passcodeCard">
+
+        <div class="passcodeLogo">
+
+            <h1>THD</h1>
+
+            <span data-i18n="logo.subtitle">Analytics</span>
+
+        </div>
+
+        <form id="passcodeForm">
+
+            <label for="passcodeInput" data-i18n="gate.label">Enter passcode to continue</label>
+
+            <input type="password" id="passcodeInput" autocomplete="off" autofocus>
+
+            <button type="button" id="passcodeSubmitBtn" class="primaryButton" data-i18n="gate.submit">Unlock</button>
+
+            <p id="passcodeError" class="passcodeError" style="display:none;" data-i18n="gate.error">Incorrect passcode — try again.</p>
+
+        </form>
+
+    </div>
+
+</div>
 
 <div class="app">
 
@@ -579,7 +609,7 @@ MAIN
 
     </div>
 
-    <div class="trafficDoughnutRow">
+    <div class="trafficDoughnutRow" id="trafficDoughnutRow">
 
         <div class="trafficDoughnutCol">
 
@@ -614,6 +644,90 @@ MAIN
                 <canvas id="trafficChartPrevious"></canvas>
 
             </div>
+
+        </div>
+
+    </div>
+
+    <div class="trafficChannelTrendWrap" id="trafficChannelTrendWrap" style="display:none;">
+
+        <div class="trafficChannelTrendHeader">
+
+            <div>
+
+                <span class="trafficPeriodDot current"></span>
+
+                <strong id="trafficChannelTrendTitle">--</strong>
+
+            </div>
+
+            <div class="chartTools">
+
+                <select id="trafficChannelMetricSelect">
+
+                    <option value="sessions" selected data-i18n="kpi.sessions">Sessions</option>
+
+                    <option value="users" data-i18n="kpi.totalUsers">Total Users</option>
+
+                    <option value="purchases" data-i18n="kpi.purchases">Ecommerce Purchases</option>
+
+                    <option value="revenue" data-i18n="kpi.revenue">Total Revenue</option>
+
+                    <option value="cvr" data-i18n="kpi.cvr">CVR</option>
+
+                </select>
+
+                <button class="secondaryButton" id="trafficChannelTrendCloseBtn" data-i18n="traffic.backToOverview">Back to Overview</button>
+
+            </div>
+
+        </div>
+
+        <div class="chartBody">
+
+            <canvas id="trafficChannelTrendChart"></canvas>
+
+        </div>
+
+    </div>
+
+    <div class="trafficTrendDrill" id="trafficTrendDrill" style="display:none;">
+
+        <div class="chartHeader">
+
+            <div>
+
+                <span class="trafficDrillLabel" data-i18n="traffic.drillPrefix">Trend for</span>
+
+                <strong id="trafficDrillChannelName">--</strong>
+
+            </div>
+
+            <div class="chartTools">
+
+                <select id="trafficDrillMetricSelect">
+
+                    <option value="sessions" selected data-i18n="kpi.sessions">Sessions</option>
+
+                    <option value="users" data-i18n="kpi.totalUsers">Total Users</option>
+
+                    <option value="purchases" data-i18n="kpi.purchases">Ecommerce Purchases</option>
+
+                    <option value="revenue" data-i18n="kpi.revenue">Total Revenue</option>
+
+                    <option value="cvr" data-i18n="kpi.cvr">CVR</option>
+
+                </select>
+
+                <button class="secondaryButton" id="trafficDrillCloseBtn" data-i18n="traffic.drillClose">Back to Overview</button>
+
+            </div>
+
+        </div>
+
+        <div class="chartBody">
+
+            <canvas id="trafficDrillChart"></canvas>
 
         </div>
 
@@ -1195,14 +1309,15 @@ MAIN
 
 </script>
 
-<script src="js/i18n.js"></script>
-<script src="js/charts.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/data.js"></script>
+<script src="js/i18n.js?v=2"></script>
+<script src="js/gate.js?v=2"></script>
+<script src="js/charts.js?v=2"></script>
+<script src="js/ui.js?v=2"></script>
+<script src="js/data.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/notes.js"></script>
-<script src="js/app.js"></script>
+<script src="js/notes.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
 
 </body>
 </html>

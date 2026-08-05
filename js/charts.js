@@ -1,7 +1,7 @@
 /* ==========================================================
    THD Analytics
    Chart Rendering
-   Version 0.3
+   Version 1.0
 ========================================================== */
 
 window.THD = window.THD || {};
@@ -9,6 +9,7 @@ window.THD = window.THD || {};
 (function (THD) {
 
     let trendChartInstance = null;
+    let channelTrendChartInstance = null;
     const trafficChartInstances = {}; // keyed by canvas id, since current/previous each get their own doughnut
 
     // Read fresh at render time (not cached) so charts pick up the
@@ -187,6 +188,14 @@ window.THD = window.THD || {};
         return trafficColorAssignments[label];
     }
 
+    function hexToRgba(hex, alpha) {
+        const clean = hex.replace("#", "");
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     function renderTrafficChart(canvasId, channels, totalSessions) {
 
         const canvas = document.getElementById(canvasId);
@@ -257,6 +266,103 @@ window.THD = window.THD || {};
         });
 
         return channels.map((c) => ({ ...c, color: colorForLabel(c.label) }));
+    }
+
+    /* ==========================================================
+       Channel Trend (doughnut click drill-down)
+       Replaces both doughnuts with one merged line chart when a
+       Traffic Comparison row is clicked — current period solid,
+       previous period dashed in a lighter shade of the same hue,
+       aligned by day-offset (not calendar date) so "This Month"
+       sits directly above "Last Month" for genuine comparison.
+    ========================================================== */
+
+    function renderChannelTrendChart(canvasId, channelKey, data, metric) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const colors = getChartColors();
+        const cfg = METRIC_CONFIG[metric] || METRIC_CONFIG.sessions;
+        const color = colorForLabel(channelKey);
+
+        if (channelTrendChartInstance) {
+            channelTrendChartInstance.destroy();
+            channelTrendChartInstance = null;
+        }
+
+        if (!data || !data.labels || !data.labels.length) return;
+
+        const safeMetric = data.series[metric] ? metric : "sessions";
+        const currentValues = data.series[safeMetric].current;
+        const previousValues = data.series[safeMetric].previous;
+        const previousLabels = data.previousLabels;
+
+        channelTrendChartInstance = new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: window.I18N.t("traffic.selectedPeriod").replace(":", ""),
+                        data: currentValues,
+                        borderColor: color,
+                        backgroundColor: color,
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.35
+                    },
+                    {
+                        label: window.I18N.t("traffic.previousPeriod").replace(":", ""),
+                        data: previousValues,
+                        borderColor: hexToRgba(color, 0.55),
+                        backgroundColor: hexToRgba(color, 0.55),
+                        borderWidth: 2,
+                        borderDash: [5, 4],
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.35
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
+                    },
+                    tooltip: {
+                        backgroundColor: "#111827",
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            title: (items) => {
+                                if (!items.length) return "";
+                                const i = items[0].dataIndex;
+                                return `${data.labels[i]} / ${previousLabels[i]}`;
+                            },
+                            label: (item) => `${item.dataset.label}: ${cfg.format(item.parsed.y)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: colors.textLight }
+                    },
+                    y: {
+                        grid: { color: colors.grid },
+                        border: { display: false },
+                        ticks: { callback: (v) => cfg.format(v), color: colors.textLight }
+                    }
+                }
+            }
+        });
     }
 
     /* ==========================================================
@@ -511,12 +617,14 @@ window.THD = window.THD || {};
         if (trendChartInstance) trendChartInstance.resize();
         if (newRepeatChartInstance) newRepeatChartInstance.resize();
         if (aovChartInstance) aovChartInstance.resize();
+        if (channelTrendChartInstance) channelTrendChartInstance.resize();
         Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
     THD.charts = {
         renderTrendChart,
         renderTrafficChart,
+        renderChannelTrendChart,
         renderNewRepeatChart,
         renderAovChart,
         resizeCharts

@@ -72,40 +72,55 @@
         }
     }
 
+    function attemptUnlock(input) {
+        if (!window.crypto || !window.crypto.subtle) {
+            showError("gate.errorNoCrypto");
+            return;
+        }
+        sha256Hex(((input ? input.value : "") || "").trim()).then((hash) => {
+            if (hash === PASSCODE_HASH) {
+                try {
+                    localStorage.setItem(UNLOCK_KEY, "1");
+                } catch (err) {
+                    // Private browsing / storage disabled — will just re-prompt next visit.
+                }
+                removeGate();
+            } else {
+                showError();
+            }
+        }).catch(() => {
+            // crypto.subtle threw (e.g. still somehow reached this
+            // point in an insecure context) rather than just being
+            // absent — same message either way.
+            showError("gate.errorNoCrypto");
+        });
+    }
+
     function wireGate() {
         const form = document.getElementById("passcodeForm");
         const input = document.getElementById("passcodeInput");
+        const submitBtn = document.getElementById("passcodeSubmitBtn");
 
-        // Attach the submit handler FIRST, before anything else in
-        // this function — if the code below (translation, storage
-        // checks) ever throws for an unrelated reason, the form
-        // must still never fall through to a real page submit/
-        // reload, which is what "hit Unlock and nothing visibly
-        // happens" looks like from the outside.
+        // Two independent trigger paths, both calling the same
+        // attemptUnlock() — deliberately not relying on "clicking a
+        // type=submit button natively fires the form's submit event"
+        // working correctly in every environment. The <form> submit
+        // listener below still covers pressing Enter in the password
+        // field; the button (type="button", not "submit") is wired
+        // directly so a click can never silently fail to reach the
+        // check for any reason related to native form-submission
+        // quirks.
         if (form) {
             form.addEventListener("submit", (e) => {
                 e.preventDefault();
-                if (!window.crypto || !window.crypto.subtle) {
-                    showError("gate.errorNoCrypto");
-                    return;
-                }
-                sha256Hex(((input ? input.value : "") || "").trim()).then((hash) => {
-                    if (hash === PASSCODE_HASH) {
-                        try {
-                            localStorage.setItem(UNLOCK_KEY, "1");
-                        } catch (err) {
-                            // Private browsing / storage disabled — will just re-prompt next visit.
-                        }
-                        removeGate();
-                    } else {
-                        showError();
-                    }
-                }).catch(() => {
-                    // crypto.subtle threw (e.g. still somehow reached this
-                    // point in an insecure context) rather than just being
-                    // absent — same message either way.
-                    showError("gate.errorNoCrypto");
-                });
+                attemptUnlock(input);
+            });
+        }
+
+        if (submitBtn) {
+            submitBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                attemptUnlock(input);
             });
         }
 
