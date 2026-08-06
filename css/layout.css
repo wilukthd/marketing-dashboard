@@ -518,6 +518,85 @@
 
 }
 
+/* ==========================================================
+   Rising Landing Page Panel
+   Highlight box shown on the Landing Pages tab after clicking
+   the Overview "rising page" insight — deliberately styled a
+   step brighter than .landingInsightsCard below it (solid
+   border + accent icon) since this is a "something happened,
+   go look" alert rather than a routine summary.
+========================================================== */
+
+.landingRisingPanel{
+
+    background:var(--primary-light);
+
+    border:1px solid var(--primary);
+
+    border-radius:12px;
+
+    padding:16px 18px;
+
+    margin-bottom:20px;
+
+}
+
+.landingRisingPanelHeader{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    gap:12px;
+
+    margin-bottom:10px;
+
+    flex-wrap:wrap;
+
+}
+
+.landingRisingPanelHeader > div:first-child{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:6px;
+
+    font-size:14px;
+
+    flex-wrap:wrap;
+
+}
+
+.landingRisingPanelHeader strong{
+
+    color:var(--text);
+
+    font-size:15px;
+
+}
+
+.risingPanelIcon{
+
+    font-size:15px;
+
+}
+
+.landingRisingPanelSpike{
+
+    font-size:13px;
+
+    line-height:1.5;
+
+    color:var(--text-light);
+
+    margin:8px 0 0;
+
+}
+
 
 /* ==========================================================
    Insight
@@ -548,6 +627,30 @@
     margin-bottom:12px;
 
     line-height:1.6;
+
+}
+
+/* The "rising landing page" insight (buildRisingLandingPageInsight)
+   is the only clickable item in this list — an inset highlight +
+   pointer cursor marks it as "click for detail" rather than a
+   plain fact like the others. */
+.insightCard li.insightClickable{
+
+    cursor:pointer;
+
+    padding:6px 10px;
+
+    margin:-6px -10px 12px;
+
+    border-radius:8px;
+
+    transition:background .15s ease;
+
+}
+
+.insightCard li.insightClickable:hover{
+
+    background:var(--primary-light);
 
 }
 

@@ -609,6 +609,75 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Rising Landing Page — mini daily chart
+       Powers the click-through from the Overview "rising landing
+       page" insight: one page's daily sessions across the full
+       30-day landing-pages window, with the single standout day
+       (from buildRisingLandingPageInsight's z-score check) picked
+       out in a different bar color so the eye lands on it
+       immediately instead of having to read the x-axis.
+    ========================================================== */
+
+    let landingRisingChartInstance = null;
+
+    function renderLandingPageMiniChart(canvasId, dailySessions, spikeDate) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const colors = getChartColors();
+
+        if (landingRisingChartInstance) {
+            landingRisingChartInstance.destroy();
+            landingRisingChartInstance = null;
+        }
+        if (!dailySessions || !dailySessions.length) return;
+
+        const labels = dailySessions.map((d) => window.I18N.formatDayLabel(d.date));
+        const values = dailySessions.map((d) => d.sessions);
+        const barColors = dailySessions.map((d) => (d.date === spikeDate ? "#EA580C" : "#2563EB"));
+
+        landingRisingChartInstance = new Chart(canvas.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: metricLabel("sessions"),
+                    data: values,
+                    backgroundColor: barColors,
+                    borderRadius: 4,
+                    maxBarThickness: 18
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#111827",
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: (item) => `${metricLabel("sessions")}: ${Math.round(item.parsed.y).toLocaleString("en-US")}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: colors.textLight, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+                    },
+                    y: {
+                        grid: { color: colors.grid },
+                        border: { display: false },
+                        ticks: { color: colors.textLight }
+                    }
+                }
+            }
+        });
+    }
+
     // Charts created while their tab is hidden (display:none) get stuck
     // at Chart.js's zero-size fallback, since nothing tells them to
     // remeasure once the container becomes visible again. Call this
@@ -618,6 +687,7 @@ window.THD = window.THD || {};
         if (newRepeatChartInstance) newRepeatChartInstance.resize();
         if (aovChartInstance) aovChartInstance.resize();
         if (channelTrendChartInstance) channelTrendChartInstance.resize();
+        if (landingRisingChartInstance) landingRisingChartInstance.resize();
         Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
@@ -627,6 +697,7 @@ window.THD = window.THD || {};
         renderChannelTrendChart,
         renderNewRepeatChart,
         renderAovChart,
+        renderLandingPageMiniChart,
         resizeCharts
     };
 

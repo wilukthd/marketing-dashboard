@@ -36,12 +36,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css?v=2">
-    <link rel="stylesheet" href="css/layout.css?v=2">
-    <link rel="stylesheet" href="css/cards.css?v=2">
-    <link rel="stylesheet" href="css/charts.css?v=2">
-    <link rel="stylesheet" href="css/tables.css?v=2">
-    <link rel="stylesheet" href="css/dark.css?v=2">
+    <link rel="stylesheet" href="css/main.css?v=3">
+    <link rel="stylesheet" href="css/layout.css?v=3">
+    <link rel="stylesheet" href="css/cards.css?v=3">
+    <link rel="stylesheet" href="css/charts.css?v=3">
+    <link rel="stylesheet" href="css/tables.css?v=3">
+    <link rel="stylesheet" href="css/dark.css?v=3">
 
 </head>
 
@@ -917,6 +917,34 @@ MAIN
 
     </div>
 
+    <div class="landingRisingPanel" id="landingRisingPanel" style="display:none;">
+
+        <div class="landingRisingPanelHeader">
+
+            <div>
+
+                <span class="risingPanelIcon">📈</span>
+
+                <span data-i18n="landing.risingPanelTitle">Rising Page Detected</span> — <strong id="landingRisingPanelTitle">--</strong>
+
+            </div>
+
+            <button class="secondaryButton" id="landingRisingPanelCloseBtn" data-i18n="landing.risingPanelClose">Close</button>
+
+        </div>
+
+        <p id="landingRisingPanelSummary"></p>
+
+        <div class="chartBody miniTrendChart">
+
+            <canvas id="landingRisingPanelChart"></canvas>
+
+        </div>
+
+        <p class="landingRisingPanelSpike" id="landingRisingPanelSpike"></p>
+
+    </div>
+
     <div class="landingInsightsCard" id="landingInsightsCard">
 
         <h4 data-i18n="landingInsights.heading">Insights</h4>
@@ -1309,15 +1337,15 @@ MAIN
 
 </script>
 
-<script src="js/i18n.js?v=2"></script>
-<script src="js/gate.js?v=2"></script>
-<script src="js/charts.js?v=2"></script>
-<script src="js/ui.js?v=2"></script>
-<script src="js/data.js?v=2"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/gate.js?v=3"></script>
+<script src="js/charts.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/data.js?v=3"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/notes.js?v=2"></script>
-<script src="js/app.js?v=2"></script>
+<script src="js/notes.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
 
 </body>
 </html>

@@ -121,8 +121,14 @@ window.I18N = (function () {
             "landingInsight.cooling": "{title}'s sessions dropped {figure} in the second half of the last 30 days vs. the first half.",
             "landingInsight.deviceMismatch": "{title} skews heavily toward {device} ({figure} of its sessions).",
             "landingInsight.spike": "{title} had an unusually high {figure} sessions on {date}, compared to its typical {mean} per day.",
+            "landingInsight.overviewRising": "📈 {title} is up {figure} this week vs. last week — click to see when it happened.",
             "landing.empty": "No landing page data for this window.",
             "landing.notSet": "(not set)",
+
+            "landing.risingPanelTitle": "Rising Page Detected",
+            "landing.risingPanelWeek": "{current} sessions this week vs. {previous} last week ({figure})",
+            "landing.risingPanelSpike": "Biggest single-day jump: {date} — {value} sessions (typical day: ~{mean})",
+            "landing.risingPanelClose": "Close",
 
             "insights.title": "Key Insights",
             "insights.empty": "Not enough data yet to generate insights for this period.",
@@ -346,8 +352,14 @@ window.I18N = (function () {
             "landingInsight.cooling": "{title}のセッションは直近30日間の後半で前半比{figure}減少しました。",
             "landingInsight.deviceMismatch": "{title}は{device}に大きく偏っています（セッションの{figure}）。",
             "landingInsight.spike": "{title}は{date}に{figure}セッションと、通常の1日あたり{mean}セッションに比べて突出して多くなりました。",
+            "landingInsight.overviewRising": "📈 {title}が今週{figure}増加しています。クリックするといつ急増したか確認できます。",
             "landing.empty": "この期間のランディングページデータはありません。",
             "landing.notSet": "（未設定）",
+
+            "landing.risingPanelTitle": "急上昇ページを検出",
+            "landing.risingPanelWeek": "今週 {current} セッション（先週 {previous} セッションから {figure}）",
+            "landing.risingPanelSpike": "最も急増した日：{date} — {value}セッション（通常は1日あたり約{mean}セッション）",
+            "landing.risingPanelClose": "閉じる",
 
             "insights.title": "主なインサイト",
             "insights.empty": "この期間はインサイトを生成するのに十分なデータがありません。",

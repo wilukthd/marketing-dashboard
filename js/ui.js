@@ -234,6 +234,61 @@ window.THD = window.THD || {};
         el.textContent = startStr && endStr ? window.I18N.t("landing.fixedWindow", { start: startStr, end: endStr }) : "";
     }
 
+    /* ==========================================================
+       Rising Landing Page Panel
+       Shown on the Landing Pages tab after clicking the Overview
+       "rising page" insight (see buildRisingLandingPageInsight in
+       data.js) — a dismissible highlight box with the page's own
+       daily-sessions mini chart, so "click to see when it
+       happened" leads somewhere concrete instead of just a fact.
+    ========================================================== */
+
+    function renderLandingRisingPanel(insight) {
+        const panel = document.getElementById("landingRisingPanel");
+        if (!panel || !insight) return;
+
+        const titleEl = document.getElementById("landingRisingPanelTitle");
+        const summaryEl = document.getElementById("landingRisingPanelSummary");
+        const spikeEl = document.getElementById("landingRisingPanelSpike");
+
+        if (titleEl) titleEl.textContent = insight.pageTitle;
+
+        if (summaryEl) {
+            const figure = `<span class="insightNum pos">+${Math.round(insight.changePct)}%</span>`;
+            summaryEl.innerHTML = window.I18N.t("landing.risingPanelWeek", {
+                current: Math.round(insight.current).toLocaleString("en-US"),
+                previous: Math.round(insight.previous).toLocaleString("en-US"),
+                figure
+            });
+        }
+
+        if (spikeEl) {
+            spikeEl.textContent = insight.spikeDate
+                ? window.I18N.t("landing.risingPanelSpike", {
+                    date: insight.spikeDate,
+                    value: Math.round(insight.spikeValue).toLocaleString("en-US"),
+                    mean: Math.round(insight.mean).toLocaleString("en-US")
+                })
+                : "";
+        }
+
+        panel.style.display = "";
+    }
+
+    function hideLandingRisingPanel() {
+        const panel = document.getElementById("landingRisingPanel");
+        if (panel) panel.style.display = "none";
+    }
+
+    function wireLandingRisingPanelClose(onClose) {
+        const btn = document.getElementById("landingRisingPanelCloseBtn");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+            hideLandingRisingPanel();
+            if (onClose) onClose();
+        });
+    }
+
     function getLandingDevice() {
         const select = document.getElementById("landingDeviceSelect");
         return select ? select.value : "all";
@@ -249,16 +304,31 @@ window.THD = window.THD || {};
        Key Insights
     ========================================================== */
 
-    function renderInsights(insights) {
+    // riseInsight/onRiseClick are optional — when present, the "rising
+    // landing page" insight (buildRisingLandingPageInsight in data.js)
+    // is appended as its own clickable <li>, styled distinctly so it
+    // reads as "click for detail" rather than a plain fact like the
+    // others in this list.
+    function renderInsights(insights, riseInsight, onRiseClick) {
         const container = document.querySelector(".insightCard ul");
         if (!container) return;
 
-        if (!insights || !insights.length) {
+        const items = (insights || []).map((text) => `<li>${text}</li>`);
+        if (riseInsight) {
+            items.push(`<li class="insightClickable" id="risingPageInsightItem">${riseInsight.sentence}</li>`);
+        }
+
+        if (!items.length) {
             container.innerHTML = `<li>${window.I18N.t("insights.empty")}</li>`;
             return;
         }
 
-        container.innerHTML = insights.map((text) => `<li>${text}</li>`).join("");
+        container.innerHTML = items.join("");
+
+        if (riseInsight && onRiseClick) {
+            const el = document.getElementById("risingPageInsightItem");
+            if (el) el.addEventListener("click", () => onRiseClick(riseInsight));
+        }
     }
 
     /* ==========================================================
@@ -870,27 +940,43 @@ window.THD = window.THD || {};
         if (active) applyHeaderText(active.dataset.view);
     }
 
-    function wireSidebarNav(onSwitch) {
+    // Shared by both the sidebar nav click handler and switchToView
+    // (the programmatic version used by the Overview "rising landing
+    // page" insight click-through), so the two ways of changing tabs
+    // can't drift out of sync with each other.
+    function activateView(target, onSwitch) {
         const links = document.querySelectorAll(".sidebarMenu a[data-view]");
         const views = document.querySelectorAll(".dashboardView");
         if (!links.length || !views.length) return;
 
+        links.forEach((l) => l.classList.toggle("active", l.dataset.view === target));
+        views.forEach((v) => v.classList.toggle("viewHidden", v.dataset.view !== target));
+
+        applyHeaderText(target);
+
+        // Charts inside the newly-shown view were sized while hidden
+        // and need a beat for layout to settle before they can
+        // correctly measure their container.
+        if (onSwitch) requestAnimationFrame(() => requestAnimationFrame(onSwitch));
+    }
+
+    function wireSidebarNav(onSwitch) {
+        const links = document.querySelectorAll(".sidebarMenu a[data-view]");
+        if (!links.length) return;
+
         links.forEach((link) => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
-                const target = link.dataset.view;
-
-                links.forEach((l) => l.classList.toggle("active", l === link));
-                views.forEach((v) => v.classList.toggle("viewHidden", v.dataset.view !== target));
-
-                applyHeaderText(target);
-
-                // Charts inside the newly-shown view were sized while
-                // hidden and need a beat for layout to settle before
-                // they can correctly measure their container.
-                if (onSwitch) requestAnimationFrame(() => requestAnimationFrame(onSwitch));
+                activateView(link.dataset.view, onSwitch);
             });
         });
+    }
+
+    // Programmatic tab switch (no click event) — used when the
+    // Overview "rising landing page" insight is clicked, to jump to
+    // the Landing Pages tab and reveal its highlight panel.
+    function switchToView(target, onSwitch) {
+        activateView(target, onSwitch);
     }
 
     THD.ui = {
@@ -908,6 +994,9 @@ window.THD = window.THD || {};
         renderLandingPagesPeriodLabel,
         getLandingDevice,
         wireLandingDeviceToggle,
+        renderLandingRisingPanel,
+        hideLandingRisingPanel,
+        wireLandingRisingPanelClose,
         renderTrafficComparison,
         wireTrafficComparisonFilter,
         showChannelTrendMode,
@@ -935,6 +1024,7 @@ window.THD = window.THD || {};
         wireTrendOverlayToggle,
         wireRefreshButton,
         wireSidebarNav,
+        switchToView,
         refreshActiveHeader,
         wireThemeToggle,
         wireNotes,

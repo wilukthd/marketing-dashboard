@@ -34,6 +34,15 @@
     let newRepeatRows = []; // last-loaded new/repeat rows (sliced to 12), kept so the Orders/Revenue toggle can re-render without re-fetching
     let fullNewRepeatRows = []; // full history (unsliced) — needed to rebuild New/Repeat insights on a language change without re-fetching
 
+    // Overview "rising landing page" insight (see buildRisingLandingPageInsight
+    // in data.js) — fixed 7-day-vs-prior-7-day window, independent of the
+    // main date-range picker, same as Landing Pages' own fixed 30-day
+    // window. risingPanelActiveInsight tracks whether its detail panel on
+    // the Landing Pages tab is currently open, so a language change can
+    // re-render it in place instead of leaving it showing stale text.
+    let risingPageInsight = null;
+    let risingPanelActiveInsight = null;
+
     // Cached from the last renderForRange call so the channel-trend
     // click handler / metric toggle can recompute without redoing the
     // whole period's work.
@@ -83,6 +92,25 @@
         THD.ui.renderLandingPageInsights(THD.data.buildLandingPageInsights(landingRows));
         const win = THD.data.resolveLast30DayWindow(landingRows);
         if (win) THD.ui.renderLandingPagesPeriodLabel(win.startStr, win.endStr);
+    }
+
+    // Click-through for the Overview "rising landing page" insight:
+    // jumps to the Landing Pages tab and reveals its highlight panel
+    // with a mini daily-sessions chart for that one page, the standout
+    // day picked out in a different color. The chart is rendered
+    // inside the tab-switch's onSwitch callback (not immediately)
+    // since the canvas is still zero-size until the newly-shown tab's
+    // layout has settled — same reason resizeCharts() exists.
+    function onRisingPageInsightClick(insight) {
+        if (!insight) return;
+        risingPanelActiveInsight = insight;
+        THD.ui.renderLandingRisingPanel(insight);
+        THD.ui.switchToView("traffic", () => {
+            THD.charts.resizeCharts();
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", insight.dailySessions, insight.spikeDate);
+            const panel = document.getElementById("landingRisingPanel");
+            if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
     }
 
     /* ==========================================================
@@ -196,7 +224,21 @@
                 // demonstrates something in demo mode.
                 const pageType = THD.data.classifyLandingPageType(landingPage, pageTitle);
                 const weight = (pageType === "system" ? 1.6 : 1) * (1 - idx * 0.08);
-                const sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
+                let sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
+
+                // Demo-only: give one content page a deliberate rise over
+                // the most recent 7 days, with a standout single day in
+                // the middle of that window, so the Overview "Rising
+                // Landing Page" insight (buildRisingLandingPageInsight)
+                // has something real to surface when the live GA4 feed
+                // isn't configured yet — random noise alone wouldn't
+                // reliably clear its 100%+ threshold.
+                const daysFromEnd = days - 1 - i; // 0 = most recent day
+                if (idx === 5 && daysFromEnd < 7) {
+                    sessions = Math.round(sessions * 2.6);
+                    if (daysFromEnd === 2) sessions = Math.round(sessions * 1.8);
+                }
+
                 const purchases = pageType === "system" ? 0 : (Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0);
                 const revenue = purchases * (7000 + Math.random() * 6000);
                 const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
@@ -272,7 +314,7 @@
         THD.ui.renderInsights([
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
             ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
-        ]);
+        ], risingPageInsight, onRisingPageInsightClick);
 
         // Monthly Business Performance recomputed here too (rather
         // than only once at load) so it stays in sync with the
@@ -329,6 +371,10 @@
         THD.ui.refreshActiveHeader();
         THD.ui.populateSourceFilterOptions(availableChannels);
         THD.ui.renderDataSourceWarning(dataSourceStatus);
+        // Rebuilt (not just re-rendered) since insight.sentence is a
+        // pre-formatted i18n string baked in at build time, same
+        // reason the New/Repeat insights below get rebuilt too.
+        risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();
         renderNewRepeatChartForMetric();
@@ -336,6 +382,16 @@
         THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(fullNewRepeatRows));
         renderNewRepeatSourceNote();
         THD.ui.refreshNotesList();
+
+        // If the rising-page panel is currently open, refresh its text
+        // in place rather than leaving it showing the old language —
+        // it's not touched by renderForRange since that only rebuilds
+        // the Overview insight list, not the Landing Pages panel.
+        if (risingPanelActiveInsight && risingPageInsight) {
+            risingPanelActiveInsight = risingPageInsight;
+            THD.ui.renderLandingRisingPanel(risingPageInsight);
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", risingPageInsight.dailySessions, risingPageInsight.spikeDate);
+        }
     }
 
     /* ==========================================================
@@ -384,6 +440,9 @@
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
         THD.ui.wireLandingPagesToggle();
+        THD.ui.wireLandingRisingPanelClose(() => {
+            risingPanelActiveInsight = null;
+        });
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
             renderForRange(currentRange, currentCustomRange);
@@ -421,6 +480,12 @@
 
         availableChannels = THD.data.listAvailableChannels(sourceRows, "channel");
         THD.ui.populateSourceFilterOptions(availableChannels);
+
+        // Fixed 7-day-vs-prior-7-day window (independent of the main
+        // date-range picker), so this must be computed before the
+        // first renderForRange call — renderForRange is what actually
+        // passes it into THD.ui.renderInsights.
+        risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
 
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();

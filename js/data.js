@@ -1080,6 +1080,134 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Overview "Rising Landing Page" Insight
+       A focused early-warning signal, deliberately separate from
+       the Landing Pages tab's own momentum/spike insights above
+       (buildLandingPageInsights): this looks ONLY at the most
+       recent 7 days vs. the 7 days right before that — not the
+       30-day half-window split used there — and ONLY surfaces a
+       page whose sessions at least doubled. The point is "is
+       something unusual happening RIGHT NOW", checkable at a
+       glance from Overview, rather than a general momentum read.
+
+       A minimum previous-week session floor keeps a 1session->3
+       session blip from reading as a "300% rise". Content pages
+       only (see classifyLandingPageType) — a spike on a checkout
+       or login page isn't the kind of anomaly this is hunting for.
+
+       Also pinpoints the single biggest day behind the rise (same
+       z-score approach as the per-page spike detector above,
+       scoped to just this one page's daily series across the full
+       30-day window) so a click-through can show exactly when it
+       happened instead of just that it happened.
+    ========================================================== */
+
+    const RISING_PAGE_MIN_PREV_SESSIONS = 10;
+    const RISING_PAGE_THRESHOLD_PCT = 100;
+
+    function buildRisingLandingPageInsight(landingRows) {
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win) return null;
+
+        // This-week / last-week windows, anchored to the most recent
+        // date actually present in the data (not "today"), same
+        // anchoring approach resolveLast30DayWindow already uses.
+        const maxDate = new Date(win.endStr);
+        const curStart = new Date(maxDate);
+        curStart.setDate(curStart.getDate() - 6);
+        const prevEnd = new Date(curStart);
+        prevEnd.setDate(prevEnd.getDate() - 1);
+        const prevStart = new Date(prevEnd);
+        prevStart.setDate(prevStart.getDate() - 6);
+
+        const curStartStr = curStart.toISOString().slice(0, 10);
+        const prevStartStr = prevStart.toISOString().slice(0, 10);
+        const prevEndStr = prevEnd.toISOString().slice(0, 10);
+
+        const contentRows = landingRows.filter((r) => r.pageType !== "system");
+        const curRows = contentRows.filter((r) => r.date >= curStartStr && r.date <= win.endStr);
+        const prevRows = contentRows.filter((r) => r.date >= prevStartStr && r.date <= prevEndStr);
+
+        const sumByTitle = (rows) => {
+            const map = {};
+            rows.forEach((r) => {
+                const key = r.pageTitle || "(not set)";
+                map[key] = (map[key] || 0) + r.sessions;
+            });
+            return map;
+        };
+        const curMap = sumByTitle(curRows);
+        const prevMap = sumByTitle(prevRows);
+
+        // Single biggest riser clearing both the noise-floor and the
+        // 100%+ threshold — ties broken by whichever change % is
+        // largest, so this reads as "the one thing most worth a look"
+        // rather than a list that could get noisy in a busy week.
+        let best = null;
+        Object.keys(curMap).forEach((title) => {
+            const current = curMap[title];
+            const previous = prevMap[title] || 0;
+            if (previous < RISING_PAGE_MIN_PREV_SESSIONS) return;
+            const changePct = ((current - previous) / previous) * 100;
+            if (changePct < RISING_PAGE_THRESHOLD_PCT) return;
+            if (!best || changePct > best.changePct) {
+                best = { pageTitle: title, current, previous, changePct };
+            }
+        });
+        if (!best) return null;
+
+        // This page's own daily series across the full 30-day window,
+        // plus the single day that stands out most (highest z-score,
+        // even if it doesn't clear the ANOMALY_Z_THRESHOLD used
+        // elsewhere — here we always want *a* day to point to, not
+        // just a statistically extreme one).
+        const allDates = [];
+        for (let d = new Date(win.start); d <= win.end; d.setDate(d.getDate() + 1)) {
+            allDates.push(d.toISOString().slice(0, 10));
+        }
+        const byDate = {};
+        contentRows
+            .filter((r) => (r.pageTitle || "(not set)") === best.pageTitle)
+            .forEach((r) => { byDate[r.date] = (byDate[r.date] || 0) + r.sessions; });
+
+        const dailySessions = allDates.map((d) => ({ date: d, sessions: byDate[d] || 0 }));
+        const values = dailySessions.map((d) => d.sessions);
+        const n = values.length;
+        const mean = n ? values.reduce((a, b) => a + b, 0) / n : 0;
+        const variance = n ? values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n : 0;
+        const stdDev = Math.sqrt(variance);
+
+        let spikeDate = null;
+        let spikeValue = null;
+        let spikeZ = null;
+        values.forEach((v, i) => {
+            const z = stdDev ? (v - mean) / stdDev : 0;
+            if (spikeZ === null || z > spikeZ) {
+                spikeZ = z;
+                spikeDate = allDates[i];
+                spikeValue = v;
+            }
+        });
+
+        const sentence = window.I18N.t("landingInsight.overviewRising", {
+            title: `<strong>${best.pageTitle}</strong>`,
+            figure: highlight(`+${Math.round(best.changePct)}%`, "pos")
+        });
+
+        return {
+            pageTitle: best.pageTitle,
+            current: best.current,
+            previous: best.previous,
+            changePct: best.changePct,
+            sentence,
+            dailySessions,
+            mean,
+            spikeDate,
+            spikeValue
+        };
+    }
+
+    /* ==========================================================
        Current vs previous period, merged into one row per
        channel/platform so the two can be shown side by side
        (and so a channel that only appears in one period still
@@ -1270,6 +1398,7 @@ window.THD = window.THD || {};
         classifyLandingPageType,
         aggregateLandingPages,
         buildLandingPageInsights,
+        buildRisingLandingPageInsight,
         buildTrafficComparison,
         buildChannelTrend,
         computeMovingAverage,
