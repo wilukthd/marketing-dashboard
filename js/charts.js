@@ -277,6 +277,11 @@ window.THD = window.THD || {};
        sits directly above "Last Month" for genuine comparison.
     ========================================================== */
 
+    // Single line for the selected channel's own current-period trend.
+    // A "vs. previous period" overlay used to render here too, but it
+    // added visual noise without much payoff once you're already
+    // looking at one channel in isolation — the doughnuts one level up
+    // are where the current-vs-previous comparison actually belongs.
     function renderChannelTrendChart(canvasId, channelKey, data, metric) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
@@ -294,8 +299,6 @@ window.THD = window.THD || {};
 
         const safeMetric = data.series[metric] ? metric : "sessions";
         const currentValues = data.series[safeMetric].current;
-        const previousValues = data.series[safeMetric].previous;
-        const previousLabels = data.previousLabels;
 
         channelTrendChartInstance = new Chart(canvas.getContext("2d"), {
             type: "line",
@@ -303,24 +306,13 @@ window.THD = window.THD || {};
                 labels: data.labels,
                 datasets: [
                     {
-                        label: window.I18N.t("traffic.selectedPeriod").replace(":", ""),
+                        label: metricLabel(safeMetric),
                         data: currentValues,
                         borderColor: color,
                         backgroundColor: color,
                         borderWidth: 2.5,
                         pointRadius: 3,
                         pointHoverRadius: 5,
-                        tension: 0.35
-                    },
-                    {
-                        label: window.I18N.t("traffic.previousPeriod").replace(":", ""),
-                        data: previousValues,
-                        borderColor: hexToRgba(color, 0.55),
-                        backgroundColor: hexToRgba(color, 0.55),
-                        borderWidth: 2,
-                        borderDash: [5, 4],
-                        pointRadius: 2,
-                        pointHoverRadius: 4,
                         tension: 0.35
                     }
                 ]
@@ -330,22 +322,13 @@ window.THD = window.THD || {};
                 maintainAspectRatio: false,
                 interaction: { mode: "index", intersect: false },
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: "top",
-                        align: "end",
-                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: "#111827",
                         padding: 12,
                         cornerRadius: 10,
                         callbacks: {
-                            title: (items) => {
-                                if (!items.length) return "";
-                                const i = items[0].dataIndex;
-                                return `${data.labels[i]} / ${previousLabels[i]}`;
-                            },
+                            title: (items) => (items.length ? data.labels[items[0].dataIndex] : ""),
                             label: (item) => `${item.dataset.label}: ${cfg.format(item.parsed.y)}`
                         }
                     }

@@ -1080,38 +1080,28 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
-       Overview "Rising Landing Page" Insight
-       A focused early-warning signal, deliberately separate from
-       the Landing Pages tab's own momentum/spike insights above
-       (buildLandingPageInsights): this looks ONLY at the most
-       recent 7 days vs. the 7 days right before that — not the
-       30-day half-window split used there — and ONLY surfaces a
-       page whose sessions at least doubled. The point is "is
-       something unusual happening RIGHT NOW", checkable at a
-       glance from Overview, rather than a general momentum read.
-
-       A minimum previous-week session floor keeps a 1session->3
-       session blip from reading as a "300% rise". Content pages
-       only (see classifyLandingPageType) — a spike on a checkout
-       or login page isn't the kind of anomaly this is hunting for.
-
-       Also pinpoints the single biggest day behind the rise (same
-       z-score approach as the per-page spike detector above,
-       scoped to just this one page's daily series across the full
-       30-day window) so a click-through can show exactly when it
-       happened instead of just that it happened.
+       Landing Page Detail — shared helpers
+       Both the Overview "rising page" insight and clicking any row
+       in the Top Landing Pages list need the same two things: a
+       page's daily-sessions series across the 30-day window (with
+       its single standout day picked out), and its this-week vs.
+       last-week totals. Pulled out here so both call sites stay in
+       sync instead of drifting apart.
     ========================================================== */
 
-    const RISING_PAGE_MIN_PREV_SESSIONS = 10;
-    const RISING_PAGE_THRESHOLD_PCT = 100;
+    function sumSessionsByTitle(rows) {
+        const map = {};
+        rows.forEach((r) => {
+            const key = r.pageTitle || "(not set)";
+            map[key] = (map[key] || 0) + r.sessions;
+        });
+        return map;
+    }
 
-    function buildRisingLandingPageInsight(landingRows) {
-        const win = resolveLast30DayWindow(landingRows);
-        if (!win) return null;
-
-        // This-week / last-week windows, anchored to the most recent
-        // date actually present in the data (not "today"), same
-        // anchoring approach resolveLast30DayWindow already uses.
+    // This-week / last-week windows, anchored to the most recent date
+    // actually present in the data (not "today"), same anchoring
+    // approach resolveLast30DayWindow already uses.
+    function weekWindowsFor(win) {
         const maxDate = new Date(win.endStr);
         const curStart = new Date(maxDate);
         curStart.setDate(curStart.getDate() - 6);
@@ -1119,55 +1109,27 @@ window.THD = window.THD || {};
         prevEnd.setDate(prevEnd.getDate() - 1);
         const prevStart = new Date(prevEnd);
         prevStart.setDate(prevStart.getDate() - 6);
-
-        const curStartStr = curStart.toISOString().slice(0, 10);
-        const prevStartStr = prevStart.toISOString().slice(0, 10);
-        const prevEndStr = prevEnd.toISOString().slice(0, 10);
-
-        const contentRows = landingRows.filter((r) => r.pageType !== "system");
-        const curRows = contentRows.filter((r) => r.date >= curStartStr && r.date <= win.endStr);
-        const prevRows = contentRows.filter((r) => r.date >= prevStartStr && r.date <= prevEndStr);
-
-        const sumByTitle = (rows) => {
-            const map = {};
-            rows.forEach((r) => {
-                const key = r.pageTitle || "(not set)";
-                map[key] = (map[key] || 0) + r.sessions;
-            });
-            return map;
+        return {
+            curStartStr: curStart.toISOString().slice(0, 10),
+            prevStartStr: prevStart.toISOString().slice(0, 10),
+            prevEndStr: prevEnd.toISOString().slice(0, 10)
         };
-        const curMap = sumByTitle(curRows);
-        const prevMap = sumByTitle(prevRows);
+    }
 
-        // Single biggest riser clearing both the noise-floor and the
-        // 100%+ threshold — ties broken by whichever change % is
-        // largest, so this reads as "the one thing most worth a look"
-        // rather than a list that could get noisy in a busy week.
-        let best = null;
-        Object.keys(curMap).forEach((title) => {
-            const current = curMap[title];
-            const previous = prevMap[title] || 0;
-            if (previous < RISING_PAGE_MIN_PREV_SESSIONS) return;
-            const changePct = ((current - previous) / previous) * 100;
-            if (changePct < RISING_PAGE_THRESHOLD_PCT) return;
-            if (!best || changePct > best.changePct) {
-                best = { pageTitle: title, current, previous, changePct };
-            }
-        });
-        if (!best) return null;
-
-        // This page's own daily series across the full 30-day window,
-        // plus the single day that stands out most (highest z-score,
-        // even if it doesn't clear the ANOMALY_Z_THRESHOLD used
-        // elsewhere — here we always want *a* day to point to, not
-        // just a statistically extreme one).
+    // One page's daily series across the full 30-day window, plus the
+    // single day that stands out most (highest z-score, even if it
+    // doesn't clear the ANOMALY_Z_THRESHOLD used elsewhere — here we
+    // always want *a* day to point to, not just a statistically
+    // extreme one). `rows` should already be scoped to whatever
+    // device/page-type filter the caller wants applied.
+    function buildLandingPageDailySeries(rows, win, pageTitle) {
         const allDates = [];
         for (let d = new Date(win.start); d <= win.end; d.setDate(d.getDate() + 1)) {
             allDates.push(d.toISOString().slice(0, 10));
         }
         const byDate = {};
-        contentRows
-            .filter((r) => (r.pageTitle || "(not set)") === best.pageTitle)
+        rows
+            .filter((r) => (r.pageTitle || "(not set)") === pageTitle)
             .forEach((r) => { byDate[r.date] = (byDate[r.date] || 0) + r.sessions; });
 
         const dailySessions = allDates.map((d) => ({ date: d, sessions: byDate[d] || 0 }));
@@ -1189,6 +1151,61 @@ window.THD = window.THD || {};
             }
         });
 
+        return { dailySessions, mean, spikeDate, spikeValue };
+    }
+
+    /* ==========================================================
+       Overview "Rising Landing Page" Insight
+       A focused early-warning signal, deliberately separate from
+       the Landing Pages tab's own momentum/spike insights above
+       (buildLandingPageInsights): this looks ONLY at the most
+       recent 7 days vs. the 7 days right before that — not the
+       30-day half-window split used there — and ONLY surfaces a
+       page whose sessions at least doubled. The point is "is
+       something unusual happening RIGHT NOW", checkable at a
+       glance from Overview, rather than a general momentum read.
+
+       A minimum previous-week session floor keeps a 1session->3
+       session blip from reading as a "300% rise". Content pages
+       only (see classifyLandingPageType) — a spike on a checkout
+       or login page isn't the kind of anomaly this is hunting for.
+    ========================================================== */
+
+    const RISING_PAGE_MIN_PREV_SESSIONS = 10;
+    const RISING_PAGE_THRESHOLD_PCT = 100;
+
+    function buildRisingLandingPageInsight(landingRows) {
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win) return null;
+
+        const { curStartStr, prevStartStr, prevEndStr } = weekWindowsFor(win);
+
+        const contentRows = landingRows.filter((r) => r.pageType !== "system");
+        const curRows = contentRows.filter((r) => r.date >= curStartStr && r.date <= win.endStr);
+        const prevRows = contentRows.filter((r) => r.date >= prevStartStr && r.date <= prevEndStr);
+
+        const curMap = sumSessionsByTitle(curRows);
+        const prevMap = sumSessionsByTitle(prevRows);
+
+        // Single biggest riser clearing both the noise-floor and the
+        // 100%+ threshold — ties broken by whichever change % is
+        // largest, so this reads as "the one thing most worth a look"
+        // rather than a list that could get noisy in a busy week.
+        let best = null;
+        Object.keys(curMap).forEach((title) => {
+            const current = curMap[title];
+            const previous = prevMap[title] || 0;
+            if (previous < RISING_PAGE_MIN_PREV_SESSIONS) return;
+            const changePct = ((current - previous) / previous) * 100;
+            if (changePct < RISING_PAGE_THRESHOLD_PCT) return;
+            if (!best || changePct > best.changePct) {
+                best = { pageTitle: title, current, previous, changePct };
+            }
+        });
+        if (!best) return null;
+
+        const { dailySessions, mean, spikeDate, spikeValue } = buildLandingPageDailySeries(contentRows, win, best.pageTitle);
+
         const sentence = window.I18N.t("landingInsight.overviewRising", {
             title: `<strong>${best.pageTitle}</strong>`,
             figure: highlight(`+${Math.round(best.changePct)}%`, "pos")
@@ -1205,6 +1222,39 @@ window.THD = window.THD || {};
             spikeDate,
             spikeValue
         };
+    }
+
+    /* ==========================================================
+       Landing Page Detail (any page, on demand)
+       Powers clicking a row in the Top Landing Pages list: same
+       week-over-week comparison and daily-series/spike-day lookup
+       as the rising-page insight above, but for whichever specific
+       page was clicked — no threshold, no content-only restriction
+       (a system page can be clicked too if it's visible in the
+       list), and scoped to whichever device filter is currently
+       selected so the numbers shown match the row the person
+       clicked. changePct is null (not 0) when there's no previous-
+       week data to compare against, so the UI can say "no data"
+       instead of a misleading "+∞%" or "0%".
+    ========================================================== */
+
+    function buildLandingPageDetail(landingRows, pageTitle, device) {
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win || !pageTitle) return null;
+
+        const { curStartStr, prevStartStr, prevEndStr } = weekWindowsFor(win);
+        const scoped = landingRows.filter((r) => !device || device === "all" || r.device === device);
+
+        const curRows = scoped.filter((r) => r.date >= curStartStr && r.date <= win.endStr);
+        const prevRows = scoped.filter((r) => r.date >= prevStartStr && r.date <= prevEndStr);
+
+        const current = sumSessionsByTitle(curRows)[pageTitle] || 0;
+        const previous = sumSessionsByTitle(prevRows)[pageTitle] || 0;
+        const changePct = previous > 0 ? ((current - previous) / previous) * 100 : null;
+
+        const { dailySessions, mean, spikeDate, spikeValue } = buildLandingPageDailySeries(scoped, win, pageTitle);
+
+        return { pageTitle, current, previous, changePct, dailySessions, mean, spikeDate, spikeValue };
     }
 
     /* ==========================================================
@@ -1399,6 +1449,7 @@ window.THD = window.THD || {};
         aggregateLandingPages,
         buildLandingPageInsights,
         buildRisingLandingPageInsight,
+        buildLandingPageDetail,
         buildTrafficComparison,
         buildChannelTrend,
         computeMovingAverage,

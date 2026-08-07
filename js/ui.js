@@ -144,9 +144,10 @@ window.THD = window.THD || {};
 
     let allLandingPages = [];
     let landingPagesExpanded = false;
+    let visibleLandingPages = []; // the slice actually rendered right now, indexed to match data-page-index
     const COLLAPSED_LANDING_COUNT = 10;
 
-    function landingItemHtml(p) {
+    function landingItemHtml(p, index) {
         const label = p.pageTitle || window.I18N.t("landing.notSet");
         let trendHtml = "";
         if (p.trend !== null && p.trend !== undefined) {
@@ -155,7 +156,7 @@ window.THD = window.THD || {};
         }
         const stats = `<small>${fmtNumber(p.sessions)} ${window.I18N.t("landing.sessionsUnit")}${trendHtml}</small>`;
         return `
-            <div class="landingItem">
+            <div class="landingItem" data-page-index="${index}" role="button" tabindex="0">
                 <div class="landingItemTop">
                     <span>${label}</span>
                     ${stats}
@@ -177,14 +178,15 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!allLandingPages.length) {
+            visibleLandingPages = [];
             container.innerHTML = `<p class="emptyRow">${window.I18N.t("landing.empty")}</p>`;
             const btn = document.getElementById("toggleLandingPagesBtn");
             if (btn) btn.style.display = "none";
             return;
         }
 
-        const visible = landingPagesExpanded ? allLandingPages : allLandingPages.slice(0, COLLAPSED_LANDING_COUNT);
-        container.innerHTML = visible.map(landingItemHtml).join("");
+        visibleLandingPages = landingPagesExpanded ? allLandingPages : allLandingPages.slice(0, COLLAPSED_LANDING_COUNT);
+        container.innerHTML = visibleLandingPages.map(landingItemHtml).join("");
 
         const btn = document.getElementById("toggleLandingPagesBtn");
         if (btn) {
@@ -193,6 +195,20 @@ window.THD = window.THD || {};
                 ? window.I18N.t("source.showLess")
                 : window.I18N.t("source.showAllCount", { n: allLandingPages.length });
         }
+    }
+
+    // Delegated (not per-row) so it survives renderLandingPages()
+    // re-rendering the container's innerHTML on every device/toggle
+    // change — wire this once, not after every render.
+    function wireLandingPageItemClick(onClick) {
+        const container = document.getElementById("landingPages");
+        if (!container || !onClick) return;
+        container.addEventListener("click", (e) => {
+            const item = e.target.closest(".landingItem[data-page-index]");
+            if (!item || !container.contains(item)) return;
+            const page = visibleLandingPages[Number(item.dataset.pageIndex)];
+            if (page) onClick(page);
+        });
     }
 
     function wireLandingPagesToggle() {
@@ -243,23 +259,50 @@ window.THD = window.THD || {};
        happened" leads somewhere concrete instead of just a fact.
     ========================================================== */
 
-    function renderLandingRisingPanel(insight) {
+    /* ==========================================================
+       Rising / Detail Landing Page Panel
+       Shown on the Landing Pages tab in two ways: (1) after
+       clicking the Overview "rising page" insight (see
+       buildRisingLandingPageInsight in data.js) — pass
+       { generic: false } (the default), or (2) after clicking any
+       row in the Top Landing Pages list (see buildLandingPageDetail)
+       — pass { generic: true }, which swaps the "Rising Page
+       Detected" framing for a neutral "Page Detail" label and
+       handles a changePct of null (no prior-week data) gracefully.
+       Same dismissible highlight box + daily-sessions mini chart
+       either way.
+    ========================================================== */
+
+    function renderLandingRisingPanel(insight, opts) {
         const panel = document.getElementById("landingRisingPanel");
         if (!panel || !insight) return;
+        const generic = !!(opts && opts.generic);
 
+        const iconEl = document.getElementById("landingRisingPanelIcon");
+        const labelEl = document.getElementById("landingRisingPanelLabel");
         const titleEl = document.getElementById("landingRisingPanelTitle");
         const summaryEl = document.getElementById("landingRisingPanelSummary");
         const spikeEl = document.getElementById("landingRisingPanelSpike");
 
+        if (iconEl) iconEl.textContent = generic ? "📊" : "📈";
+        if (labelEl) labelEl.textContent = window.I18N.t(generic ? "landing.pageDetailTitle" : "landing.risingPanelTitle");
         if (titleEl) titleEl.textContent = insight.pageTitle;
 
         if (summaryEl) {
-            const figure = `<span class="insightNum pos">+${Math.round(insight.changePct)}%</span>`;
-            summaryEl.innerHTML = window.I18N.t("landing.risingPanelWeek", {
-                current: Math.round(insight.current).toLocaleString("en-US"),
-                previous: Math.round(insight.previous).toLocaleString("en-US"),
-                figure
-            });
+            if (insight.changePct === null || insight.changePct === undefined) {
+                summaryEl.innerHTML = window.I18N.t("landing.risingPanelWeekNew", {
+                    current: Math.round(insight.current).toLocaleString("en-US")
+                });
+            } else {
+                const cls = insight.changePct >= 0 ? "pos" : "neg";
+                const sign = insight.changePct >= 0 ? "+" : "";
+                const figure = `<span class="insightNum ${cls}">${sign}${Math.round(insight.changePct)}%</span>`;
+                summaryEl.innerHTML = window.I18N.t("landing.risingPanelWeek", {
+                    current: Math.round(insight.current).toLocaleString("en-US"),
+                    previous: Math.round(insight.previous).toLocaleString("en-US"),
+                    figure
+                });
+            }
         }
 
         if (spikeEl) {
@@ -988,6 +1031,7 @@ window.THD = window.THD || {};
         renderTrafficPeriodLabels,
         renderLandingPages,
         wireLandingPagesToggle,
+        wireLandingPageItemClick,
         renderLandingPageInsights,
         getHideSystemPages,
         wireHideSystemToggle,

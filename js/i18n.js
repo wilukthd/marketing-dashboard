@@ -126,7 +126,9 @@ window.I18N = (function () {
             "landing.notSet": "(not set)",
 
             "landing.risingPanelTitle": "Rising Page Detected",
+            "landing.pageDetailTitle": "Page Detail",
             "landing.risingPanelWeek": "{current} sessions this week vs. {previous} last week ({figure})",
+            "landing.risingPanelWeekNew": "{current} sessions this week (no data last week to compare)",
             "landing.risingPanelSpike": "Biggest single-day jump: {date} — {value} sessions (typical day: ~{mean})",
             "landing.risingPanelClose": "Close",
 
@@ -357,7 +359,9 @@ window.I18N = (function () {
             "landing.notSet": "（未設定）",
 
             "landing.risingPanelTitle": "急上昇ページを検出",
+            "landing.pageDetailTitle": "ページ詳細",
             "landing.risingPanelWeek": "今週 {current} セッション（先週 {previous} セッションから {figure}）",
+            "landing.risingPanelWeekNew": "今週 {current} セッション（先週のデータなし）",
             "landing.risingPanelSpike": "最も急増した日：{date} — {value}セッション（通常は1日あたり約{mean}セッション）",
             "landing.risingPanelClose": "閉じる",
 

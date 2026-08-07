@@ -38,10 +38,14 @@
     // in data.js) — fixed 7-day-vs-prior-7-day window, independent of the
     // main date-range picker, same as Landing Pages' own fixed 30-day
     // window. risingPanelActiveInsight tracks whether its detail panel on
-    // the Landing Pages tab is currently open, so a language change can
-    // re-render it in place instead of leaving it showing stale text.
+    // the Landing Pages tab is currently open (and risingPanelActiveGeneric
+    // whether it's showing that rising insight vs. an arbitrary page clicked
+    // in the Top Landing Pages list — see buildLandingPageDetail), so a
+    // language change or device-filter change can refresh it in place
+    // instead of leaving it showing stale numbers.
     let risingPageInsight = null;
     let risingPanelActiveInsight = null;
+    let risingPanelActiveGeneric = false;
 
     // Cached from the last renderForRange call so the channel-trend
     // click handler / metric toggle can recompute without redoing the
@@ -92,6 +96,21 @@
         THD.ui.renderLandingPageInsights(THD.data.buildLandingPageInsights(landingRows));
         const win = THD.data.resolveLast30DayWindow(landingRows);
         if (win) THD.ui.renderLandingPagesPeriodLabel(win.startStr, win.endStr);
+
+        // If a page-detail panel (opened by clicking a row — see
+        // onLandingPageItemClick) is currently open, refresh it against
+        // the new device filter so its numbers stay consistent with
+        // what the list above it is now showing. The "rising" panel
+        // (opened from the Overview insight) intentionally ignores the
+        // device filter, same as the insight itself, so it's left as-is.
+        if (risingPanelActiveInsight && risingPanelActiveGeneric) {
+            const refreshed = THD.data.buildLandingPageDetail(landingRows, risingPanelActiveInsight.pageTitle, device);
+            if (refreshed) {
+                risingPanelActiveInsight = refreshed;
+                THD.ui.renderLandingRisingPanel(refreshed, { generic: true });
+                THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", refreshed.dailySessions, refreshed.spikeDate);
+            }
+        }
     }
 
     // Click-through for the Overview "rising landing page" insight:
@@ -104,6 +123,7 @@
     function onRisingPageInsightClick(insight) {
         if (!insight) return;
         risingPanelActiveInsight = insight;
+        risingPanelActiveGeneric = false;
         THD.ui.renderLandingRisingPanel(insight);
         THD.ui.switchToView("traffic", () => {
             THD.charts.resizeCharts();
@@ -111,6 +131,26 @@
             const panel = document.getElementById("landingRisingPanel");
             if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
         });
+    }
+
+    // Click-through for clicking any row in the Top Landing Pages list
+    // (already on the Landing Pages tab, so no tab switch needed — just
+    // the panel itself going from display:none to visible, which still
+    // needs a layout beat before Chart.js can measure the canvas, hence
+    // the double rAF here too.
+    function onLandingPageItemClick(page) {
+        if (!page || !page.pageTitle) return;
+        const device = THD.ui.getLandingDevice();
+        const detail = THD.data.buildLandingPageDetail(landingRows, page.pageTitle, device);
+        if (!detail) return;
+        risingPanelActiveInsight = detail;
+        risingPanelActiveGeneric = true;
+        THD.ui.renderLandingRisingPanel(detail, { generic: true });
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", detail.dailySessions, detail.spikeDate);
+            const panel = document.getElementById("landingRisingPanel");
+            if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }));
     }
 
     /* ==========================================================
@@ -383,11 +423,14 @@
         renderNewRepeatSourceNote();
         THD.ui.refreshNotesList();
 
-        // If the rising-page panel is currently open, refresh its text
-        // in place rather than leaving it showing the old language —
-        // it's not touched by renderForRange since that only rebuilds
-        // the Overview insight list, not the Landing Pages panel.
-        if (risingPanelActiveInsight && risingPageInsight) {
+        // If the "rising" panel (opened from the Overview insight) is
+        // currently open, refresh it in place too — the generic
+        // per-row-click panel doesn't need separate handling here since
+        // renderLandingPagesForDevice() above already refreshes it as
+        // part of its own re-render (by the time it runs, I18N's
+        // internal language state has already switched, so its strings
+        // come out translated).
+        if (risingPanelActiveInsight && !risingPanelActiveGeneric && risingPageInsight) {
             risingPanelActiveInsight = risingPageInsight;
             THD.ui.renderLandingRisingPanel(risingPageInsight);
             THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", risingPageInsight.dailySessions, risingPageInsight.spikeDate);
@@ -440,8 +483,10 @@
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
         THD.ui.wireLandingPagesToggle();
+        THD.ui.wireLandingPageItemClick(onLandingPageItemClick);
         THD.ui.wireLandingRisingPanelClose(() => {
             risingPanelActiveInsight = null;
+            risingPanelActiveGeneric = false;
         });
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
