@@ -37,11 +37,7 @@
 
     --shadow-md:0 8px 24px rgba(0,0,0,.08);
 
-    --shadow-lg:0 20px 40px rgba(0,0,0,.12);
-
-    --radius-sm:10px;
     --radius:16px;
-    --radius-lg:24px;
 
 }
 
@@ -354,12 +350,6 @@ select:focus{
 
 }
 
-.warning{
-
-    color:var(--warning);
-
-}
-
 .textLight{
 
     color:var(--text-light);
@@ -394,21 +384,6 @@ select:focus{
 
 
 /* ==========================================================
-   Spacing Helpers
-========================================================== */
-
-.mt8{margin-top:8px;}
-.mt16{margin-top:16px;}
-.mt24{margin-top:24px;}
-.mt32{margin-top:32px;}
-
-.mb8{margin-bottom:8px;}
-.mb16{margin-bottom:16px;}
-.mb24{margin-bottom:24px;}
-.mb32{margin-bottom:32px;}
-
-
-/* ==========================================================
    Scrollbar
 ========================================================== */
 
@@ -435,37 +410,6 @@ select:focus{
 ::-webkit-scrollbar-thumb:hover{
 
     background:#94A3B8;
-
-}
-
-
-/* ==========================================================
-   Fade Animation
-========================================================== */
-
-.fadeIn{
-
-    animation:fade .4s ease;
-
-}
-
-@keyframes fade{
-
-    from{
-
-        opacity:0;
-
-        transform:translateY(8px);
-
-    }
-
-    to{
-
-        opacity:1;
-
-        transform:translateY(0);
-
-    }
 
 }
 

@@ -80,34 +80,6 @@
 
 }
 
-.chartBadge{
-
-    background:#EEF4FF;
-
-    color:var(--blue);
-
-    padding:8px 14px;
-
-    border-radius:30px;
-
-    font-size:13px;
-
-    font-weight:600;
-
-}
-
-.chartMenu{
-
-    border:1px solid var(--border);
-
-    border-radius:10px;
-
-    padding:10px 14px;
-
-    background:white;
-
-}
-
 /* ==========================================================
    Chart Area
 ========================================================== */
@@ -141,18 +113,6 @@
 /* ==========================================================
    Legend
 ========================================================== */
-
-.customLegend{
-
-    display:flex;
-
-    flex-direction:column;
-
-    gap:14px;
-
-    margin-top:20px;
-
-}
 
 .metricToggles{
 
@@ -222,20 +182,6 @@
 
 }
 
-.legendItem{
-
-    display:flex;
-
-    align-items:flex-start;
-
-    gap:10px;
-
-    color:var(--text-light);
-
-    font-size:14px;
-
-}
-
 .legendColor{
 
     width:12px;
@@ -247,64 +193,6 @@
     margin-top:5px;
 
     flex-shrink:0;
-
-}
-
-.legendItemBody{
-
-    flex:1;
-
-    min-width:0;
-
-}
-
-.legendItemTop{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    color:var(--text);
-
-    font-weight:600;
-
-    font-size:14px;
-
-}
-
-.legendItemMeta{
-
-    color:var(--text-light);
-
-    font-size:12.5px;
-
-    margin-top:2px;
-
-}
-
-.legendBlue{
-
-    background:#2563EB;
-
-}
-
-.legendGreen{
-
-    background:#10B981;
-
-}
-
-.legendOrange{
-
-    background:#F59E0B;
-
-}
-
-.legendRed{
-
-    background:#EF4444;
 
 }
 
@@ -634,24 +522,6 @@
     accent-color:var(--primary);
 
     cursor:pointer;
-
-}
-
-/* ==========================================================
-   Empty State
-========================================================== */
-
-.emptyChart{
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-    height:350px;
-
-    color:var(--text-light);
 
 }
 

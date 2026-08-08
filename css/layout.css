@@ -344,53 +344,6 @@
 
 }
 
-.chartTabs{
-
-    display:flex;
-
-    gap:10px;
-
-}
-
-.chartTabs button{
-
-    background:#F8FAFC;
-
-    border:1px solid var(--border);
-
-    border-radius:10px;
-
-    padding:10px 16px;
-
-    font-size:13px;
-
-}
-
-.chartTabs button.active{
-
-    background:var(--primary);
-
-    color:white;
-
-}
-
-
-/* ==========================================================
-   Two Columns
-========================================================== */
-
-.twoColumn{
-
-    display:grid;
-
-    grid-template-columns:2fr 1fr;
-
-    gap:24px;
-
-    margin-bottom:28px;
-
-}
-
 
 /* ==========================================================
    Landing Pages
@@ -706,16 +659,6 @@
 /* ==========================================================
    Responsive
 ========================================================== */
-
-@media(max-width:1200px){
-
-    .twoColumn{
-
-        grid-template-columns:1fr;
-
-    }
-
-}
 
 @media(max-width:900px){
 

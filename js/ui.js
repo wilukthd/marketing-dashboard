@@ -713,11 +713,6 @@ window.THD = window.THD || {};
         if (channels && channels.includes(current)) select.value = current;
     }
 
-    function getSourceFilterChannel() {
-        const select = document.getElementById("sourceFilterSelect");
-        return select ? select.value : "all";
-    }
-
     function wireSourceFilterToggle(onChange) {
         const select = document.getElementById("sourceFilterSelect");
         if (!select) return;
@@ -1049,7 +1044,6 @@ window.THD = window.THD || {};
         wireChannelTrendMetricToggle,
         wireChannelTrendCloseButton,
         populateSourceFilterOptions,
-        getSourceFilterChannel,
         wireSourceFilterToggle,
         getTrafficGroupBy,
         wireTrafficGroupToggle,

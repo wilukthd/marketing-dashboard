@@ -28,15 +28,13 @@
 
     --shadow-sm:0 1px 3px rgba(0,0,0,.35);
     --shadow-md:0 8px 24px rgba(0,0,0,.4);
-    --shadow-lg:0 20px 40px rgba(0,0,0,.5);
 
 }
 
 /* Components that used a literal white/near-white background
    instead of var(--surface) in the base stylesheets. */
 [data-theme="dark"] .chartCard,
-[data-theme="dark"] .tableCard,
-[data-theme="dark"] .chartMenu{
+[data-theme="dark"] .tableCard{
 
     background:var(--surface);
 
@@ -49,13 +47,6 @@
     background:var(--surface);
     color:var(--text);
     border-color:var(--border);
-
-}
-
-[data-theme="dark"] .chartBadge{
-
-    background:#1E3A6E;
-    color:#BFDBFE;
 
 }
 

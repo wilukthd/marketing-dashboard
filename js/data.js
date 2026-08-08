@@ -403,17 +403,6 @@ window.THD = window.THD || {};
         return Object.values(byDate).sort((a, b) => new Date(a.date) - new Date(b.date));
     }
 
-    // Daily series for one specific channel/platform within a date
-    // window — powers the "click a channel to see its trend instead
-    // of the doughnut" view. Just filters down to that one channel's
-    // rows first, then reuses the same daily aggregator above.
-    function buildChannelDailySeries(sourceRows, channel, groupBy, start, end) {
-        const filtered = (sourceRows || []).filter((r) =>
-            classifyForGroupBy(r, groupBy) === channel && inRange(r.date, start, end)
-        );
-        return buildDailyRowsFromSources(filtered);
-    }
-
     function deriveTrafficBreakdown(sourceRows, groupBy) {
         const totals = {};
         let totalSessions = 0;
@@ -859,11 +848,6 @@ window.THD = window.THD || {};
         return Object.values(totals)
             .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
             .sort((a, b) => b.sessions - a.sessions);
-    }
-
-    function filterSourcesRange(sourceRows, rangeKey, customRange) {
-        const { start, end } = resolveRange(rangeKey, customRange);
-        return filterSourcesByDates(sourceRows, start, end);
     }
 
     /* ==========================================================
@@ -1434,7 +1418,6 @@ window.THD = window.THD || {};
         classifyForGroupBy,
         listAvailableChannels,
         buildDailyRowsFromSources,
-        buildChannelDailySeries,
         deriveTrafficBreakdown,
         buildInsights,
         buildNewRepeatInsights,
@@ -1442,7 +1425,6 @@ window.THD = window.THD || {};
         buildAnomalyInsights,
         resolveRange,
         filterDailyRange,
-        filterSourcesRange,
         filterSourcesByDates,
         resolveLast30DayWindow,
         classifyLandingPageType,
