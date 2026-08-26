@@ -124,8 +124,14 @@
     // (platform or channel), so a person who just came from grouping
     // by channel there sees the same grouping here. Reads from
     // landingRows directly — sourceMedium lives on that same feed.
+    // Remembers {pageTitle, date, groupBy} in breakdownContext so the
+    // row-click handler (wired once in init(), see below) knows what
+    // to drill into without needing that context passed back to it.
+    let breakdownContext = null;
+
     function showBreakdownForDate(date, pageTitle) {
         const groupBy = THD.ui.getTrafficGroupBy();
+        breakdownContext = { date, pageTitle, groupBy };
         const result = THD.data.buildDayPageSourceBreakdown(landingRows, pageTitle, date, groupBy);
         THD.ui.renderSourceBreakdown(result, window.I18N.formatDayLabel(date));
     }
@@ -553,6 +559,11 @@
         THD.ui.wireLandingRisingPanelClose(() => {
             risingPanelActiveInsight = null;
             risingPanelActiveGeneric = false;
+        });
+        THD.ui.wireSourceBreakdownRowClicks((label) => {
+            if (!breakdownContext) return;
+            const detail = THD.data.buildDayPageSourceDetail(landingRows, breakdownContext.pageTitle, breakdownContext.date, breakdownContext.groupBy, label);
+            THD.ui.renderSourceBreakdownDetail(label, detail);
         });
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {

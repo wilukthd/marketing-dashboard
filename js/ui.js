@@ -457,12 +457,85 @@ window.THD = window.THD || {};
         if (hintEl) hintEl.style.display = "none";
 
         listEl.innerHTML = result.breakdown.map((row) => `
-            <div class="sourceBreakdownRow">
-                <span class="sourceBreakdownLabel" title="${row.label}">${row.label}</span>
-                <div class="sourceBreakdownBarTrack"><div class="sourceBreakdownBarFill" style="width:${Math.max(row.pct, 3)}%"></div></div>
-                <span class="sourceBreakdownValue">${Math.round(row.sessions).toLocaleString("en-US")} <small>(${Math.round(row.pct)}%)</small></span>
+            <div class="sourceBreakdownRowWrap" data-label="${row.label}">
+                <div class="sourceBreakdownRow">
+                    <span class="sourceBreakdownLabel" title="${row.label}">${row.label}</span>
+                    <div class="sourceBreakdownBarTrack"><div class="sourceBreakdownBarFill" style="width:${Math.max(row.pct, 3)}%"></div></div>
+                    <span class="sourceBreakdownValue">${Math.round(row.sessions).toLocaleString("en-US")} <small>(${Math.round(row.pct)}%)</small></span>
+                    <span class="sourceBreakdownChevron">›</span>
+                </div>
             </div>
         `).join("");
+    }
+
+    // Delegated once (see app.js init) rather than re-wired per render,
+    // since #sourceBreakdownList's innerHTML is replaced wholesale
+    // every time renderSourceBreakdown runs above. Handles collapsing
+    // (accordion — only one group's raw-source detail open at a time,
+    // and clicking an already-open group closes it) entirely locally;
+    // onRowClick only fires when a closed group needs its detail
+    // fetched and rendered.
+    function wireSourceBreakdownRowClicks(onRowClick) {
+        const listEl = document.getElementById("sourceBreakdownList");
+        if (!listEl) return;
+        listEl.addEventListener("click", (evt) => {
+            const wrap = evt.target.closest(".sourceBreakdownRowWrap");
+            if (!wrap) return;
+            const label = wrap.dataset.label;
+            const wasOpen = wrap.classList.contains("isExpanded");
+
+            listEl.querySelectorAll(".sourceBreakdownRowWrap.isExpanded").forEach((w) => {
+                w.classList.remove("isExpanded");
+                const detailEl = w.querySelector(".sourceBreakdownDetailTable");
+                if (detailEl) detailEl.remove();
+            });
+
+            if (!wasOpen && onRowClick) onRowClick(label);
+        });
+    }
+
+    // detail is THD.data.buildDayPageSourceDetail's return value (an
+    // array, or null/empty when that group genuinely has no rows —
+    // shouldn't normally happen since the group came from the same
+    // day's data, but the empty state is here defensively).
+    function renderSourceBreakdownDetail(label, detail) {
+        const listEl = document.getElementById("sourceBreakdownList");
+        if (!listEl || !window.CSS || !CSS.escape) return;
+        const wrap = listEl.querySelector(`.sourceBreakdownRowWrap[data-label="${CSS.escape(label)}"]`);
+        if (!wrap) return;
+        wrap.classList.add("isExpanded");
+
+        if (!detail || !detail.length) {
+            wrap.insertAdjacentHTML("beforeend", `<div class="sourceBreakdownDetailTable"><p class="sourceBreakdownDetailEmpty">${window.I18N.t("landing.sourceDetailEmpty")}</p></div>`);
+            return;
+        }
+
+        const rowsHtml = detail.map((d) => `
+            <tr>
+                <td>${d.sourceMedium}</td>
+                <td class="number">${Math.round(d.sessions).toLocaleString("en-US")}</td>
+                <td class="number">${Math.round(d.purchases).toLocaleString("en-US")}</td>
+                <td class="number">¥${Math.round(d.revenue).toLocaleString("en-US")}</td>
+                <td class="number">${d.cvr.toFixed(1)}%</td>
+            </tr>
+        `).join("");
+
+        wrap.insertAdjacentHTML("beforeend", `
+            <div class="sourceBreakdownDetailTable">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>${window.I18N.t("landing.sourceDetailSource")}</th>
+                            <th class="number">${window.I18N.t("landing.sourceDetailSessions")}</th>
+                            <th class="number">${window.I18N.t("landing.sourceDetailPurchases")}</th>
+                            <th class="number">${window.I18N.t("landing.sourceDetailRevenue")}</th>
+                            <th class="number">${window.I18N.t("landing.sourceDetailCvr")}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `);
     }
 
     function wireLandingRisingPanelClose(onClose) {
@@ -1180,6 +1253,8 @@ window.THD = window.THD || {};
         hideLandingRisingPanel,
         resetSourceBreakdown,
         renderSourceBreakdown,
+        wireSourceBreakdownRowClicks,
+        renderSourceBreakdownDetail,
         wireLandingRisingPanelClose,
         renderTrafficComparison,
         wireTrafficComparisonFilter,

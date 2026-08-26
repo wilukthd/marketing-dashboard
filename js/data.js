@@ -1290,6 +1290,35 @@ window.THD = window.THD || {};
         return { date, pageTitle, total, breakdown };
     }
 
+    // Second-level drill-down for the panel above: given a group label
+    // the person clicked ("Referral (Other)", "Direct", etc. — one of
+    // buildDayPageSourceBreakdown's own labels for that same
+    // date/page/groupBy), returns the raw sourceMedium rows that
+    // rolled up into it — this is the actual "p01.mul-pay.jp /
+    // referral" / "youtube.com / referral" level needed to trace an
+    // anomaly back to its real origin, not just its category.
+    function buildDayPageSourceDetail(landingRows, pageTitle, date, groupBy, groupLabel) {
+        if (!landingRows || !landingRows.length || !pageTitle || !date || !groupLabel) return null;
+
+        const rows = landingRows.filter((r) =>
+            r.date === date && r.pageTitle === pageTitle && classifyForGroupBy(r, groupBy) === groupLabel
+        );
+        if (!rows.length) return null;
+
+        const totals = {};
+        rows.forEach((r) => {
+            const key = r.sourceMedium || "(not set)";
+            if (!totals[key]) totals[key] = { sourceMedium: key, sessions: 0, purchases: 0, revenue: 0 };
+            totals[key].sessions += r.sessions;
+            totals[key].purchases += r.purchases;
+            totals[key].revenue += r.revenue;
+        });
+
+        return Object.values(totals)
+            .map((t) => ({ ...t, cvr: t.sessions ? (t.purchases / t.sessions) * 100 : 0 }))
+            .sort((a, b) => b.sessions - a.sessions);
+    }
+
     /* ==========================================================
        Current vs previous period, merged into one row per
        channel/platform so the two can be shown side by side
@@ -1463,6 +1492,7 @@ window.THD = window.THD || {};
         loadNewRepeat,
         loadLandingPages,
         buildDayPageSourceBreakdown,
+        buildDayPageSourceDetail,
         classifySourceChannel,
         classifyPlatform,
         classifyForGroupBy,

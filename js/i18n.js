@@ -136,6 +136,13 @@ window.I18N = (function () {
             "landing.sourceBreakdownHint": "Click any bar above to see that day's source breakdown.",
             "landing.sourceBreakdownEmpty": "No source breakdown available for this day.",
 
+            "landing.sourceDetailSource": "Source / Medium",
+            "landing.sourceDetailSessions": "Sessions",
+            "landing.sourceDetailPurchases": "Purchases",
+            "landing.sourceDetailRevenue": "Revenue",
+            "landing.sourceDetailCvr": "CVR",
+            "landing.sourceDetailEmpty": "No detail available for this group.",
+
             "insights.title": "Key Insights",
             "insights.empty": "Not enough data yet to generate insights for this period.",
 
@@ -372,6 +379,13 @@ window.I18N = (function () {
             "landing.sourceBreakdownTitle": "セッションの流入元",
             "landing.sourceBreakdownHint": "上のグラフのバーをクリックすると、その日の流入元内訳を表示します。",
             "landing.sourceBreakdownEmpty": "この日の流入元データはありません。",
+
+            "landing.sourceDetailSource": "流入元 / メディア",
+            "landing.sourceDetailSessions": "セッション数",
+            "landing.sourceDetailPurchases": "購入数",
+            "landing.sourceDetailRevenue": "売上",
+            "landing.sourceDetailCvr": "CVR",
+            "landing.sourceDetailEmpty": "このグループの詳細データはありません。",
 
             "insights.title": "主なインサイト",
             "insights.empty": "この期間はインサイトを生成するのに十分なデータがありません。",
