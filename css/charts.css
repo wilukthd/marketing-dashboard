@@ -4,25 +4,25 @@
 
 .chartCard{
 
-    background:#FFFFFF;
+    background:var(--surface);
 
     border:1px solid var(--border);
 
-    border-radius:18px;
+    border-radius:var(--radius);
 
-    box-shadow:var(--shadow-sm);
+    box-shadow:none;
 
-    padding:28px;
+    padding:20px 22px;
 
-    margin-bottom:28px;
+    margin-bottom:20px;
 
-    transition:.25s;
+    transition:.2s;
 
 }
 
 .chartCard:hover{
 
-    box-shadow:var(--shadow-md);
+    border-color:#D3D6DD;
 
 }
 
@@ -38,7 +38,7 @@
 
     align-items:center;
 
-    margin-bottom:28px;
+    margin-bottom:18px;
 
 }
 
@@ -52,9 +52,9 @@
 
 .chartTitle h3{
 
-    font-size:20px;
+    font-size:16px;
 
-    margin-bottom:6px;
+    margin-bottom:4px;
 
 }
 
@@ -62,7 +62,7 @@
 
     color:var(--text-light);
 
-    font-size:13px;
+    font-size:12.5px;
 
 }
 
@@ -316,7 +316,7 @@
 
     border:1px solid var(--border);
 
-    border-radius:10px;
+    border-radius:8px;
 
     padding:10px 14px;
 
@@ -324,7 +324,7 @@
 
     font-weight:600;
 
-    background:#FFFFFF;
+    background:var(--surface);
 
     color:var(--text);
 
@@ -366,27 +366,29 @@
 
     padding:4px 10px;
 
-    border-radius:20px;
+    border-radius:6px;
 
     font-size:12.5px;
 
     font-weight:700;
 
+    font-family:var(--font-mono);
+
 }
 
 .deltaBadge.positive{
 
-    background:#DCFCE7;
+    background:var(--success-light);
 
-    color:#15803D;
+    color:#0B7A4C;
 
 }
 
 .deltaBadge.negative{
 
-    background:#FEE2E2;
+    background:var(--danger-light);
 
-    color:#B91C1C;
+    color:#A11530;
 
 }
 
@@ -447,7 +449,7 @@
 
     padding:8px 14px;
 
-    border-radius:12px;
+    border-radius:8px;
 
 }
 
@@ -528,6 +530,15 @@
 .viewHidden{
 
     display:none !important;
+
+}
+
+/* Runs every time a view goes from hidden back to visible — CSS
+   animations replay automatically on a display:none -> block
+   transition, so no JS is needed to retrigger this. */
+.dashboardView:not(.viewHidden){
+
+    animation:viewEnter .32s cubic-bezier(.16,1,.3,1) both;
 
 }
 

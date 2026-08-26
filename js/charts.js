@@ -18,24 +18,27 @@ window.THD = window.THD || {};
     function getChartColors() {
         const dark = document.documentElement.getAttribute("data-theme") === "dark";
         return {
-            grid: dark ? "#334155" : "#F1F5F9",
-            textLight: dark ? "#94A3B8" : "#6B7280",
-            text: dark ? "#F1F5F9" : "#111827",
-            surface: dark ? "#1E293B" : "#FFFFFF"
+            grid: dark ? "#2B2E38" : "#E9EAED",
+            textLight: dark ? "#9498A6" : "#6B6F7B",
+            text: dark ? "#EDEEF2" : "#14151A",
+            surface: dark ? "#1C1E27" : "#FFFFFF"
         };
     }
 
-    // Colors match each metric's KPI card accent, so the chart
-    // and the cards above it read as the same visual language.
-    // Hues spread ~72° apart around the wheel (blue / orange / green /
-    // magenta / purple) so no two lines read as "the same color family"
-    // when several are stacked together — unlike the old cyan+blue pair.
+    // Colors match each metric's KPI card accent (see --m-* tokens
+    // in css/main.css), so the chart and the cards above it read as
+    // the same visual language. Hues spread ~72° apart around the
+    // wheel (cobalt / teal / green / rose / violet) so no two lines
+    // read as "the same color family" when several are stacked
+    // together, and none of them collide with the brand signal
+    // color (#FF5A2E), which is reserved for interactive/highlight
+    // use only (see the rising-day bar highlight further down).
     const METRIC_CONFIG = {
-        users: { color: "#2563EB", format: (v) => Math.round(v).toLocaleString("en-US") },
-        sessions: { color: "#EA580C", format: (v) => Math.round(v).toLocaleString("en-US") },
-        purchases: { color: "#16A34A", format: (v) => Math.round(v).toLocaleString("en-US") },
-        revenue: { color: "#DB2777", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
-        cvr: { color: "#7C3AED", format: (v) => v.toFixed(2) + "%" }
+        users: { color: "#2B59FF", format: (v) => Math.round(v).toLocaleString("en-US") },
+        sessions: { color: "#0EA5A5", format: (v) => Math.round(v).toLocaleString("en-US") },
+        purchases: { color: "#0F9D63", format: (v) => Math.round(v).toLocaleString("en-US") },
+        revenue: { color: "#D6336C", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
+        cvr: { color: "#7C4DFF", format: (v) => v.toFixed(2) + "%" }
     };
 
     // Reuses the same dictionary keys as the KPI cards, so a metric's
@@ -148,9 +151,9 @@ window.THD = window.THD || {};
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 12,
-                        cornerRadius: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             label: (item) => {
                                 const key = item.dataset.metricKey;
@@ -175,8 +178,8 @@ window.THD = window.THD || {};
     // and previous doughnut, which is what makes the two visually
     // comparable at a glance instead of just two unrelated pie charts.
     const TRAFFIC_PALETTE = [
-        "#2563EB", "#16A34A", "#EA580C", "#7C3AED", "#DB2777", "#0891B2",
-        "#CA8A04", "#DC2626", "#4F46E5", "#059669", "#9333EA", "#6B7280"
+        "#2B59FF", "#0F9D63", "#0EA5A5", "#7C4DFF", "#D6336C", "#FF5A2E",
+        "#C67C00", "#C81E3A", "#5B6EF5", "#2E8B7C", "#A64DFF", "#6B6F7B"
     ];
     const trafficColorAssignments = {}; // label -> color, built up as labels are seen
 
@@ -245,9 +248,9 @@ window.THD = window.THD || {};
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 12,
-                        cornerRadius: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             label: (item) => `${item.label}: ${item.parsed}%`
                         }
@@ -316,9 +319,9 @@ window.THD = window.THD || {};
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 12,
-                        cornerRadius: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             title: (items) => (items.length ? data.labels[items[0].dataIndex] : ""),
                             label: (item) => `${item.dataset.label}: ${cfg.format(item.parsed.y)}`
@@ -351,9 +354,9 @@ window.THD = window.THD || {};
     let newRepeatChartInstance = null;
 
     const NEW_REPEAT_COLORS = {
-        newBar: "#2563EB",
-        repeatBar: "#94A3B8",
-        pctLine: "#16A34A"
+        newBar: "#2B59FF",
+        repeatBar: "#9498A6",
+        pctLine: "#0F9D63"
     };
 
     function formatNewRepeatValue(v, isRevenue) {
@@ -437,9 +440,9 @@ window.THD = window.THD || {};
                         labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
                     },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 12,
-                        cornerRadius: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             label: (item) => item.dataset.yAxisID === "yPct"
                                 ? `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`
@@ -486,9 +489,9 @@ window.THD = window.THD || {};
     let aovChartInstance = null;
 
     const AOV_COLORS = {
-        overall: "#7C3AED",
-        newCustomer: "#2563EB",
-        repeatCustomer: "#94A3B8"
+        overall: "#7C4DFF",
+        newCustomer: "#2B59FF",
+        repeatCustomer: "#9498A6"
     };
 
     function renderAovChart(rows) {
@@ -561,9 +564,9 @@ window.THD = window.THD || {};
                         labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
                     },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 12,
-                        cornerRadius: 10,
+                        cornerRadius: 8,
                         callbacks: {
                             label: (item) => `${item.dataset.label}: ${fmtYenShort(item.parsed.y)}`
                         }
@@ -596,7 +599,11 @@ window.THD = window.THD || {};
 
     let landingRisingChartInstance = null;
 
-    function renderLandingPageMiniChart(canvasId, dailySessions, spikeDate) {
+    // onBarClick(date) fires when any bar is clicked — not just the
+    // highlighted spike bar — so the breakdown panel (see
+    // buildDayPageSourceBreakdown in data.js) works for any day the
+    // person is curious about, the spike day included.
+    function renderLandingPageMiniChart(canvasId, dailySessions, spikeDate, onBarClick) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
 
@@ -610,7 +617,7 @@ window.THD = window.THD || {};
 
         const labels = dailySessions.map((d) => window.I18N.formatDayLabel(d.date));
         const values = dailySessions.map((d) => d.sessions);
-        const barColors = dailySessions.map((d) => (d.date === spikeDate ? "#EA580C" : "#2563EB"));
+        const barColors = dailySessions.map((d) => (d.date === spikeDate ? "#FF5A2E" : "#2B59FF"));
 
         landingRisingChartInstance = new Chart(canvas.getContext("2d"), {
             type: "bar",
@@ -627,10 +634,19 @@ window.THD = window.THD || {};
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onClick: (evt, elements) => {
+                    if (!onBarClick || !elements || !elements.length) return;
+                    const point = dailySessions[elements[0].index];
+                    if (point) onBarClick(point.date);
+                },
+                onHover: (evt, elements) => {
+                    if (!onBarClick) return;
+                    evt.native.target.style.cursor = elements.length ? "pointer" : "default";
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#111827",
+                        backgroundColor: "#181A22",
                         padding: 10,
                         cornerRadius: 8,
                         callbacks: {

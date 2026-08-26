@@ -15,9 +15,9 @@
 
     grid-template-columns:repeat(5,minmax(0,1fr));
 
-    gap:24px;
+    gap:14px;
 
-    margin-bottom:32px;
+    margin-bottom:24px;
 
 }
 
@@ -28,19 +28,29 @@
 
 .kpiCard{
 
-    padding:24px;
+    padding:18px 20px 20px;
 
     position:relative;
 
     overflow:hidden;
 
-    transition:.25s;
+    transition:.2s;
+
+    animation:cardEnter .35s cubic-bezier(.16,1,.3,1) both;
 
 }
 
+.kpiGrid .kpiCard:nth-child(1){ animation-delay:0ms; }
+.kpiGrid .kpiCard:nth-child(2){ animation-delay:40ms; }
+.kpiGrid .kpiCard:nth-child(3){ animation-delay:80ms; }
+.kpiGrid .kpiCard:nth-child(4){ animation-delay:120ms; }
+.kpiGrid .kpiCard:nth-child(5){ animation-delay:160ms; }
+
 .kpiCard:hover{
 
-    transform:translateY(-4px);
+    transform:translateY(-2px);
+
+    border-color:#D3D6DD;
 
 }
 
@@ -72,31 +82,31 @@
 
 .users::before{
 
-    background:#2563EB;
+    background:var(--m-users);
 
 }
 
 .sessions::before{
 
-    background:#EA580C;
+    background:var(--m-sessions);
 
 }
 
 .purchases::before{
 
-    background:#16A34A;
+    background:var(--m-purchases);
 
 }
 
 .revenue::before{
 
-    background:#DB2777;
+    background:var(--m-revenue);
 
 }
 
 .cvr::before{
 
-    background:#7C3AED;
+    background:var(--m-cvr);
 
 }
 
@@ -113,7 +123,7 @@
 
     align-items:center;
 
-    margin-bottom:22px;
+    margin-bottom:16px;
 
 }
 
@@ -121,17 +131,21 @@
 
     color:var(--text-light);
 
-    font-size:14px;
+    font-size:12.5px;
 
     font-weight:600;
+
+    text-transform:uppercase;
+
+    letter-spacing:.06em;
 
 }
 
 .cardTop svg{
 
-    width:22px;
+    width:18px;
 
-    height:22px;
+    height:18px;
 
     color:var(--text-light);
 
@@ -144,13 +158,74 @@
 
 .kpiCard h3{
 
-    font-size:36px;
+    font-size:28px;
 
-    font-weight:700;
+    font-weight:600;
 
-    letter-spacing:-1px;
+    letter-spacing:-.01em;
 
-    margin-bottom:22px;
+    margin-bottom:16px;
+
+}
+
+
+/* ==========================================================
+   Skeleton State
+   Applied to a KPI card from page load until its first real
+   value arrives (see THD.ui.showInitialSkeletons in ui.js) —
+   masks the "--" placeholders with a shimmering bar instead.
+========================================================== */
+
+.kpiCard.isSkeleton [data-field]{
+
+    color:transparent;
+
+    position:relative;
+
+    display:inline-block;
+
+    border-radius:4px;
+
+    background:linear-gradient(90deg,var(--border) 25%,#EDEEF1 37%,var(--border) 63%);
+
+    background-size:400px 100%;
+
+    animation:shimmer 1.3s ease-in-out infinite;
+
+}
+
+[data-theme="dark"] .kpiCard.isSkeleton [data-field]{
+
+    background:linear-gradient(90deg,var(--border) 25%,#353946 37%,var(--border) 63%);
+
+    background-size:400px 100%;
+
+}
+
+.kpiCard.isSkeleton [data-field="value"]{
+
+    min-width:90px;
+
+}
+
+.kpiCard.isSkeleton [data-field="delta"],
+.kpiCard.isSkeleton [data-field="daily"]{
+
+    min-width:56px;
+
+}
+
+
+/* ==========================================================
+   Update Flash
+   Briefly highlights a card whose value just changed (range
+   filter, refresh) — skipped on first load, since cardEnter
+   above already announces those.
+========================================================== */
+
+.kpiCard.kpiFlash{
+
+    animation:flashHighlight .9s ease-out;
 
 }
 
@@ -167,7 +242,7 @@
 
     align-items:flex-end;
 
-    gap:20px;
+    gap:16px;
 
 }
 
@@ -175,13 +250,15 @@
 
     display:block;
 
-    margin-top:4px;
+    margin-top:2px;
+
+    font-size:11.5px;
 
 }
 
 .cardBottom strong{
 
-    font-size:15px;
+    font-size:13.5px;
 
 }
 
@@ -195,39 +272,6 @@
     transform:scale(1.08);
 
     transition:.2s;
-
-}
-
-
-/* ==========================================================
-   Small Animation
-========================================================== */
-
-.kpiCard::after{
-
-    content:"";
-
-    position:absolute;
-
-    width:180px;
-
-    height:180px;
-
-    background:rgba(37,99,235,.04);
-
-    border-radius:50%;
-
-    right:-80px;
-
-    top:-80px;
-
-    transition:.4s;
-
-}
-
-.kpiCard:hover::after{
-
-    transform:scale(1.15);
 
 }
 

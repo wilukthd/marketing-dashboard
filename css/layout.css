@@ -24,11 +24,11 @@
 
 .sidebar{
 
-    width:260px;
+    width:240px;
 
-    background:var(--surface);
+    background:var(--ink);
 
-    border-right:1px solid var(--border);
+    border-right:1px solid var(--ink);
 
     display:flex;
 
@@ -55,23 +55,33 @@
 
 .logo{
 
-    padding:36px 30px;
+    padding:30px 26px 24px;
 
 }
 
 .logo h1{
 
-    font-size:30px;
+    font-size:22px;
 
     line-height:1;
+
+    color:#FFFFFF;
+
+    letter-spacing:.02em;
 
 }
 
 .logo span{
 
-    color:var(--text-light);
+    color:var(--signal);
 
-    font-size:15px;
+    font-size:12px;
+
+    font-weight:600;
+
+    text-transform:uppercase;
+
+    letter-spacing:.12em;
 
 }
 
@@ -86,9 +96,9 @@
 
     flex-direction:column;
 
-    padding:12px;
+    padding:8px 12px;
 
-    gap:8px;
+    gap:2px;
 
 }
 
@@ -98,41 +108,65 @@
 
     align-items:center;
 
-    gap:14px;
+    gap:13px;
 
-    padding:14px 18px;
+    padding:11px 14px;
 
-    border-radius:14px;
+    border-radius:8px;
 
-    color:var(--text-light);
+    color:#9DA2B3;
 
-    transition:.25s;
+    transition:.2s;
 
     font-weight:500;
+
+    font-size:14px;
+
+    position:relative;
 
 }
 
 .sidebarMenu a:hover{
 
-    background:var(--primary-light);
+    background:rgba(255,255,255,.06);
 
-    color:var(--primary);
+    color:#FFFFFF;
 
 }
 
 .sidebarMenu a.active{
 
-    background:var(--primary);
+    background:rgba(255,90,46,.14);
 
-    color:white;
+    color:#FFFFFF;
+
+}
+
+.sidebarMenu a.active::before{
+
+    content:"";
+
+    position:absolute;
+
+    left:-12px;
+
+    top:8px;
+
+    bottom:8px;
+
+    width:3px;
+
+    border-radius:2px;
+
+    background:var(--signal);
 
 }
 
 .sidebarMenu svg{
 
-    width:20px;
+    width:18px;
 
-    height:20px;
+    height:18px;
 
 }
 
@@ -143,17 +177,19 @@
 
 .sidebarBottom{
 
-    padding:24px;
+    padding:20px 26px;
 
-    border-top:1px solid var(--border);
+    border-top:1px solid rgba(255,255,255,.08);
 
 }
 
 .version{
 
-    color:var(--text-light);
+    color:#5C6072;
 
-    font-size:13px;
+    font-size:12px;
+
+    font-family:var(--font-mono);
 
 }
 
@@ -168,9 +204,9 @@
 
     min-width:0;
 
-    margin-left:260px;
+    margin-left:240px;
 
-    padding:40px;
+    padding:32px 36px;
 
 }
 
@@ -187,7 +223,13 @@
 
     align-items:center;
 
-    margin-bottom:32px;
+    margin-bottom:24px;
+
+}
+
+.pageHeader p{
+
+    font-size:13.5px;
 
 }
 
@@ -220,11 +262,11 @@
 
     display:flex;
 
-    gap:16px;
+    gap:12px;
 
     flex-wrap:wrap;
 
-    margin-bottom:32px;
+    margin-bottom:24px;
 
 }
 
@@ -236,21 +278,21 @@
 
     gap:10px;
 
-    background:var(--primary-light);
+    background:var(--signal-light);
 
-    color:var(--primary);
+    color:#B8380E;
 
-    border-radius:12px;
+    border-radius:8px;
 
-    padding:12px 18px;
+    padding:11px 16px;
 
-    font-size:13.5px;
+    font-size:13px;
 
     font-weight:500;
 
-    margin-top:-16px;
+    margin-top:-12px;
 
-    margin-bottom:28px;
+    margin-bottom:24px;
 
 }
 
@@ -286,17 +328,17 @@
 
     background:var(--warning-light);
 
-    color:var(--warning);
+    color:#8A5B00;
 
     font-size:13px;
 
     font-weight:600;
 
-    padding:12px 20px;
+    padding:11px 18px;
 
-    border-radius:12px;
+    border-radius:8px;
 
-    margin-bottom:20px;
+    margin-bottom:18px;
 
 }
 
@@ -323,7 +365,7 @@
 
     align-items:center;
 
-    margin-bottom:20px;
+    margin-bottom:16px;
 
 }
 
@@ -340,7 +382,7 @@
 
     align-items:center;
 
-    margin-bottom:24px;
+    margin-bottom:20px;
 
 }
 
@@ -554,6 +596,161 @@
 
 
 /* ==========================================================
+   Source Breakdown
+   Revealed inside the landing-page detail panel by clicking a
+   bar in its mini chart (see renderLandingPageMiniChart's
+   onBarClick in js/charts.js) — answers "where did this day's
+   sessions come from" for the page currently shown above it.
+========================================================== */
+
+.sourceBreakdownSection{
+
+    margin-top:16px;
+
+    padding-top:14px;
+
+    border-top:1px solid rgba(255,90,46,.18);
+
+}
+
+.sourceBreakdownHeader{
+
+    display:flex;
+
+    align-items:baseline;
+
+    justify-content:space-between;
+
+    gap:10px;
+
+    margin-bottom:4px;
+
+}
+
+.sourceBreakdownHeader h4{
+
+    font-size:13px;
+
+    font-weight:600;
+
+    color:var(--text);
+
+}
+
+.sourceBreakdownDate{
+
+    font-family:var(--font-mono);
+
+    font-size:12px;
+
+    font-weight:600;
+
+    color:var(--text);
+
+    white-space:nowrap;
+
+}
+
+.sourceBreakdownHint{
+
+    font-size:12.5px;
+
+    color:var(--text-light);
+
+    margin:0 0 8px;
+
+}
+
+.sourceBreakdownList{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:7px;
+
+}
+
+.sourceBreakdownRow{
+
+    display:grid;
+
+    grid-template-columns:104px 1fr auto;
+
+    align-items:center;
+
+    gap:10px;
+
+}
+
+.sourceBreakdownLabel{
+
+    font-size:12.5px;
+
+    color:var(--text);
+
+    white-space:nowrap;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+}
+
+.sourceBreakdownBarTrack{
+
+    height:7px;
+
+    border-radius:4px;
+
+    background:rgba(18,20,28,.06);
+
+    overflow:hidden;
+
+}
+
+[data-theme="dark"] .sourceBreakdownBarTrack{
+
+    background:rgba(255,255,255,.08);
+
+}
+
+.sourceBreakdownBarFill{
+
+    height:100%;
+
+    border-radius:4px;
+
+    background:var(--signal);
+
+    transition:width .4s cubic-bezier(.16,1,.3,1);
+
+}
+
+.sourceBreakdownValue{
+
+    font-family:var(--font-mono);
+
+    font-size:12px;
+
+    font-weight:600;
+
+    color:var(--text);
+
+    white-space:nowrap;
+
+}
+
+.sourceBreakdownValue small{
+
+    color:var(--text-light);
+
+    font-weight:500;
+
+}
+
+
+/* ==========================================================
    Insight
 ========================================================== */
 
@@ -563,11 +760,11 @@
 
     border:1px solid var(--border);
 
-    border-radius:18px;
+    border-radius:var(--radius);
 
-    padding:28px;
+    padding:20px 22px;
 
-    margin-bottom:28px;
+    margin-bottom:20px;
 
 }
 
@@ -1228,8 +1425,16 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    background:var(--bg);
+    background:var(--ink);
     padding:20px;
+    opacity:1;
+    transition:opacity .3s ease;
+
+}
+
+.passcodeGateExit{
+
+    opacity:0;
 
 }
 
@@ -1242,30 +1447,34 @@ body.gate-active{
 .passcodeCard{
 
     width:100%;
-    max-width:360px;
-    padding:36px 32px;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:18px;
+    max-width:340px;
+    padding:34px 30px;
+    background:#181B26;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:12px;
     text-align:center;
-    box-shadow:0 20px 40px rgba(0,0,0,.08);
+    box-shadow:0 20px 48px rgba(0,0,0,.45);
 
 }
 
 .passcodeLogo h1{
 
-    font-size:26px;
-    font-weight:800;
-    color:var(--text);
+    font-family:var(--font-display);
+    font-size:24px;
+    font-weight:700;
+    color:#FFFFFF;
     margin:0;
-    letter-spacing:-.02em;
+    letter-spacing:.02em;
 
 }
 
 .passcodeLogo span{
 
-    color:var(--text-light);
-    font-size:13px;
+    color:var(--signal);
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.14em;
     display:block;
     margin-bottom:26px;
 
@@ -1275,7 +1484,7 @@ body.gate-active{
 
     display:block;
     font-size:13px;
-    color:var(--text-light);
+    color:#9DA2B3;
     margin-bottom:10px;
 
 }
@@ -1284,15 +1493,15 @@ body.gate-active{
 
     width:100%;
     padding:12px 14px;
-    border:1px solid var(--border);
-    border-radius:10px;
-    background:var(--bg);
-    color:var(--text);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:8px;
+    background:#0F1119;
+    color:#FFFFFF;
+    font-family:var(--font-mono);
     font-size:16px;
     text-align:center;
     letter-spacing:3px;
     margin-bottom:16px;
-    font-family:inherit;
     box-sizing:border-box;
 
 }
@@ -1300,7 +1509,7 @@ body.gate-active{
 #passcodeInput:focus{
 
     outline:none;
-    border-color:var(--primary);
+    border-color:var(--signal);
 
 }
 

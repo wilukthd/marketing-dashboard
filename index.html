@@ -24,7 +24,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -36,12 +36,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css?v=6">
-    <link rel="stylesheet" href="css/layout.css?v=6">
-    <link rel="stylesheet" href="css/cards.css?v=6">
-    <link rel="stylesheet" href="css/charts.css?v=6">
-    <link rel="stylesheet" href="css/tables.css?v=6">
-    <link rel="stylesheet" href="css/dark.css?v=6">
+    <link rel="stylesheet" href="css/main.css?v=7">
+    <link rel="stylesheet" href="css/layout.css?v=7">
+    <link rel="stylesheet" href="css/cards.css?v=7">
+    <link rel="stylesheet" href="css/charts.css?v=7">
+    <link rel="stylesheet" href="css/tables.css?v=7">
+    <link rel="stylesheet" href="css/dark.css?v=7">
 
 </head>
 
@@ -497,7 +497,7 @@ MAIN
 
                 <input type="checkbox" checked>
 
-                <span class="metricDot" style="background:#2563EB"></span>
+                <span class="metricDot" style="background:#2B59FF"></span>
 
                 <span data-i18n="kpi.totalUsers">Total Users</span>
 
@@ -507,7 +507,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#EA580C"></span>
+                <span class="metricDot" style="background:#0EA5A5"></span>
 
                 <span data-i18n="kpi.sessions">Sessions</span>
 
@@ -517,7 +517,7 @@ MAIN
 
                 <input type="checkbox" checked>
 
-                <span class="metricDot" style="background:#16A34A"></span>
+                <span class="metricDot" style="background:#0F9D63"></span>
 
                 <span data-i18n="kpi.purchases">Ecommerce Purchases</span>
 
@@ -527,7 +527,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#DB2777"></span>
+                <span class="metricDot" style="background:#D6336C"></span>
 
                 <span data-i18n="kpi.revenue">Total Revenue</span>
 
@@ -537,7 +537,7 @@ MAIN
 
                 <input type="checkbox">
 
-                <span class="metricDot" style="background:#7C3AED"></span>
+                <span class="metricDot" style="background:#7C4DFF"></span>
 
                 <span data-i18n="kpi.cvr">CVR</span>
 
@@ -900,6 +900,22 @@ MAIN
         </div>
 
         <p class="landingRisingPanelSpike" id="landingRisingPanelSpike"></p>
+
+        <div class="sourceBreakdownSection" id="sourceBreakdownSection">
+
+            <div class="sourceBreakdownHeader">
+
+                <h4 data-i18n="landing.sourceBreakdownTitle">Where the sessions came from</h4>
+
+                <span class="sourceBreakdownDate" id="sourceBreakdownDate"></span>
+
+            </div>
+
+            <p class="sourceBreakdownHint" id="sourceBreakdownHint" data-i18n="landing.sourceBreakdownHint">Click any bar above to see that day's source breakdown.</p>
+
+            <div class="sourceBreakdownList" id="sourceBreakdownList"></div>
+
+        </div>
 
     </div>
 

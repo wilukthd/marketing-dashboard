@@ -16,7 +16,7 @@
 
     let dailyRows = [];       // full daily GA4 rows (real or dummy), oldest -> newest
     let sourceRows = [];      // full per-day-per-source rows (real or dummy)
-    let landingRows = [];     // full per-day-per-path rows (real or dummy)
+    let landingRows = [];     // full per-day-per-path-per-source rows (real or dummy)
     let currentRange = "month";
     let currentCustomRange = null; // { start: Date, end: Date }, only used when currentRange === "custom"
 
@@ -108,9 +108,26 @@
             if (refreshed) {
                 risingPanelActiveInsight = refreshed;
                 THD.ui.renderLandingRisingPanel(refreshed, { generic: true });
-                THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", refreshed.dailySessions, refreshed.spikeDate);
+                THD.ui.resetSourceBreakdown();
+                THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", refreshed.dailySessions, refreshed.spikeDate,
+                    (date) => showBreakdownForDate(date, refreshed.pageTitle));
+                if (refreshed.spikeDate) showBreakdownForDate(refreshed.spikeDate, refreshed.pageTitle);
             }
         }
+    }
+
+    // Populates the source-breakdown panel for one specific day of the
+    // currently-open landing-page detail (see onRisingPageInsightClick /
+    // onLandingPageItemClick below) — shared by the initial auto-fill
+    // (spike day, if there is one) and every subsequent bar click.
+    // Groups the same way the Traffic Sources tab currently is
+    // (platform or channel), so a person who just came from grouping
+    // by channel there sees the same grouping here. Reads from
+    // landingRows directly — sourceMedium lives on that same feed.
+    function showBreakdownForDate(date, pageTitle) {
+        const groupBy = THD.ui.getTrafficGroupBy();
+        const result = THD.data.buildDayPageSourceBreakdown(landingRows, pageTitle, date, groupBy);
+        THD.ui.renderSourceBreakdown(result, window.I18N.formatDayLabel(date));
     }
 
     // Click-through for the Overview "rising landing page" insight:
@@ -125,9 +142,12 @@
         risingPanelActiveInsight = insight;
         risingPanelActiveGeneric = false;
         THD.ui.renderLandingRisingPanel(insight);
+        THD.ui.resetSourceBreakdown();
         THD.ui.switchToView("traffic", () => {
             THD.charts.resizeCharts();
-            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", insight.dailySessions, insight.spikeDate);
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", insight.dailySessions, insight.spikeDate,
+                (date) => showBreakdownForDate(date, insight.pageTitle));
+            if (insight.spikeDate) showBreakdownForDate(insight.spikeDate, insight.pageTitle);
             const panel = document.getElementById("landingRisingPanel");
             if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -146,8 +166,11 @@
         risingPanelActiveInsight = detail;
         risingPanelActiveGeneric = true;
         THD.ui.renderLandingRisingPanel(detail, { generic: true });
+        THD.ui.resetSourceBreakdown();
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", detail.dailySessions, detail.spikeDate);
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", detail.dailySessions, detail.spikeDate,
+                (date) => showBreakdownForDate(date, detail.pageTitle));
+            if (detail.spikeDate) showBreakdownForDate(detail.spikeDate, detail.pageTitle);
             const panel = document.getElementById("landingRisingPanel");
             if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
         }));
@@ -249,12 +272,26 @@
 
     function buildDummyLandingPagesDaily(days = 45) {
         const rows = [];
-        for (let i = 0; i < days; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - (days - 1 - i));
-            const dateStr = d.toISOString().slice(0, 10);
+        const spikeSource = "instagram / social";
 
-            LANDING_PAGE_POOL.forEach(({ landingPage, pageTitle }, idx) => {
+        LANDING_PAGE_POOL.forEach(({ landingPage, pageTitle }, idx) => {
+            const pageType = THD.data.classifyLandingPageType(landingPage, pageTitle);
+            const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
+
+            // A fixed subset of ~5 sources per page (not the full pool)
+            // keeps the breakdown readable, and stable across days so
+            // repeat visits to the same page show a consistent set of
+            // sources — like a real page would.
+            const sources = [spikeSource, ...SOURCE_POOL.filter((s) => s !== spikeSource)]
+                .filter((_, sIdx) => (sIdx + idx) % 4 !== 0)
+                .slice(0, 5);
+
+            for (let i = 0; i < days; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() - (days - 1 - i));
+                const dateStr = d.toISOString().slice(0, 10);
+                const daysFromEnd = days - 1 - i; // 0 = most recent day
+
                 // Rough relative popularity by pool position, so the
                 // top-N ranking looks realistic instead of flat noise.
                 // System pages (login/order-confirm/home) get an extra
@@ -262,9 +299,8 @@
                 // observation that these tend to dominate raw session
                 // counts — so the hide-system-pages toggle actually
                 // demonstrates something in demo mode.
-                const pageType = THD.data.classifyLandingPageType(landingPage, pageTitle);
                 const weight = (pageType === "system" ? 1.6 : 1) * (1 - idx * 0.08);
-                let sessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
+                let totalSessions = Math.max(5, Math.round((Math.random() * 40 + 20) * weight));
 
                 // Demo-only: give one content page a deliberate rise over
                 // the most recent 7 days, with a standout single day in
@@ -272,19 +308,46 @@
                 // Landing Page" insight (buildRisingLandingPageInsight)
                 // has something real to surface when the live GA4 feed
                 // isn't configured yet — random noise alone wouldn't
-                // reliably clear its 100%+ threshold.
-                const daysFromEnd = days - 1 - i; // 0 = most recent day
-                if (idx === 5 && daysFromEnd < 7) {
-                    sessions = Math.round(sessions * 2.6);
-                    if (daysFromEnd === 2) sessions = Math.round(sessions * 1.8);
+                // reliably clear its 100%+ threshold. On that standout
+                // day specifically, the extra sessions are concentrated
+                // into one source below so clicking that bar tells a
+                // coherent story ("an Instagram post drove this")
+                // instead of flat random noise.
+                const isSpikeWeek = idx === 5 && daysFromEnd < 7;
+                const isSpikeDay = idx === 5 && daysFromEnd === 2;
+                if (isSpikeWeek) {
+                    totalSessions = Math.round(totalSessions * 2.6);
+                    if (isSpikeDay) totalSessions = Math.round(totalSessions * 1.8);
                 }
 
-                const purchases = pageType === "system" ? 0 : (Math.random() < 0.5 ? Math.round(sessions * Math.random() * 0.05) : 0);
-                const revenue = purchases * (7000 + Math.random() * 6000);
-                const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
-                rows.push({ landingPage, pageTitle, device, pageType, date: dateStr, sessions, purchases, revenue });
-            });
-        }
+                const totalPurchases = pageType === "system" ? 0 : (Math.random() < 0.5 ? Math.round(totalSessions * Math.random() * 0.05) : 0);
+                const totalRevenue = totalPurchases * (7000 + Math.random() * 6000);
+
+                // Split this page/day's totals across its sources by
+                // random weight (renormalized to sum to totalSessions
+                // exactly, remainder on the last source) — purchases
+                // and revenue follow each source's session share.
+                const weights = sources.map((s) => (isSpikeDay && s === spikeSource ? 4 + Math.random() * 2 : Math.random() + 0.1));
+                const weightSum = weights.reduce((a, b) => a + b, 0);
+
+                let assignedSessions = 0;
+                sources.forEach((sourceMedium, sIdx) => {
+                    const isLast = sIdx === sources.length - 1;
+                    const sessions = isLast
+                        ? Math.max(0, totalSessions - assignedSessions)
+                        : Math.round(totalSessions * (weights[sIdx] / weightSum));
+                    assignedSessions += sessions;
+                    if (sessions <= 0) return;
+                    const share = sessions / totalSessions;
+                    rows.push({
+                        landingPage, pageTitle, device, pageType, date: dateStr, sourceMedium,
+                        sessions,
+                        purchases: Math.round(totalPurchases * share),
+                        revenue: Math.round(totalRevenue * share)
+                    });
+                });
+            }
+        });
         return rows;
     }
 
@@ -433,7 +496,9 @@
         if (risingPanelActiveInsight && !risingPanelActiveGeneric && risingPageInsight) {
             risingPanelActiveInsight = risingPageInsight;
             THD.ui.renderLandingRisingPanel(risingPageInsight);
-            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", risingPageInsight.dailySessions, risingPageInsight.spikeDate);
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", risingPageInsight.dailySessions, risingPageInsight.spikeDate,
+                (date) => showBreakdownForDate(date, risingPageInsight.pageTitle));
+            if (risingPageInsight.spikeDate) showBreakdownForDate(risingPageInsight.spikeDate, risingPageInsight.pageTitle);
         }
     }
 
@@ -446,6 +511,7 @@
         window.I18N.applyStatic();
         window.I18N.wireLanguageToggle(onLanguageChange);
 
+        THD.ui.showInitialSkeletons();
         THD.ui.renderLastUpdate();
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);

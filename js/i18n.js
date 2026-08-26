@@ -132,6 +132,10 @@ window.I18N = (function () {
             "landing.risingPanelSpike": "Biggest single-day jump: {date} — {value} sessions (typical day: ~{mean})",
             "landing.risingPanelClose": "Close",
 
+            "landing.sourceBreakdownTitle": "Where the sessions came from",
+            "landing.sourceBreakdownHint": "Click any bar above to see that day's source breakdown.",
+            "landing.sourceBreakdownEmpty": "No source breakdown available for this day.",
+
             "insights.title": "Key Insights",
             "insights.empty": "Not enough data yet to generate insights for this period.",
 
@@ -364,6 +368,10 @@ window.I18N = (function () {
             "landing.risingPanelWeekNew": "今週 {current} セッション（先週のデータなし）",
             "landing.risingPanelSpike": "最も急増した日：{date} — {value}セッション（通常は1日あたり約{mean}セッション）",
             "landing.risingPanelClose": "閉じる",
+
+            "landing.sourceBreakdownTitle": "セッションの流入元",
+            "landing.sourceBreakdownHint": "上のグラフのバーをクリックすると、その日の流入元内訳を表示します。",
+            "landing.sourceBreakdownEmpty": "この日の流入元データはありません。",
 
             "insights.title": "主なインサイト",
             "insights.empty": "この期間はインサイトを生成するのに十分なデータがありません。",

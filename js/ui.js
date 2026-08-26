@@ -100,6 +100,35 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Number Count-Up
+       Animates a KPI's displayed value from its previous number
+       to the new one instead of snapping straight to it. Skipped
+       under prefers-reduced-motion (matched once, at module
+       load — a user who changes the OS setting mid-session will
+       pick it up on next page load, same as the browser's own
+       reduced-motion-dependent UI generally behaves).
+    ========================================================== */
+
+    const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const kpiPreviousValues = {}; // kpi key -> last raw numeric value shown, so re-renders animate FROM there rather than from 0
+
+    function animateNumber(el, from, to, formatFn, duration) {
+        if (prefersReducedMotion || from === to || !window.requestAnimationFrame) {
+            el.textContent = formatFn(to);
+            return;
+        }
+        const start = performance.now();
+        const ease = (t) => 1 - Math.pow(1 - t, 3); // easeOutCubic
+        function tick(now) {
+            const progress = Math.min(1, (now - start) / duration);
+            const current = from + (to - from) * ease(progress);
+            el.textContent = formatFn(current);
+            if (progress < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    }
+
+    /* ==========================================================
        KPI Cards
        Each card is <article data-kpi="key"> with children
        marked data-field="value|delta|daily"
@@ -119,11 +148,27 @@ window.THD = window.THD || {};
             const format = KPI_FORMATS[key];
             if (!card || !format) return;
 
+            card.classList.remove("isSkeleton");
+
             const valueEl = card.querySelector('[data-field="value"]');
             const deltaEl = card.querySelector('[data-field="delta"]');
             const dailyEl = card.querySelector('[data-field="daily"]');
 
-            if (valueEl) valueEl.textContent = format.value(data.value);
+            if (valueEl) {
+                const isFirstRender = kpiPreviousValues[key] === undefined;
+                const from = isFirstRender ? 0 : kpiPreviousValues[key];
+                animateNumber(valueEl, from, data.value, format.value, 700);
+                kpiPreviousValues[key] = data.value;
+
+                if (!isFirstRender && !prefersReducedMotion) {
+                    card.classList.remove("kpiFlash");
+                    // Force reflow so the animation restarts even if
+                    // the class never left (two updates in quick
+                    // succession, e.g. rapid range changes).
+                    void card.offsetWidth;
+                    card.classList.add("kpiFlash");
+                }
+            }
 
             if (deltaEl) {
                 deltaEl.textContent = fmtDelta(data.delta);
@@ -133,6 +178,54 @@ window.THD = window.THD || {};
 
             if (dailyEl) dailyEl.textContent = format.daily(data.daily);
         });
+    }
+
+    /* ==========================================================
+       Skeleton Loading
+       Shown from init() (see app.js) the moment the page paints,
+       before the first live-data fetch resolves — cleared
+       automatically as each section's real render function
+       overwrites the same containers. Table skeletons infer
+       their column count from the table's own <thead>, so they
+       stay correct if a column is ever added or removed.
+    ========================================================== */
+
+    function showKpiSkeletons() {
+        document.querySelectorAll(".kpiCard").forEach((card) => card.classList.add("isSkeleton"));
+    }
+
+    function skeletonTableRows(cols, rows) {
+        const cell = `<td><span class="skeletonBlock" style="width:${60 + Math.random() * 30}%"></span></td>`;
+        const row = `<tr class="skeletonRow">${cell.repeat(cols)}</tr>`;
+        return row.repeat(rows);
+    }
+
+    function showTableSkeleton(tbodyId, rows) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        const table = tbody.closest("table");
+        const cols = table ? table.querySelectorAll("thead th").length : 4;
+        tbody.innerHTML = skeletonTableRows(cols, rows || 5);
+    }
+
+    function showListSkeleton(selector, rows) {
+        const container = typeof selector === "string" ? document.querySelector(selector) : selector;
+        if (!container) return;
+        const width = () => `${55 + Math.random() * 35}%`;
+        container.innerHTML = Array.from({ length: rows || 3 })
+            .map(() => `<li class="skeletonRow"><span class="skeletonBlock" style="width:${width()}"></span></li>`)
+            .join("");
+    }
+
+    // Called once, right at init — see THD.ui.showInitialSkeletons in app.js.
+    function showInitialSkeletons() {
+        showKpiSkeletons();
+        showTableSkeleton("sourceTable", 6);
+        showTableSkeleton("monthlyTable", 6);
+        showTableSkeleton("newRepeatTable", 6);
+        showTableSkeleton("trafficCompareTable", 5);
+        showListSkeleton(".insightCard ul", 3);
+        showListSkeleton("#newRepeatInsights", 2);
     }
 
     /* ==========================================================
@@ -321,6 +414,55 @@ window.THD = window.THD || {};
     function hideLandingRisingPanel() {
         const panel = document.getElementById("landingRisingPanel");
         if (panel) panel.style.display = "none";
+    }
+
+    /* ==========================================================
+       Source Breakdown (inside the landing-page detail panel)
+    ========================================================== */
+
+    // Called whenever the panel opens on a fresh page/insight, before
+    // any bar has been clicked yet — clears any breakdown left over
+    // from a previously-viewed page and shows the "click a bar" hint.
+    function resetSourceBreakdown() {
+        const listEl = document.getElementById("sourceBreakdownList");
+        const dateEl = document.getElementById("sourceBreakdownDate");
+        const hintEl = document.getElementById("sourceBreakdownHint");
+        if (listEl) listEl.innerHTML = "";
+        if (dateEl) dateEl.textContent = "";
+        if (hintEl) {
+            hintEl.textContent = window.I18N.t("landing.sourceBreakdownHint");
+            hintEl.style.display = "";
+        }
+    }
+
+    // result is THD.data.buildDayPageSourceBreakdown's return value —
+    // null when that exact day/page has no matching rows.
+    function renderSourceBreakdown(result, dateLabel) {
+        const listEl = document.getElementById("sourceBreakdownList");
+        const dateEl = document.getElementById("sourceBreakdownDate");
+        const hintEl = document.getElementById("sourceBreakdownHint");
+        if (!listEl) return;
+
+        if (dateEl) dateEl.textContent = dateLabel || "";
+
+        if (!result || !result.breakdown || !result.breakdown.length) {
+            listEl.innerHTML = "";
+            if (hintEl) {
+                hintEl.textContent = window.I18N.t("landing.sourceBreakdownEmpty");
+                hintEl.style.display = "";
+            }
+            return;
+        }
+
+        if (hintEl) hintEl.style.display = "none";
+
+        listEl.innerHTML = result.breakdown.map((row) => `
+            <div class="sourceBreakdownRow">
+                <span class="sourceBreakdownLabel" title="${row.label}">${row.label}</span>
+                <div class="sourceBreakdownBarTrack"><div class="sourceBreakdownBarFill" style="width:${Math.max(row.pct, 3)}%"></div></div>
+                <span class="sourceBreakdownValue">${Math.round(row.sessions).toLocaleString("en-US")} <small>(${Math.round(row.pct)}%)</small></span>
+            </div>
+        `).join("");
     }
 
     function wireLandingRisingPanelClose(onClose) {
@@ -598,7 +740,7 @@ window.THD = window.THD || {};
         const prev = row.previous;
         const curSessions = cur ? cur.sessions : 0;
         const prevSessions = prev ? prev.sessions : 0;
-        const color = (cur && cur.color) || (prev && prev.color) || "#94A3B8";
+        const color = (cur && cur.color) || (prev && prev.color) || "#9498A6";
         const isActive = !!activeLabel && activeLabel === row.label;
         const displayLabel = window.I18N.channelLabel(row.label);
 
@@ -1020,6 +1162,7 @@ window.THD = window.THD || {};
     THD.ui = {
         renderLastUpdate,
         renderKpis,
+        showInitialSkeletons,
         renderInsights,
         renderRangeCompare,
         renderDataSourceWarning,
@@ -1035,6 +1178,8 @@ window.THD = window.THD || {};
         wireLandingDeviceToggle,
         renderLandingRisingPanel,
         hideLandingRisingPanel,
+        resetSourceBreakdown,
+        renderSourceBreakdown,
         wireLandingRisingPanelClose,
         renderTrafficComparison,
         wireTrafficComparisonFilter,

@@ -29,11 +29,19 @@ window.THD = window.THD || {};
 
         // GA4 landing page breakdown — fixed 30-day rolling window
         // (the underlying GA4 export is capped there; ~60k rows even
-        // at 30 days, so no more history is kept). Columns: date,
-        // landingPage, pageTitle, landingPagePlusQueryString, sessions,
-        // ecommercePurchases, totalRevenue. See loadLandingPages() —
-        // grouping uses pageTitle (readable) rather than landingPage,
-        // since landingPage is a generic template shared by hundreds of
+        // at 30 days, so no more history is kept). Columns:
+        // sourceMedium, date, landingPage, pageTitle,
+        // landingPagePlusQueryString, sessions, ecommercePurchases,
+        // totalRevenue — sourceMedium was added on top of the original
+        // report so this single feed can also answer "where did this
+        // day's sessions come from" (see buildDayPageSourceBreakdown),
+        // meaning each date+page combination now spans several rows
+        // (one per source) rather than one summed row. Every function
+        // that reads landingRows already sums across matching rows
+        // rather than assuming one-row-per-day, so this needed no
+        // changes anywhere else. See loadLandingPages() — grouping
+        // uses pageTitle (readable) rather than landingPage, since
+        // landingPage is a generic template shared by hundreds of
         // different product pages (the actual product only shows up in
         // the query string / pageTitle).
         GA4_LANDING_PAGES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=1176432957&single=true&output=csv",
@@ -263,6 +271,7 @@ window.THD = window.THD || {};
                         pageTitle,
                         device: classifyDevice(landingPage),
                         pageType: classifyLandingPageType(landingPage, pageTitle),
+                        sourceMedium: r.sourceMedium || r.sessionSourceMedium || "(not set)",
                         sessions: Number(r.sessions) || 0,
                         // Column name confirmed from the sheet is truncated in
                         // the UI preview ("ecommercePurc…") — covering the
@@ -1242,6 +1251,46 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Day/Page Source Breakdown
+       Answers "where did THIS day's sessions for THIS page come
+       from" — powers clicking a bar in the landing-page detail
+       mini chart (buildLandingPageMiniChart's onClick, wired in
+       app.js). Reuses classifyForGroupBy so the breakdown groups
+       the exact same way as the Traffic Sources tab (platform or
+       channel, whichever the person currently has selected there),
+       rather than introducing a third, inconsistent grouping.
+
+       Reads from the same landingRows every other Landing Pages
+       function uses (sourceMedium is just another column on that
+       feed) — not a separate dataset. Returns null (not an empty
+       array) when there's no matching row for that exact day/page,
+       so the UI can show a distinct "no data" state instead of a
+       misleading empty list.
+    ========================================================== */
+
+    function buildDayPageSourceBreakdown(landingRows, pageTitle, date, groupBy) {
+        if (!landingRows || !landingRows.length || !pageTitle || !date) return null;
+
+        const dayRows = landingRows.filter((r) => r.date === date && r.pageTitle === pageTitle);
+        if (!dayRows.length) return null;
+
+        const totals = {};
+        let total = 0;
+        dayRows.forEach((r) => {
+            const label = classifyForGroupBy(r, groupBy);
+            totals[label] = (totals[label] || 0) + r.sessions;
+            total += r.sessions;
+        });
+        if (!total) return null;
+
+        const breakdown = Object.entries(totals)
+            .map(([label, sessions]) => ({ label, sessions, pct: (sessions / total) * 100 }))
+            .sort((a, b) => b.sessions - a.sessions);
+
+        return { date, pageTitle, total, breakdown };
+    }
+
+    /* ==========================================================
        Current vs previous period, merged into one row per
        channel/platform so the two can be shown side by side
        (and so a channel that only appears in one period still
@@ -1413,6 +1462,7 @@ window.THD = window.THD || {};
         loadSources,
         loadNewRepeat,
         loadLandingPages,
+        buildDayPageSourceBreakdown,
         classifySourceChannel,
         classifyPlatform,
         classifyForGroupBy,

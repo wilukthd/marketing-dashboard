@@ -55,8 +55,21 @@
 
     function removeGate() {
         const gate = document.getElementById("passcodeGate");
-        if (gate) gate.remove();
-        document.body.classList.remove("gate-active");
+        if (!gate) {
+            document.body.classList.remove("gate-active");
+            return;
+        }
+        gate.classList.add("passcodeGateExit");
+        const finish = () => {
+            gate.remove();
+            document.body.classList.remove("gate-active");
+        };
+        gate.addEventListener("transitionend", finish, { once: true });
+        // Fallback in case the transition never fires (e.g. the gate
+        // was already display:none, or reduced-motion collapsed the
+        // duration to ~0 and the event fires before this listener
+        // finishes attaching).
+        setTimeout(finish, 400);
     }
 
     function showError(messageKey) {

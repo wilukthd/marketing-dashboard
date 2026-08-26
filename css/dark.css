@@ -13,18 +13,19 @@
 
 [data-theme="dark"]{
 
-    --primary-light:#1E3A6E;
-    --success-light:#14331F;
-    --danger-light:#3F1D1D;
-    --warning-light:#3F2F0F;
+    --signal-light:#3A2013;
+    --primary-light:var(--signal-light);
+    --success-light:#12301F;
+    --danger-light:#3A1720;
+    --warning-light:#382A0D;
 
-    --bg:#0F172A;
-    --surface:#1E293B;
+    --bg:#15161C;
+    --surface:#1C1E27;
 
-    --border:#334155;
+    --border:#2B2E38;
 
-    --text:#F1F5F9;
-    --text-light:#94A3B8;
+    --text:#EDEEF2;
+    --text-light:#9498A6;
 
     --shadow-sm:0 1px 3px rgba(0,0,0,.35);
     --shadow-md:0 8px 24px rgba(0,0,0,.4);
@@ -52,19 +53,19 @@
 
 [data-theme="dark"] .modernTable thead{
 
-    background:#151F30;
+    background:#181A22;
 
 }
 
 [data-theme="dark"] .modernTable tbody tr:nth-child(even){
 
-    background:#19233A;
+    background:#191B23;
 
 }
 
 [data-theme="dark"] .modernTable tbody tr:hover{
 
-    background:#24365B;
+    background:#33241A;
 
 }
 
@@ -73,13 +74,14 @@
 [data-theme="dark"] .spreadsheetTable td:nth-child(6),
 [data-theme="dark"] .spreadsheetTable td:nth-child(8){
 
-    background:#182238;
+    background:#1A1C25;
 
 }
 
 [data-theme="dark"] .rangeCompareBar{
 
-    background:#1E3A6E;
+    background:var(--signal-light);
+    color:#FF9D75;
 
 }
 
@@ -98,5 +100,25 @@
 
     background:#2E1F4D;
     color:#C4B5FD;
+
+}
+
+[data-theme="dark"] .status.up,
+[data-theme="dark"] .deltaBadge.positive{
+
+    color:#4ADE94;
+
+}
+
+[data-theme="dark"] .status.down,
+[data-theme="dark"] .deltaBadge.negative{
+
+    color:#FF7A93;
+
+}
+
+[data-theme="dark"] .dataSourceWarning{
+
+    color:#F2B84B;
 
 }
