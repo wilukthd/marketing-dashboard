@@ -494,7 +494,13 @@ window.THD = window.THD || {};
         repeatCustomer: "#9498A6"
     };
 
-    function renderAovChart(rows) {
+    // visibleMetrics: array of "overall" | "new" | "repeat" — mirrors
+    // the main trend chart's visibleMetrics pattern (renderTrendChart
+    // above) so both charts behave the same way: an unchecked series
+    // isn't just hidden, its dataset is never built at all. Defaults
+    // to all three so any caller that hasn't been updated still gets
+    // the original behavior.
+    function renderAovChart(rows, visibleMetrics = ["overall", "new", "repeat"]) {
         const canvas = document.getElementById("aovChart");
         if (!canvas) return;
 
@@ -505,64 +511,66 @@ window.THD = window.THD || {};
             aovChartInstance = null;
         }
 
-        if (!rows || !rows.length) return;
+        if (!rows || !rows.length || !visibleMetrics || !visibleMetrics.length) return;
 
         const labels = rows.map((r) => r.period);
-        const overallAov = rows.map((r) => (r.totalOrders ? r.totalRevenue / r.totalOrders : 0));
-        const newAov = rows.map((r) => (r.newOrders ? r.newRevenue / r.newOrders : 0));
-        const repeatAov = rows.map((r) => (r.repeatOrders ? r.repeatRevenue / r.repeatOrders : 0));
         const fmtYenShort = (v) => "¥" + Math.round(v).toLocaleString("en-US");
+
+        const AOV_SERIES = {
+            overall: {
+                label: window.I18N.t("aov.legendOverall"),
+                data: rows.map((r) => (r.totalOrders ? r.totalRevenue / r.totalOrders : 0)),
+                color: AOV_COLORS.overall,
+                borderWidth: 2.5,
+                borderDash: undefined
+            },
+            new: {
+                label: window.I18N.t("aov.legendNew"),
+                data: rows.map((r) => (r.newOrders ? r.newRevenue / r.newOrders : 0)),
+                color: AOV_COLORS.newCustomer,
+                borderWidth: 2,
+                borderDash: [5, 4]
+            },
+            repeat: {
+                label: window.I18N.t("aov.legendRepeat"),
+                data: rows.map((r) => (r.repeatOrders ? r.repeatRevenue / r.repeatOrders : 0)),
+                color: AOV_COLORS.repeatCustomer,
+                borderWidth: 2,
+                borderDash: [5, 4]
+            }
+        };
+
+        const datasets = visibleMetrics
+            .filter((key) => AOV_SERIES[key])
+            .map((key) => {
+                const s = AOV_SERIES[key];
+                return {
+                    label: s.label,
+                    data: s.data,
+                    borderColor: s.color,
+                    backgroundColor: s.color,
+                    borderWidth: s.borderWidth,
+                    borderDash: s.borderDash,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.35
+                };
+            });
 
         aovChartInstance = new Chart(canvas.getContext("2d"), {
             type: "line",
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: window.I18N.t("aov.legendOverall"),
-                        data: overallAov,
-                        borderColor: AOV_COLORS.overall,
-                        backgroundColor: AOV_COLORS.overall,
-                        borderWidth: 2.5,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        tension: 0.35
-                    },
-                    {
-                        label: window.I18N.t("aov.legendNew"),
-                        data: newAov,
-                        borderColor: AOV_COLORS.newCustomer,
-                        backgroundColor: AOV_COLORS.newCustomer,
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        borderDash: [5, 4],
-                        tension: 0.35
-                    },
-                    {
-                        label: window.I18N.t("aov.legendRepeat"),
-                        data: repeatAov,
-                        borderColor: AOV_COLORS.repeatCustomer,
-                        backgroundColor: AOV_COLORS.repeatCustomer,
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        borderDash: [5, 4],
-                        tension: 0.35
-                    }
-                ]
-            },
+            data: { labels, datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: "index", intersect: false },
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: "top",
-                        align: "end",
-                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
-                    },
+                    // Replaced by the custom checkbox toggles above the
+                    // chart (#aovMetricToggles, same pattern as the main
+                    // trend chart's #metricToggles) — a plain legend
+                    // click-to-hide was there before, but wasn't as
+                    // discoverable as an explicit checkbox with a label.
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: "#181A22",
                         padding: 12,

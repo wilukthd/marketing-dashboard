@@ -82,7 +82,11 @@
 
     function renderNewRepeatChartForMetric() {
         THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric());
-        THD.charts.renderAovChart(newRepeatRows);
+        renderAovChartOnly();
+    }
+
+    function renderAovChartOnly() {
+        THD.charts.renderAovChart(newRepeatRows, THD.ui.getCheckedMetrics("aovMetricToggles"));
     }
 
     // Top Landing Pages ignores the global date-range picker (fixed
@@ -558,6 +562,7 @@
         THD.ui.wireSourceTableToggle();
         THD.ui.wireRefreshButton(loadAndRenderAll);
         THD.ui.wireMetricToggles(renderTrendOnly);
+        THD.ui.wireMetricToggles(renderAovChartOnly, "aovMetricToggles");
         THD.ui.wireTrendOverlayToggle(renderTrendOnly);
         THD.ui.wireSourceFilterToggle((channel) => {
             sourceFilterChannel = channel;

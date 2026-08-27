@@ -1126,21 +1126,26 @@ window.THD = window.THD || {};
 
     /* ==========================================================
        Trend Chart Metric Toggles
+       Generalized over a container id so the same checkbox-toggle
+       pattern (colored dot + label, click to show/hide a series)
+       works for both the main Overview trend chart (#metricToggles)
+       and the AOV trend chart (#aovMetricToggles) — defaults to the
+       original container so every existing call site is unaffected.
     ========================================================== */
 
-    function getCheckedMetrics() {
-        const container = document.getElementById("metricToggles");
+    function getCheckedMetrics(containerId = "metricToggles") {
+        const container = document.getElementById(containerId);
         if (!container) return [];
         return Array.from(container.querySelectorAll(".metricToggle"))
             .filter((label) => label.querySelector("input").checked)
             .map((label) => label.dataset.metric);
     }
 
-    function wireMetricToggles(onChange) {
-        const container = document.getElementById("metricToggles");
+    function wireMetricToggles(onChange, containerId = "metricToggles") {
+        const container = document.getElementById(containerId);
         if (!container) return;
         container.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-            cb.addEventListener("change", () => onChange(getCheckedMetrics()));
+            cb.addEventListener("change", () => onChange(getCheckedMetrics(containerId)));
         });
     }
 
