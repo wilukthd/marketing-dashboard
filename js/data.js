@@ -30,18 +30,24 @@ window.THD = window.THD || {};
         // GA4 landing page breakdown — fixed 30-day rolling window
         // (the underlying GA4 export is capped there; ~60k rows even
         // at 30 days, so no more history is kept). Columns:
-        // sourceMedium, date, landingPage, pageTitle,
+        // device, sourceMedium, date, landingPage, pageTitle,
         // landingPagePlusQueryString, sessions, ecommercePurchases,
-        // totalRevenue — sourceMedium was added on top of the original
-        // report so this single feed can also answer "where did this
-        // day's sessions come from" (see buildDayPageSourceBreakdown),
-        // meaning each date+page combination now spans several rows
-        // (one per source) rather than one summed row. Every function
-        // that reads landingRows already sums across matching rows
-        // rather than assuming one-row-per-day, so this needed no
-        // changes anywhere else. See loadLandingPages() — grouping
-        // uses pageTitle (readable) rather than landingPage, since
-        // landingPage is a generic template shared by hundreds of
+        // totalRevenue — sourceMedium and device were both added on top
+        // of the original report (device = GA4's own deviceCategory:
+        // desktop/mobile/tablet, mapped in loadLandingPages via
+        // mapDeviceCategory — replaced the old "/smartphone/" URL-path
+        // guess, which silently misclassified every landing page hosted
+        // off the main site's own domain, e.g. cross-domain-tracked
+        // checkout/payment pages, as PC regardless of actual device).
+        // sourceMedium lets this single feed also answer "where did
+        // this day's sessions come from" (see buildDayPageSourceBreakdown).
+        // Both additions mean each date+page combination now spans
+        // several rows (one per source) rather than one summed row.
+        // Every function that reads landingRows already sums across
+        // matching rows rather than assuming one-row-per-day, so this
+        // needed no changes anywhere else. See loadLandingPages() —
+        // grouping uses pageTitle (readable) rather than landingPage,
+        // since landingPage is a generic template shared by hundreds of
         // different product pages (the actual product only shows up in
         // the query string / pageTitle).
         GA4_LANDING_PAGES_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFOBVOeXWRrqSmnIFlU_wmlMlN3bw9mHJsJF-8OhA9I5PVVRKwam6k1hYkUBWCqr9AroVCvCSHTrsy/pub?gid=1176432957&single=true&output=csv",
@@ -216,11 +222,32 @@ window.THD = window.THD || {};
     }
 
     // This site's mobile pages all live under a "/smartphone/" path
-    // prefix and PC pages don't — so device can be read straight off
-    // landingPage without GA4 needing a separate device dimension.
-    function classifyDevice(landingPage) {
+    // prefix and PC pages don't — so before GA4's own deviceCategory
+    // was added to the sheet, this URL heuristic was the only signal
+    // available. It breaks down for any landing page hosted off the
+    // main site's own domain (a cross-domain-tracked checkout/payment
+    // page, a docomo carrier-billing page, an iframe sandbox, etc.) —
+    // those never follow the "/smartphone/" convention regardless of
+    // the visitor's actual device, so they always fell into "PC" and
+    // quietly skewed every device-mix number toward PC. Kept now only
+    // as a fallback for rows where the real device column (added
+    // below in loadLandingPages) is missing or blank.
+    function classifyDeviceFromUrl(landingPage) {
         if (!landingPage) return "Unknown";
         return landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
+    }
+
+    // Maps GA4's own deviceCategory values (desktop/mobile/tablet) onto
+    // this app's existing PC/Smartphone labels, adding Tablet as its
+    // own bucket rather than folding it into either — silently
+    // guessing which one a tablet visitor "really" is would just trade
+    // one inaccuracy for another.
+    function mapDeviceCategory(raw) {
+        const key = (raw || "").trim().toLowerCase();
+        if (key === "desktop") return "PC";
+        if (key === "mobile") return "Smartphone";
+        if (key === "tablet") return "Tablet";
+        return null;
     }
 
     // Distinguishes actual content (products, blog posts) from the
@@ -269,7 +296,15 @@ window.THD = window.THD || {};
                         date: parseGA4Date(r.date),
                         landingPage,
                         pageTitle,
-                        device: classifyDevice(landingPage),
+                        // Prefer GA4's own deviceCategory (added as a real
+                        // column on this report) over the URL-prefix guess —
+                        // it's ground truth and works for every landing
+                        // page regardless of which domain it's hosted on.
+                        // Falls back to the URL heuristic only when the
+                        // column is missing or has an unrecognized value,
+                        // so this keeps working during any transition and
+                        // against older cached data.
+                        device: mapDeviceCategory(r.device) || classifyDeviceFromUrl(landingPage),
                         pageType: classifyLandingPageType(landingPage, pageTitle),
                         sourceMedium: r.sourceMedium || r.sessionSourceMedium || "(not set)",
                         sessions: Number(r.sessions) || 0,
@@ -825,6 +860,88 @@ window.THD = window.THD || {};
                     mean: a.meanText
                 });
             });
+    }
+
+    /* ==========================================================
+       Traffic Sources Anomaly Detection
+       Same z-score method as the KPI-level detector just above
+       (detectAnomalies), but run once per channel/platform's OWN
+       daily sessions series rather than the property-wide total —
+       flags a channel that swung unusually for ITSELF, which the
+       KPI-level detector can miss entirely (a channel going from
+       40 to 90 sessions barely moves the property-wide total, but
+       is exactly the swing worth investigating on its own terms —
+       this is the "where did that day's anomaly come from at the
+       channel level" counterpart to the landing-page spike/source
+       drill-down).
+
+       channels should be trafficCurrent.channels (deriveTrafficBreakdown's
+       output) — just used here as the current period's set of
+       labels to check; each label's own daily series is rebuilt
+       via buildChannelTrend so the detector always looks at the
+       exact same grouping (platform/channel) currently on screen.
+    ========================================================== */
+
+    function buildChannelAnomalyInsights(sourceRows, channels, groupBy, range) {
+        if (!channels || !channels.length || !range) return [];
+
+        const anomalies = [];
+        channels.forEach((c) => {
+            const trend = buildChannelTrend(sourceRows, c.label, groupBy, range);
+            const trimmed = excludeToday(trend.labels, { sessions: trend.series.sessions.current });
+            const values = trimmed.series.sessions;
+            const n = values.length;
+            if (n < ANOMALY_MIN_DAYS) return;
+
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            if (!stdDev) return;
+
+            // Always locate this channel's single most extreme day (same
+            // "report the most extreme day" approach as
+            // buildLandingPageDailySeries) — only kept below if it clears
+            // ANOMALY_Z_THRESHOLD, same bar the KPI-level detector uses.
+            let bestZ = null;
+            let bestIdx = null;
+            values.forEach((v, i) => {
+                const z = (v - mean) / stdDev;
+                if (bestZ === null || Math.abs(z) > Math.abs(bestZ)) {
+                    bestZ = z;
+                    bestIdx = i;
+                }
+            });
+            if (bestIdx === null || Math.abs(bestZ) < ANOMALY_Z_THRESHOLD) return;
+
+            anomalies.push({
+                channel: c.label,
+                date: trimmed.labels[bestIdx],
+                value: values[bestIdx],
+                mean,
+                z: bestZ,
+                direction: bestZ > 0 ? "spike" : "drop"
+            });
+        });
+
+        anomalies.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+
+        // Same "anomaly.sentence" template the KPI-level insights use
+        // (just {metric} standing in for the channel name here) — one
+        // consistent sentence shape for "something unusual happened"
+        // everywhere in the app, rather than a second phrasing to
+        // maintain in both languages.
+        return anomalies.slice(0, 2).map((a) => {
+            const verb = window.I18N.t(a.direction === "spike" ? "anomaly.spike" : "anomaly.drop");
+            const figure = highlight(Math.round(a.value).toLocaleString("en-US"), a.direction === "spike" ? "pos" : "neg");
+            const sentence = window.I18N.t("anomaly.sentence", {
+                metric: `<strong>${window.I18N.channelLabel(a.channel)}</strong>`,
+                verb,
+                date: a.date,
+                figure,
+                mean: Math.round(a.mean).toLocaleString("en-US")
+            });
+            return { ...a, sentence };
+        });
     }
 
     /* ==========================================================
@@ -1503,6 +1620,7 @@ window.THD = window.THD || {};
         buildNewRepeatInsights,
         detectAnomalies,
         buildAnomalyInsights,
+        buildChannelAnomalyInsights,
         resolveRange,
         filterDailyRange,
         filterSourcesByDates,

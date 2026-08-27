@@ -136,6 +136,26 @@
         THD.ui.renderSourceBreakdown(result, window.I18N.formatDayLabel(date));
     }
 
+    // Click-through for a Traffic Sources anomaly insight (see
+    // buildChannelAnomalyInsights): jumps to the Traffic tab and
+    // applies that channel as the active drill-down filter, exactly
+    // as if the person had clicked its row in the Traffic Comparison
+    // table themselves — same channel-trend chart, same Session
+    // Source table scoping, so the anomaly leads straight into the
+    // existing investigation tools instead of a separate view.
+    function onChannelAnomalyInsightClick(anomaly) {
+        if (!anomaly || !anomaly.channel) return;
+        THD.ui.switchToView("traffic", () => {
+            THD.charts.resizeCharts();
+            activeSourceFilter = anomaly.channel;
+            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
+            renderFilteredSourceTable();
+            renderChannelTrendOrDoughnuts();
+            const wrap = document.getElementById("trafficChannelTrendWrap");
+            if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }
+
     // Click-through for the Overview "rising landing page" insight:
     // jumps to the Landing Pages tab and reveals its highlight panel
     // with a mini daily-sessions chart for that one page, the standout
@@ -282,7 +302,16 @@
 
         LANDING_PAGE_POOL.forEach(({ landingPage, pageTitle }, idx) => {
             const pageType = THD.data.classifyLandingPageType(landingPage, pageTitle);
-            const device = landingPage.startsWith("/smartphone/") ? "Smartphone" : "PC";
+            // Demo data has no real per-domain device signal to model, so
+            // this stays a simple URL-based guess (unlike the real
+            // loadLandingPages, which now reads GA4's actual device
+            // column) — a small deliberate Tablet slice is mixed in
+            // purely so the Tablet filter option has something to show
+            // in demo mode.
+            const deviceRoll = Math.random();
+            const device = landingPage.startsWith("/smartphone/")
+                ? "Smartphone"
+                : (deviceRoll < 0.06 ? "Tablet" : "PC");
 
             // A fixed subset of ~5 sources per page (not the full pool)
             // keeps the breakdown readable, and stable across days so
@@ -420,10 +449,17 @@
         THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
         renderChannelTrendOrDoughnuts();
 
+        const channelAnomalies = THD.data.buildChannelAnomalyInsights(effectiveSourceRows, trafficCurrent.channels, groupBy, range);
+
         THD.ui.renderInsights([
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
             ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
-        ], risingPageInsight, onRisingPageInsightClick);
+        ], {
+            riseInsight: risingPageInsight,
+            onRiseClick: onRisingPageInsightClick,
+            channelAnomalies,
+            onChannelAnomalyClick: onChannelAnomalyInsightClick
+        });
 
         // Monthly Business Performance recomputed here too (rather
         // than only once at load) so it stays in sync with the

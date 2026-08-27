@@ -567,11 +567,26 @@ window.THD = window.THD || {};
     // is appended as its own clickable <li>, styled distinctly so it
     // reads as "click for detail" rather than a plain fact like the
     // others in this list.
-    function renderInsights(insights, riseInsight, onRiseClick) {
+    // opts: { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick }
+    // riseInsight is the single Overview "rising landing page" callout
+    // (see buildRisingLandingPageInsight); channelAnomalies is zero or
+    // more Traffic Sources anomalies (see buildChannelAnomalyInsights)
+    // — both render as clickable list items, distinguished from plain
+    // insight text by the .insightClickable class, but wired up
+    // separately since they jump to different places (Landing Pages
+    // detail panel vs. the Traffic Sources channel-trend view).
+    function renderInsights(insights, opts) {
+        opts = opts || {};
+        const { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick } = opts;
         const container = document.querySelector(".insightCard ul");
         if (!container) return;
 
         const items = (insights || []).map((text) => `<li>${text}</li>`);
+
+        (channelAnomalies || []).forEach((a, i) => {
+            items.push(`<li class="insightClickable" data-anomaly-idx="${i}">${a.sentence}</li>`);
+        });
+
         if (riseInsight) {
             items.push(`<li class="insightClickable" id="risingPageInsightItem">${riseInsight.sentence}</li>`);
         }
@@ -582,6 +597,13 @@ window.THD = window.THD || {};
         }
 
         container.innerHTML = items.join("");
+
+        if (channelAnomalies && channelAnomalies.length && onChannelAnomalyClick) {
+            container.querySelectorAll("[data-anomaly-idx]").forEach((el) => {
+                const idx = Number(el.dataset.anomalyIdx);
+                el.addEventListener("click", () => onChannelAnomalyClick(channelAnomalies[idx]));
+            });
+        }
 
         if (riseInsight && onRiseClick) {
             const el = document.getElementById("risingPageInsightItem");
