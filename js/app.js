@@ -270,6 +270,7 @@
 
     function buildDummyNewRepeat() {
         return [
+            { period: "Jul 2025", totalRevenue: 38120400, totalOrders: 3612, newRevenue: 4100800, newOrders: 401, repeatRevenue: 34019600, repeatOrders: 3211, visitorsPc: 8650, visitorsSp: 47800, visitorsTotal: 56450 },
             { period: "Aug 2025", totalRevenue: 40310062, totalOrders: 3754, newRevenue: 4389200, newOrders: 423, repeatRevenue: 35920862, repeatOrders: 3331, visitorsPc: 8931, visitorsSp: 49719, visitorsTotal: 58650 },
             { period: "Sep 2025", totalRevenue: 35777697, totalOrders: 3538, newRevenue: 3429971, newOrders: 385, repeatRevenue: 32347726, repeatOrders: 3153, visitorsPc: 9843, visitorsSp: 51407, visitorsTotal: 61250 },
             { period: "Oct 2025", totalRevenue: 34192356, totalOrders: 3423, newRevenue: 3066125, newOrders: 322, repeatRevenue: 31126231, repeatOrders: 3101, visitorsPc: 8622, visitorsSp: 44182, visitorsTotal: 52804 },
@@ -390,7 +391,18 @@
         return rows;
     }
 
+    // Emergency fallback for Monthly Business Performance specifically
+    // (used only if buildBusinessMonths itself returns nothing — e.g.
+    // dailyRows failed to load at all) — 13 months, matching the same
+    // "13, not 12" window used everywhere else in this section.
     const DUMMY_MONTHLY = [
+        { month: "Jul 2025", revenue: 28450300, orders: 2980, users: 34200, cvr: 5.35, trend: 2.1 },
+        { month: "Aug 2025", revenue: 30120800, orders: 3050, users: 34980, cvr: 5.41, trend: 5.9 },
+        { month: "Sep 2025", revenue: 27880400, orders: 2870, users: 33650, cvr: 5.30, trend: -7.4 },
+        { month: "Oct 2025", revenue: 29340600, orders: 2990, users: 34500, cvr: 5.38, trend: 5.2 },
+        { month: "Nov 2025", revenue: 33210900, orders: 3320, users: 36700, cvr: 5.60, trend: 13.2 },
+        { month: "Dec 2025", revenue: 42780500, orders: 4150, users: 41200, cvr: 6.10, trend: 28.8 },
+        { month: "Jan 2026", revenue: 30050100, orders: 3040, users: 35400, cvr: 5.42, trend: -29.7 },
         { month: "Feb 2026", revenue: 31250400, orders: 3210, users: 36800, cvr: 5.62, trend: 4.1 },
         { month: "Mar 2026", revenue: 29870200, orders: 3050, users: 35120, cvr: 5.48, trend: -3.2 },
         { month: "Apr 2026", revenue: 33410900, orders: 3390, users: 38650, cvr: 5.77, trend: 6.5 },
@@ -469,7 +481,14 @@
         // than only once at load) so it stays in sync with the
         // source filter and with language changes, both of which
         // call renderForRange.
-        const businessMonths = THD.data.buildBusinessMonths(effectiveDailyRows, 12);
+        //
+        // 13 months, not 12: the most recent month is always still in
+        // progress, so a plain trailing-12 window is really "11
+        // complete months + 1 partial one" — one extra month at the
+        // far end keeps a full 12 complete months on screen alongside
+        // the partial current one, rather than quietly losing a
+        // month's worth of the "whole year" picture every time.
+        const businessMonths = THD.data.buildBusinessMonths(effectiveDailyRows, 13);
         THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
     }
 
@@ -659,7 +678,12 @@
         // insights below run on the FULL history instead, since the
         // year-over-year comparison needs to look back further than
         // what's shown on screen.
-        const recentNewRepeat = newRepeat.slice(-12);
+        //
+        // 13 months, not 12, for the same reason as businessMonths in
+        // renderForRange above: the most recent month is still in
+        // progress, so this keeps a full 12 complete months on screen
+        // alongside it instead of displacing one of them.
+        const recentNewRepeat = newRepeat.slice(-13);
         THD.ui.renderNewRepeatTable(recentNewRepeat);
         newRepeatRows = recentNewRepeat;
         fullNewRepeatRows = newRepeat;
