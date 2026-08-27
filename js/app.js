@@ -81,7 +81,9 @@
     }
 
     function renderNewRepeatChartForMetric() {
-        THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric());
+        const view = THD.ui.getNewRepeatView();
+        THD.ui.syncNewRepeatSubtitle(view);
+        THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric(), view);
         renderAovChartOnly();
     }
 
@@ -612,6 +614,7 @@
             renderChannelTrendOrDoughnuts();
         });
         THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
+        THD.ui.wireNewRepeatViewToggle(renderNewRepeatChartForMetric);
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
         THD.ui.wireLandingPagesToggle();

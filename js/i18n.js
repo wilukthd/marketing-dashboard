@@ -171,6 +171,9 @@ window.I18N = (function () {
 
             "newRepeat.chartTitle": "New vs Repeat Customers",
             "newRepeat.chartSubtitle": "WEB Store New / Repeat — by business month",
+            "newRepeat.chartSubtitleSimple": "Share of new vs. repeat customers, by business month",
+            "newRepeat.viewDetailed": "Detailed",
+            "newRepeat.viewSimple": "Simple",
             "newRepeat.orders": "Orders",
             "newRepeat.revenue": "Revenue",
             "newRepeat.legendNew": "New",
@@ -416,6 +419,9 @@ window.I18N = (function () {
 
             "newRepeat.chartTitle": "新規・リピーター推移",
             "newRepeat.chartSubtitle": "WEB本店 新規／リピータ — 会計月ベース",
+            "newRepeat.chartSubtitleSimple": "新規顧客とリピーターの比率（会計月ベース）",
+            "newRepeat.viewDetailed": "詳細",
+            "newRepeat.viewSimple": "シンプル",
             "newRepeat.orders": "受注件数",
             "newRepeat.revenue": "売上",
             "newRepeat.legendNew": "新規",

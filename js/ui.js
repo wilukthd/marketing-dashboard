@@ -1085,6 +1085,47 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       New / Repeat Chart View Toggle (Detailed vs Simple)
+       "Simple" swaps the dual-axis stacked-bar-plus-% -line combo
+       chart for a single-axis 100%-stacked bar showing just the
+       New/Repeat split with the percentage printed right on each
+       segment — aimed at someone who's never looked at this data
+       before and would otherwise have to work out which of two
+       different scales the line belongs to.
+    ========================================================== */
+
+    function getNewRepeatView() {
+        const container = document.getElementById("newRepeatViewToggle");
+        if (!container) return "detailed";
+        const active = container.querySelector(".viewToggleBtn.active");
+        return active ? active.dataset.view : "detailed";
+    }
+
+    // Kept in sync with the active view on every call (not just the
+    // click handler below) so a language change — which re-applies
+    // every [data-i18n] element's default text, wiping any manual
+    // override — never leaves the subtitle out of sync with whichever
+    // view is actually showing.
+    function syncNewRepeatSubtitle(view) {
+        const subtitleEl = document.getElementById("newRepeatChartSubtitle");
+        if (!subtitleEl) return;
+        subtitleEl.textContent = window.I18N.t(view === "simple" ? "newRepeat.chartSubtitleSimple" : "newRepeat.chartSubtitle");
+    }
+
+    function wireNewRepeatViewToggle(onChange) {
+        const container = document.getElementById("newRepeatViewToggle");
+        if (!container) return;
+        container.querySelectorAll(".viewToggleBtn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (btn.classList.contains("active")) return;
+                container.querySelectorAll(".viewToggleBtn").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                onChange(btn.dataset.view);
+            });
+        });
+    }
+
+    /* ==========================================================
        New / Repeat Insights
     ========================================================== */
 
@@ -1303,6 +1344,9 @@ window.THD = window.THD || {};
         renderNewRepeatInsights,
         getNewRepeatMetric,
         wireNewRepeatMetricToggle,
+        getNewRepeatView,
+        wireNewRepeatViewToggle,
+        syncNewRepeatSubtitle,
         getCheckedMetrics,
         wireMetricToggles,
         getTrendOverlayState,

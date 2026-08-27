@@ -365,12 +365,9 @@ window.THD = window.THD || {};
             : Math.round(v).toLocaleString("en-US");
     }
 
-    function renderNewRepeatChart(rows, metric) {
+    function renderNewRepeatChart(rows, metric, view = "detailed") {
         const canvas = document.getElementById("newRepeatChart");
         if (!canvas) return;
-
-        const colors = getChartColors();
-        const isRevenue = metric === "revenue";
 
         if (newRepeatChartInstance) {
             newRepeatChartInstance.destroy();
@@ -378,6 +375,14 @@ window.THD = window.THD || {};
         }
 
         if (!rows || !rows.length) return;
+
+        if (view === "simple") {
+            renderNewRepeatSimpleChart(canvas, rows, metric);
+            return;
+        }
+
+        const colors = getChartColors();
+        const isRevenue = metric === "revenue";
 
         const labels = rows.map((r) => r.period);
         const newValues = rows.map((r) => (isRevenue ? r.newRevenue : r.newOrders));
@@ -473,6 +478,116 @@ window.THD = window.THD || {};
                     }
                 }
             }
+        });
+    }
+
+    // "Simple" view: the same New/Repeat split as the detailed combo
+    // chart above, but as a single-axis 100%-stacked bar with the
+    // percentage printed directly on each segment — no secondary
+    // axis to reconcile, no line-vs-bar scale to puzzle out. Built
+    // for someone seeing this data for the first time; the detailed
+    // view (with the New Customer Share trend line and absolute
+    // values) stays one click away via the view toggle for anyone
+    // who wants that.
+    function renderNewRepeatSimpleChart(canvas, rows, metric) {
+        const colors = getChartColors();
+        const isRevenue = metric === "revenue";
+
+        const labels = rows.map((r) => r.period);
+        const newShare = rows.map((r) => {
+            const newV = isRevenue ? r.newRevenue : r.newOrders;
+            const repeatV = isRevenue ? r.repeatRevenue : r.repeatOrders;
+            const total = newV + repeatV;
+            return total ? (newV / total) * 100 : 0;
+        });
+        const repeatShare = newShare.map((v) => 100 - v);
+
+        // Prints each segment's own percentage centered inside it —
+        // skips segments under ~8% since the text wouldn't fit
+        // legibly, rather than clipping or overlapping it.
+        const segmentLabelPlugin = {
+            id: "newRepeatSegmentLabels",
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (meta.hidden) return;
+                    meta.data.forEach((bar, index) => {
+                        const value = dataset.data[index];
+                        if (value == null || value < 8) return;
+                        const midY = (bar.y + bar.base) / 2;
+                        ctx.save();
+                        ctx.fillStyle = "#FFFFFF";
+                        ctx.font = "700 11px 'IBM Plex Mono', monospace";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(`${Math.round(value)}%`, bar.x, midY);
+                        ctx.restore();
+                    });
+                });
+            }
+        };
+
+        newRepeatChartInstance = new Chart(canvas.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: window.I18N.t("newRepeat.legendNew"),
+                        data: newShare,
+                        backgroundColor: NEW_REPEAT_COLORS.newBar,
+                        stack: "total",
+                        borderRadius: 4,
+                        maxBarThickness: 48
+                    },
+                    {
+                        label: window.I18N.t("newRepeat.legendRepeat"),
+                        data: repeatShare,
+                        backgroundColor: NEW_REPEAT_COLORS.repeatBar,
+                        stack: "total",
+                        borderRadius: 4,
+                        maxBarThickness: 48
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
+                    },
+                    tooltip: {
+                        backgroundColor: "#181A22",
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        ticks: { color: colors.textLight }
+                    },
+                    y: {
+                        stacked: true,
+                        min: 0,
+                        max: 100,
+                        grid: { color: colors.grid },
+                        border: { display: false },
+                        ticks: { callback: (v) => v + "%", color: colors.textLight }
+                    }
+                }
+            },
+            plugins: [segmentLabelPlugin]
         });
     }
 
