@@ -81,69 +81,6 @@
 }
 
 
-/* ==========================================================
-   Segmented View Toggle
-   Two-way switch between a chart's detailed and simplified
-   forms (see New vs Repeat Customers) — pill-shaped so it
-   doesn't compete visually with the dropdown selects it sits
-   next to in .chartTools.
-========================================================== */
-
-.viewToggle{
-
-    display:flex;
-
-    background:var(--bg);
-
-    border:1px solid var(--border);
-
-    border-radius:8px;
-
-    padding:2px;
-
-    gap:2px;
-
-}
-
-.viewToggleBtn{
-
-    border:none;
-
-    background:transparent;
-
-    color:var(--text-light);
-
-    font-family:var(--font-display);
-
-    font-size:12.5px;
-
-    font-weight:600;
-
-    padding:7px 12px;
-
-    border-radius:6px;
-
-    cursor:pointer;
-
-    transition:.15s;
-
-}
-
-.viewToggleBtn:hover{
-
-    color:var(--text);
-
-}
-
-.viewToggleBtn.active{
-
-    background:var(--surface);
-
-    color:var(--text);
-
-    box-shadow:var(--shadow-sm);
-
-}
 
 /* ==========================================================
    Chart Area

@@ -80,10 +80,8 @@
         THD.ui.renderSourceFilterStatus(activeSourceFilter);
     }
 
-    function renderNewRepeatChartForMetric() {
-        const view = THD.ui.getNewRepeatView();
-        THD.ui.syncNewRepeatSubtitle(view);
-        THD.charts.renderNewRepeatChart(newRepeatRows, THD.ui.getNewRepeatMetric(), view);
+    function renderNewRepeatChartOnly() {
+        THD.charts.renderNewRepeatChart(newRepeatRows);
         renderAovChartOnly();
     }
 
@@ -547,7 +545,7 @@
         risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();
-        renderNewRepeatChartForMetric();
+        renderNewRepeatChartOnly();
         THD.ui.renderNewRepeatTable(newRepeatRows);
         THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(fullNewRepeatRows));
         renderNewRepeatSourceNote();
@@ -613,8 +611,6 @@
             renderFilteredSourceTable();
             renderChannelTrendOrDoughnuts();
         });
-        THD.ui.wireNewRepeatMetricToggle(renderNewRepeatChartForMetric);
-        THD.ui.wireNewRepeatViewToggle(renderNewRepeatChartForMetric);
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
         THD.ui.wireLandingPagesToggle();
@@ -631,7 +627,7 @@
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
         THD.ui.wireThemeToggle(() => {
             renderForRange(currentRange, currentCustomRange);
-            renderNewRepeatChartForMetric();
+            renderNewRepeatChartOnly();
         });
         THD.ui.wireNotes();
         wireDateRange();
@@ -690,7 +686,7 @@
         THD.ui.renderNewRepeatTable(recentNewRepeat);
         newRepeatRows = recentNewRepeat;
         fullNewRepeatRows = newRepeat;
-        renderNewRepeatChartForMetric();
+        renderNewRepeatChartOnly();
         THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(newRepeat));
         renderNewRepeatSourceNote();
 

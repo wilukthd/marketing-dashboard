@@ -170,15 +170,11 @@ window.I18N = (function () {
             "th.trend": "Trend",
 
             "newRepeat.chartTitle": "New vs Repeat Customers",
-            "newRepeat.chartSubtitle": "WEB Store New / Repeat — by business month",
-            "newRepeat.chartSubtitleSimple": "Share of new vs. repeat customers, by business month",
-            "newRepeat.viewDetailed": "Detailed",
-            "newRepeat.viewSimple": "Simple",
+            "newRepeat.chartSubtitle": "Share of orders and revenue from new vs. repeat customers, by business month",
             "newRepeat.orders": "Orders",
             "newRepeat.revenue": "Revenue",
             "newRepeat.legendNew": "New",
             "newRepeat.legendRepeat": "Repeat",
-            "newRepeat.legendShare": "New Customer Share",
 
             "aov.title": "Average Order Value Trend",
             "aov.subtitle": "Overall vs. new vs. repeat customers, by business month",
@@ -418,15 +414,11 @@ window.I18N = (function () {
             "th.trend": "前月比",
 
             "newRepeat.chartTitle": "新規・リピーター推移",
-            "newRepeat.chartSubtitle": "WEB本店 新規／リピータ — 会計月ベース",
-            "newRepeat.chartSubtitleSimple": "新規顧客とリピーターの比率（会計月ベース）",
-            "newRepeat.viewDetailed": "詳細",
-            "newRepeat.viewSimple": "シンプル",
+            "newRepeat.chartSubtitle": "新規顧客とリピーターの受注・売上比率（会計月ベース）",
             "newRepeat.orders": "受注件数",
             "newRepeat.revenue": "売上",
             "newRepeat.legendNew": "新規",
             "newRepeat.legendRepeat": "リピーター",
-            "newRepeat.legendShare": "新規顧客比率",
 
             "aov.title": "客単価（AOV）推移",
             "aov.subtitle": "全体・新規顧客・リピーター顧客別、会計月ベース",
