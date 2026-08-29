@@ -1244,6 +1244,124 @@ window.THD = window.THD || {};
         activateView(target, onSwitch);
     }
 
+    /* ==========================================================
+       Goals / Monthly Targets
+       Settings-page form (values persisted via THD.goals, shared
+       across the team through Firestore) and the read-only
+       progress bars each KPI card shows underneath its existing
+       stats. Progress always compares "This Month" actuals
+       against the saved target, independent of whatever date
+       range is selected in the main filter — app.js is
+       responsible for computing that fixed-window actual figure
+       and passing it in here.
+    ========================================================== */
+
+    const GOAL_METRICS = ["users", "sessions", "purchases", "revenue", "cvr"];
+    const GOAL_FORMATS = {
+        users: fmtNumber,
+        sessions: fmtNumber,
+        purchases: fmtNumber,
+        revenue: fmtYen,
+        cvr: fmtPercent
+    };
+
+    function renderGoalsForm(targets) {
+        targets = targets || {};
+        GOAL_METRICS.forEach((metric) => {
+            const input = document.getElementById(`goalInput-${metric}`);
+            if (!input) return;
+            const val = targets[metric];
+            input.value = (val === null || val === undefined) ? "" : val;
+        });
+    }
+
+    function readGoalsForm() {
+        const targets = {};
+        GOAL_METRICS.forEach((metric) => {
+            const input = document.getElementById(`goalInput-${metric}`);
+            const raw = input ? input.value.trim() : "";
+            targets[metric] = raw === "" ? null : Number(raw);
+        });
+        return targets;
+    }
+
+    function wireGoalsForm(onSave) {
+        const btn = document.getElementById("saveGoalsBtn");
+        if (!btn) return;
+        btn.addEventListener("click", () => onSave(readGoalsForm()));
+    }
+
+    function setGoalsStatus(text, isError) {
+        const el = document.getElementById("goalsStatus");
+        if (!el) return;
+        el.textContent = text;
+        el.classList.toggle("negative", !!isError);
+    }
+
+    // actuals: the kpi object from THD.data.filterDailyRange(...,"month",null)
+    // (i.e. "This Month" totals, regardless of the active date-range
+    // filter). targets: { users, sessions, purchases, revenue, cvr }
+    // as saved via THD.goals — any key can be null/undefined ("no
+    // target set"), in which case that card's bar stays hidden.
+    function renderGoalProgress(actuals, targets) {
+        targets = targets || {};
+        GOAL_METRICS.forEach((metric) => {
+            const wrap = document.querySelector(`[data-goal="${metric}"]`);
+            if (!wrap) return;
+
+            const target = targets[metric];
+            const hasTarget = typeof target === "number" && target > 0;
+
+            if (!hasTarget) {
+                wrap.style.display = "none";
+            } else {
+                const actual = (actuals && actuals[metric]) ? actuals[metric].value : 0;
+                const percent = target ? (actual / target) * 100 : 0;
+                const fill = wrap.querySelector('[data-field="goalFill"]');
+                const label = wrap.querySelector('[data-field="goalLabel"]');
+                if (fill) fill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+                wrap.classList.toggle("over", percent >= 100);
+                if (label) {
+                    label.textContent = window.I18N.t("goal.progress", {
+                        percent: Math.round(percent),
+                        target: GOAL_FORMATS[metric](target)
+                    });
+                }
+                wrap.style.display = "";
+            }
+
+            // The CVR card's second stat is already labeled "Goal" in
+            // the HTML (see kpiCard.cvr) rather than "Avg / Day", since
+            // averaging a percentage across days isn't meaningful —
+            // it's meant to show the actual target figure directly.
+            if (metric === "cvr") {
+                const cvrCard = document.querySelector('[data-kpi="cvr"] [data-field="daily"]');
+                if (cvrCard) cvrCard.textContent = hasTarget ? fmtPercent(target) : "--";
+            }
+        });
+    }
+
+    /* ==========================================================
+       CSV / PDF Export
+       Button wiring only — THD.exportUtil (js/export.js) owns the
+       actual mechanics. PDF export has nothing to populate here:
+       it prints the live page as-is (see css/print.css), rather
+       than building a separate summary view.
+    ========================================================== */
+
+    function wireCsvExportButtons(handlers) {
+        Object.entries(handlers || {}).forEach(([buttonId, onClick]) => {
+            const btn = document.getElementById(buttonId);
+            if (btn) btn.addEventListener("click", onClick);
+        });
+    }
+
+    function wireExportPdfButton(onClick) {
+        const btn = document.getElementById("exportPdfBtn");
+        if (!btn) return;
+        btn.addEventListener("click", onClick);
+    }
+
     THD.ui = {
         renderLastUpdate,
         renderKpis,
@@ -1296,7 +1414,13 @@ window.THD = window.THD || {};
         refreshActiveHeader,
         wireThemeToggle,
         wireNotes,
-        refreshNotesList
+        refreshNotesList,
+        renderGoalsForm,
+        wireGoalsForm,
+        setGoalsStatus,
+        renderGoalProgress,
+        wireCsvExportButtons,
+        wireExportPdfButton
     };
 
 })(window.THD);

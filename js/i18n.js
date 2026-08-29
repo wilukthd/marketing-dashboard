@@ -36,7 +36,7 @@ window.I18N = (function () {
             "gate.submit": "Unlock",
             "gate.error": "Incorrect passcode — try again.",
             "gate.errorNoCrypto": "Can't verify the passcode here — this page needs to be opened over HTTPS or localhost, not as a local file.",
-            "sidebar.version": "Version 1.0",
+            "sidebar.version": "Version 2.0",
 
             "nav.overview": "Overview",
             "nav.traffic": "Traffic",
@@ -57,6 +57,8 @@ window.I18N = (function () {
 
             "header.lastUpdate": "Last Update",
             "header.refresh": "Refresh",
+            "header.exportPdf": "Export PDF",
+            "export.csv": "Export CSV",
 
             "filter.today": "Today",
             "filter.yesterday": "Yesterday",
@@ -230,6 +232,12 @@ window.I18N = (function () {
             "settings.languageDesc": "Choose the display language for the dashboard. Saved on this device.",
             "settings.comingSoon": "More settings coming soon",
             "settings.comingSoonDesc": "Account, data source, and notification preferences will live here.",
+            "settings.goalsTitle": "Monthly Targets",
+            "settings.goalsDesc": "Shared across the team — set once here, and everyone sees the same progress bars on the Overview KPI cards. Leave a field blank to hide that card's progress bar.",
+            "settings.goalsSave": "Save Targets",
+            "settings.goalsSaved": "Saved.",
+            "settings.goalsError": "Couldn't save — check your connection and try again.",
+            "goal.progress": "{percent}% of {target} target",
 
             "dataWarning.prefix": "Showing demo data for: {list} — the live data source(s) didn't load. Numbers in these sections aren't real.",
             "dataWarning.daily": "Overview & Monthly Performance",
@@ -280,7 +288,7 @@ window.I18N = (function () {
             "gate.submit": "開く",
             "gate.error": "パスコードが正しくありません。もう一度お試しください。",
             "gate.errorNoCrypto": "この環境ではパスコードを確認できません — このページはローカルファイルではなく、HTTPSまたはlocalhost経由で開く必要があります。",
-            "sidebar.version": "バージョン 1.0",
+            "sidebar.version": "バージョン 2.0",
 
             "nav.overview": "概要",
             "nav.traffic": "トラフィック",
@@ -301,6 +309,8 @@ window.I18N = (function () {
 
             "header.lastUpdate": "最終更新",
             "header.refresh": "更新",
+            "header.exportPdf": "PDF出力",
+            "export.csv": "CSVを出力",
 
             "filter.today": "今日",
             "filter.yesterday": "昨日",
@@ -474,6 +484,12 @@ window.I18N = (function () {
             "settings.languageDesc": "ダッシュボードの表示言語を選択します。このデバイスに保存されます。",
             "settings.comingSoon": "その他の設定は近日公開予定",
             "settings.comingSoonDesc": "アカウント・データソース・通知に関する設定を今後追加予定です。",
+            "settings.goalsTitle": "月間目標",
+            "settings.goalsDesc": "チーム全体で共有されます — ここで一度設定すると、Overviewの各KPIカードに同じ進捗バーが表示されます。空欄にするとその項目の進捗バーは非表示になります。",
+            "settings.goalsSave": "目標を保存",
+            "settings.goalsSaved": "保存しました。",
+            "settings.goalsError": "保存に失敗しました。接続を確認して再度お試しください。",
+            "goal.progress": "目標 {target} に対して {percent}%",
 
             "dataWarning.prefix": "以下はデモデータを表示しています：{list} — 実データの読み込みに失敗しました。この区画の数値は実際のものではありません。",
             "dataWarning.daily": "概要・月次業績",

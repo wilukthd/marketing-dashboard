@@ -51,6 +51,67 @@
 }
 
 /* ==========================================================
+   CSV Export Button
+   Small icon-only button reused above every exportable table
+   (Session Source, Traffic Comparison, Monthly, New/Repeat).
+========================================================== */
+
+.csvExportBtn{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    width:36px;
+
+    height:36px;
+
+    background:var(--surface);
+
+    border:1px solid var(--border);
+
+    border-radius:8px;
+
+    color:var(--text-light);
+
+    transition:.2s;
+
+}
+
+.csvExportBtn:hover{
+
+    border-color:var(--primary);
+
+    color:var(--primary);
+
+}
+
+.csvExportBtn i{
+
+    width:15px;
+
+    height:15px;
+
+}
+
+/* Standalone toolbar row placed above a table that isn't
+   already inside a .tableHeader (e.g. the Traffic Comparison
+   table, which sits under the Traffic Sources doughnut header
+   rather than having its own). */
+
+.tableToolsRow{
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    margin-bottom:10px;
+
+}
+
+/* ==========================================================
    Table
 ========================================================== */
 

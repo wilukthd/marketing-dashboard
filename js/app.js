@@ -33,6 +33,11 @@
     let availableChannels = []; // cached channel list, so a language change can repopulate translated option labels without recomputing
     let newRepeatRows = []; // last-loaded new/repeat rows (sliced to 12), kept so the Orders/Revenue toggle can re-render without re-fetching
     let fullNewRepeatRows = []; // full history (unsliced) — needed to rebuild New/Repeat insights on a language change without re-fetching
+    let lastBusinessMonths = []; // last-rendered Monthly Business Performance rows, cached so the CSV export button doesn't need to recompute
+
+    // Monthly targets (see js/goals.js), shared across the team via
+    // Firestore. {} until the first subscribe() callback fires.
+    let currentGoalTargets = {};
 
     // Overview "rising landing page" insight (see buildRisingLandingPageInsight
     // in data.js) — fixed 7-day-vs-prior-7-day window, independent of the
@@ -467,10 +472,12 @@
 
         const channelAnomalies = THD.data.buildChannelAnomalyInsights(effectiveSourceRows, trafficCurrent.channels, groupBy, range);
 
-        THD.ui.renderInsights([
+        const insightSentences = [
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels),
             ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
-        ], {
+        ];
+
+        THD.ui.renderInsights(insightSentences, {
             riseInsight: risingPageInsight,
             onRiseClick: onRisingPageInsightClick,
             channelAnomalies,
@@ -489,7 +496,24 @@
         // the partial current one, rather than quietly losing a
         // month's worth of the "whole year" picture every time.
         const businessMonths = THD.data.buildBusinessMonths(effectiveDailyRows, 13);
-        THD.ui.renderMonthlyTable(businessMonths.length ? businessMonths : DUMMY_MONTHLY);
+        lastBusinessMonths = businessMonths.length ? businessMonths : DUMMY_MONTHLY;
+        THD.ui.renderMonthlyTable(lastBusinessMonths);
+
+        // Goals feature is paused (see the commented-out block in
+        // init()) — leave this uncalled for now so the CVR card's
+        // "Goal" stat keeps showing its original placeholder value
+        // rather than being blanked to "--" by an empty targets object.
+        // renderGoalsProgressFromState();
+    }
+
+    // Goal progress always compares "This Month" actuals against
+    // the saved target — a fixed window independent of whatever
+    // date range is selected above (same idea as risingPageInsight's
+    // own fixed 7-day window), since a monthly target wouldn't mean
+    // much measured against, say, "Last 7 Days".
+    function renderGoalsProgressFromState() {
+        const monthActuals = THD.data.filterDailyRange(dailyRows, "month", null).kpi;
+        THD.ui.renderGoalProgress(monthActuals, currentGoalTargets);
     }
 
     function renderTrendOnly() {
@@ -630,6 +654,100 @@
             renderNewRepeatChartOnly();
         });
         THD.ui.wireNotes();
+
+        // ---- Monthly Targets (Goals) ----
+        // Built for v2, but the target-setting approach itself hasn't
+        // been settled on yet — paused rather than shipped. Everything
+        // (js/goals.js, the Settings-page form markup, the KPI card
+        // progress bar CSS/HTML) is still in place; re-enable by
+        // uncommenting this block, adding the js/goals.js <script> tag
+        // back in index.html, and restoring the Monthly Targets section
+        // on the Settings page (see git history / previous zip).
+        //
+        // THD.goals.subscribe((targets) => {
+        //     currentGoalTargets = targets;
+        //     THD.ui.renderGoalsForm(targets);
+        //     renderGoalsProgressFromState();
+        // });
+        // THD.ui.wireGoalsForm((targets) => {
+        //     THD.ui.setGoalsStatus("");
+        //     THD.goals.save(targets).then(() => {
+        //         THD.ui.setGoalsStatus(window.I18N.t("settings.goalsSaved"));
+        //     }).catch(() => {
+        //         THD.ui.setGoalsStatus(window.I18N.t("settings.goalsError"), true);
+        //     });
+        // });
+
+        // ---- CSV Export ----
+        // Raw numeric values, not the display-formatted strings on
+        // screen (no ¥, no thousands separators) — so the exported
+        // file is actually useful to re-open and compute on.
+        THD.ui.wireCsvExportButtons({
+            exportSourceCsvBtn: () => {
+                THD.exportUtil.downloadCsv("thd-session-source.csv", [
+                    { key: "sourceMedium", header: "Source / Medium" },
+                    { key: "sessions", header: "Sessions" },
+                    { key: "users", header: "Total Users" },
+                    { key: "purchases", header: "Ecommerce Purchases" },
+                    { key: "revenue", header: "Total Revenue" },
+                    { header: "CVR (%)", value: (r) => r.cvr.toFixed(2) }
+                ], sourcesCurrentForFilter);
+            },
+            exportTrafficCsvBtn: () => {
+                THD.exportUtil.downloadCsv("thd-traffic-comparison.csv", [
+                    { key: "label", header: "Source" },
+                    { header: "Sessions (Current)", value: (r) => r.current ? r.current.sessions : 0 },
+                    { header: "Sessions (Previous)", value: (r) => r.previous ? r.previous.sessions : 0 },
+                    {
+                        header: "Delta vs Previous (%)",
+                        value: (r) => {
+                            const cur = r.current ? r.current.sessions : 0;
+                            const prev = r.previous ? r.previous.sessions : 0;
+                            return prev ? ((cur - prev) / prev * 100).toFixed(2) : "";
+                        }
+                    },
+                    { header: "Revenue (Current)", value: (r) => r.current ? r.current.revenue : 0 },
+                    { header: "CVR (Current, %)", value: (r) => r.current ? r.current.cvr.toFixed(2) : "" }
+                ], lastTrafficComparisonRows);
+            },
+            exportMonthlyCsvBtn: () => {
+                THD.exportUtil.downloadCsv("thd-monthly-performance.csv", [
+                    { key: "month", header: "Month" },
+                    { key: "revenue", header: "Revenue" },
+                    { key: "orders", header: "Orders" },
+                    { key: "users", header: "Total Users" },
+                    { header: "CVR (%)", value: (r) => r.cvr.toFixed(2) },
+                    { header: "Trend vs Prior Month (%)", value: (r) => r.trend.toFixed(2) }
+                ], lastBusinessMonths);
+            },
+            exportNewRepeatCsvBtn: () => {
+                THD.exportUtil.downloadCsv("thd-new-repeat.csv", [
+                    { key: "period", header: "Period" },
+                    { key: "totalRevenue", header: "Total Revenue" },
+                    { key: "totalOrders", header: "Total Orders" },
+                    { key: "newRevenue", header: "New Revenue" },
+                    { key: "newOrders", header: "New Orders" },
+                    { key: "repeatRevenue", header: "Repeat Revenue" },
+                    { key: "repeatOrders", header: "Repeat Orders" },
+                    { key: "visitorsPc", header: "Visitors (PC)" },
+                    { key: "visitorsSp", header: "Visitors (SP)" },
+                    { key: "visitorsTotal", header: "Visitors (Total)" }
+                ], newRepeatRows);
+            }
+        });
+
+        // ---- PDF Export ----
+        // Prints the whole active tab exactly as it currently looks —
+        // whatever date range/source filter/toggle state is applied —
+        // rather than a hand-built summary. css/print.css hides the
+        // sidebar and action buttons and leaves everything else (the
+        // .dashboardView that isn't .viewHidden, i.e. whichever tab is
+        // open) to print natively, checkboxes/selects/canvases and
+        // all, so it's a faithful snapshot of what's on screen.
+        THD.ui.wireExportPdfButton(() => {
+            THD.exportUtil.printCurrentView();
+        });
+
         wireDateRange();
 
         await loadAndRenderAll();

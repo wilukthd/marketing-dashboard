@@ -1,0 +1,117 @@
+/* ==========================================================
+   THD Analytics
+   PDF Export — Print Stylesheet
+   Version 2.1
+
+   Loaded with media="print" (see index.html), so everything here
+   only applies when the browser is actually printing — triggered
+   by THD.exportUtil.printCurrentView() (js/export.js) calling
+   window.print() when the header's "Export PDF" button is clicked.
+
+   Deliberately NOT a hand-built summary. This prints whichever tab
+   is currently open, as it currently looks — current date range,
+   source filter, doughnut group-by, chart metric toggles, an
+   expanded "Show All" table, an open channel drill-down, all of
+   it — because that's already real DOM/CSS state and the most
+   faithful "snapshot of what I'm looking at" there is. The person
+   then uses their browser's own print dialog to "Save as PDF",
+   covering both the periodic-recap and ad-hoc-snapshot cases with
+   the same one button.
+
+   The only other .dashboardView sections (other tabs) are already
+   display:none via .viewHidden (css/charts.css) regardless of
+   print — nothing extra is needed here to keep them out.
+========================================================== */
+
+@page{
+
+    size:A4;
+    margin:12mm;
+
+}
+
+@media print{
+
+    html,
+    body{
+
+        background:#fff !important;
+
+    }
+
+    /* Force browsers to actually print background colors/canvas
+       content instead of silently stripping them — otherwise a
+       dark-mode screenshot-equivalent would print as plain black
+       text on white with every colored fill missing. */
+    *{
+
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+
+    }
+
+    /* Chrome that isn't part of the tab's actual content. Every
+       control on this dashboard is an action (Export, Refresh,
+       Apply, Show All, Close, Clear, Add Note, CSV export, etc.)
+       rather than something carrying unique content of its own, so
+       hiding every <button> is safe — whatever state a button
+       toggled (an expanded table, a filtered chart) is already
+       baked into the surrounding content it's leaving behind.
+       Checkboxes and <select>s are left alone on purpose: they
+       print their current value/checked state, which is exactly
+       the filter/toggle information worth keeping in the export. */
+    .sidebar,
+    button{
+
+        display:none !important;
+
+    }
+
+    .mainContent{
+
+        margin-left:0 !important;
+        padding:0 !important;
+
+    }
+
+    .headerRight{
+
+        gap:12px !important;
+
+    }
+
+    /* Table/chart containers sometimes rely on a scrollbar or a
+       fixed height on screen — neither means anything on paper, so
+       let content lay out to its natural full size instead of
+       clipping at a page-irrelevant boundary. Wider tables (e.g.
+       New/Repeat) may still be worth printing in Landscape from the
+       browser's print dialog — that choice is left to the person,
+       not forced here. */
+    .tableResponsive,
+    .chartCard,
+    .tableCard{
+
+        overflow:visible !important;
+        max-height:none !important;
+
+    }
+
+    .modernTable{
+
+        font-size:11.5px;
+
+    }
+
+    /* Best-effort page-break hygiene — avoids splitting a single
+       card/chart/table awkwardly across two pages where the
+       content is short enough to fit on one. */
+    .card,
+    .chartCard,
+    .tableCard,
+    .insightCard{
+
+        break-inside:avoid;
+
+    }
+
+}
