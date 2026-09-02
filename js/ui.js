@@ -31,16 +31,35 @@ window.THD = window.THD || {};
        doesn't say what it's being measured against.
     ========================================================== */
 
-    function renderRangeCompare(range) {
+    // hasCompareData: pass false when the resolved comparison window
+    // has no underlying data at all (most likely with "Compare Same
+    // Period Last Year" reaching further back than the data goes) —
+    // shows a warning in place of the comparison dates instead of
+    // silently implying "no change" from an all-zero previous period.
+    function renderRangeCompare(range, hasCompareData = true) {
         const el = document.getElementById("rangeCompareBar");
         if (!el || !range) return;
 
-        el.innerHTML = `
-            <i data-lucide="calendar-range"></i>
-            Looking at <strong>${fmtISODate(range.start)} – ${fmtISODate(range.end)}</strong>
-            <span class="rangeVs">vs previous period</span>
-            <strong>${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}</strong>
-        `;
+        const lookingAt = `${window.I18N.t("rangeCompare.lookingAt")} <strong>${fmtISODate(range.start)} – ${fmtISODate(range.end)}</strong>`;
+
+        if (!hasCompareData) {
+            el.innerHTML = `
+                <i data-lucide="calendar-range"></i>
+                ${lookingAt}
+                <span class="rangeVs rangeVsWarning">
+                    <i data-lucide="alert-triangle"></i>
+                    ${window.I18N.t("rangeCompare.noCompareData", { start: fmtISODate(range.prevStart), end: fmtISODate(range.prevEnd) })}
+                </span>
+            `;
+        } else {
+            const compareLabelKey = range.compareMode === "yoy" ? "rangeCompare.vsYoy" : "rangeCompare.vsPrevious";
+            el.innerHTML = `
+                <i data-lucide="calendar-range"></i>
+                ${lookingAt}
+                <span class="rangeVs">${window.I18N.t(compareLabelKey)}</span>
+                <strong>${fmtISODate(range.prevStart)} – ${fmtISODate(range.prevEnd)}</strong>
+            `;
+        }
         if (window.lucide) lucide.createIcons();
     }
 
@@ -61,6 +80,8 @@ window.THD = window.THD || {};
         if (!status.sources) keys.push("dataWarning.sources");
         if (!status.landingPages) keys.push("dataWarning.landingPages");
         if (!status.newRepeat) keys.push("dataWarning.newRepeat");
+        if (!status.adSpend) keys.push("dataWarning.adSpend");
+        if (!status.transactions) keys.push("dataWarning.transactions");
 
         if (!keys.length) {
             el.style.display = "none";
@@ -142,7 +163,7 @@ window.THD = window.THD || {};
         cvr: { value: fmtPercent, daily: fmtPercent }
     };
 
-    function renderKpis(kpi) {
+    function renderKpis(kpi, hasCompareData = true) {
         Object.entries(kpi).forEach(([key, data]) => {
             const card = document.querySelector(`[data-kpi="${key}"]`);
             const format = KPI_FORMATS[key];
@@ -171,9 +192,18 @@ window.THD = window.THD || {};
             }
 
             if (deltaEl) {
-                deltaEl.textContent = fmtDelta(data.delta);
-                deltaEl.classList.remove("positive", "negative");
-                deltaEl.classList.add(data.delta >= 0 ? "positive" : "negative");
+                deltaEl.classList.remove("positive", "negative", "neutral");
+                if (hasCompareData) {
+                    deltaEl.textContent = fmtDelta(data.delta);
+                    deltaEl.classList.add(data.delta >= 0 ? "positive" : "negative");
+                } else {
+                    // Comparison window has no underlying data at all
+                    // (see hasDataInRange in data.js) — showing "0.0%"
+                    // here would read as "no change" rather than "no
+                    // data to compare against".
+                    deltaEl.textContent = window.I18N.t("kpi.noCompareData");
+                    deltaEl.classList.add("neutral");
+                }
             }
 
             if (dailyEl) dailyEl.textContent = format.daily(data.daily);

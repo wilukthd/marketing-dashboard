@@ -55,7 +55,31 @@ window.THD = window.THD || {};
         // Spreadsheet: WEB本店新規／リピータ — published as-is, raw
         // layout (two header rows, no need to restructure the sheet).
         // See loadNewRepeat() for the exact column mapping.
-        NEW_REPEAT_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSRf48VUc7RKvkbgkwFXDrYxPidpJaOX6xRRsu-y19J4Jas-RsrLlzNT3CCh0pxR1Ha7rLaXF1TJvS/pub?gid=0&single=true&output=csv"
+        NEW_REPEAT_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSRf48VUc7RKvkbgkwFXDrYxPidpJaOX6xRRsu-y19J4Jas-RsrLlzNT3CCh0pxR1Ha7rLaXF1TJvS/pub?gid=0&single=true&output=csv",
+
+        // ---- Not set up yet — both left blank on purpose ----
+        // loadAdSpend()/loadTransactions() below fall back to dummy
+        // data exactly like any other feed left unconfigured (see
+        // fetchCsv's `if (!url)` guard). Fill these in once each is
+        // published; see thd-dashboard-changelog.md item 12 for the
+        // exact column layout each one is expected to have.
+
+        // Daily ad spend by platform/campaign — Google Ads + Meta Ads.
+        // Columns: date, platform, campaign, spend, impressions, clicks.
+        // platform must be exactly "Google" or "Meta" (matching
+        // classifyPlatform's vendor labels below) for spend to line up
+        // with the matching "<Platform> Ads" GA4 sessions/revenue.
+        AD_SPEND_CSV_URL: "",
+
+        // Per-order transaction detail, for spot-checking that a given
+        // ad-driven session actually converted (and reconciling GA4's
+        // purchase count/revenue against your order system's own
+        // numbers — GA4 under-counting paid traffic specifically, via
+        // ad blockers/ITP/consent banners, is common enough to be
+        // worth checking rather than assuming away).
+        // Columns: orderId, date, sourceMedium, campaign, revenue,
+        // newOrRepeat ("new" or "repeat").
+        TRANSACTIONS_CSV_URL: ""
     };
 
     /* ==========================================================
@@ -152,7 +176,15 @@ window.THD = window.THD || {};
                     users: Number(r.users) || 0,
                     purchases: Number(r.purchases) || 0,
                     revenue: Number(r.revenue) || 0,
-                    channel: r.channel || null
+                    channel: r.channel || null,
+                    // Optional — only present once a "campaign" column is
+                    // added to the published sheet (see Ads Performance,
+                    // thd-dashboard-changelog.md item 12). Used to line up
+                    // GA4 sessions/revenue with ad spend at the individual
+                    // campaign level; everything else about this feed
+                    // (Traffic tab, Session Source table, etc.) works
+                    // identically whether or not it's present.
+                    campaign: r.campaign || null
                 }));
         } catch (e) {
             console.warn("[THD.data] GA4 sources CSV not available, using dummy data:", e.message);
@@ -318,6 +350,50 @@ window.THD = window.THD || {};
                 });
         } catch (e) {
             console.warn("[THD.data] Landing pages CSV not available, using dummy data:", e.message);
+            return null;
+        }
+    }
+
+    /* ==========================================================
+       Ads Performance — spend + transaction feeds
+       Both optional/unconfigured by default (see CONFIG above);
+       fail the same way every other not-yet-set-up feed does.
+    ========================================================== */
+
+    async function loadAdSpend() {
+        try {
+            const rows = await fetchCsv(CONFIG.AD_SPEND_CSV_URL);
+            return rows
+                .filter((r) => r.date && r.platform)
+                .map((r) => ({
+                    date: parseGA4Date(r.date),
+                    platform: String(r.platform).trim(), // "Google" or "Meta"
+                    campaign: r.campaign || null,
+                    spend: Number(r.spend) || 0,
+                    impressions: Number(r.impressions) || 0,
+                    clicks: Number(r.clicks) || 0
+                }));
+        } catch (e) {
+            console.warn("[THD.data] Ad spend CSV not configured, using dummy data:", e.message);
+            return null;
+        }
+    }
+
+    async function loadTransactions() {
+        try {
+            const rows = await fetchCsv(CONFIG.TRANSACTIONS_CSV_URL);
+            return rows
+                .filter((r) => r.orderId && r.date)
+                .map((r) => ({
+                    orderId: String(r.orderId),
+                    date: parseGA4Date(r.date),
+                    sourceMedium: r.sourceMedium || "(not set)",
+                    campaign: r.campaign || null,
+                    revenue: Number(r.revenue) || 0,
+                    newOrRepeat: (String(r.newOrRepeat || "").toLowerCase() === "new") ? "new" : "repeat"
+                }));
+        } catch (e) {
+            console.warn("[THD.data] Transactions CSV not configured, using dummy data:", e.message);
             return null;
         }
     }
@@ -539,7 +615,13 @@ window.THD = window.THD || {};
     // preceding" — see note above.
     const YEAR_ALIGNED_RANGES = new Set(["year", "lastYear"]);
 
-    function resolveRange(rangeKey, customRange) {
+    // compareMode: "previous" (default) = same length, immediately
+    // preceding — except the two ranges above, which are already
+    // year-aligned by definition. "yoy" = same calendar dates, exactly
+    // one year back, regardless of which range is selected — e.g. a
+    // custom Jun 1–Sep 2 2026 range compares to Jun 1–Sep 2 2025, not
+    // to the 94 days immediately before it.
+    function resolveRange(rangeKey, customRange, compareMode = "previous") {
         let start, end;
         if (rangeKey === "custom" && customRange && customRange.start && customRange.end) {
             start = startOfDay(customRange.start);
@@ -552,7 +634,7 @@ window.THD = window.THD || {};
         const spanDays = Math.round((end - start) / 86400000) + 1;
 
         let prevStart, prevEnd;
-        if (YEAR_ALIGNED_RANGES.has(rangeKey)) {
+        if (compareMode === "yoy" || YEAR_ALIGNED_RANGES.has(rangeKey)) {
             prevStart = startOfDay(new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()));
             prevEnd = startOfDay(new Date(end.getFullYear() - 1, end.getMonth(), end.getDate()));
         } else {
@@ -561,7 +643,7 @@ window.THD = window.THD || {};
             prevStart = daysAgo(spanDays - 1, prevEnd);
         }
 
-        return { start, end, spanDays, prevStart, prevEnd };
+        return { start, end, spanDays, prevStart, prevEnd, compareMode };
     }
 
     function inRange(dateStr, start, end) {
@@ -569,13 +651,23 @@ window.THD = window.THD || {};
         return d >= start && d <= end;
     }
 
+    // Whether any row in dailyRows falls inside [start, end] — used
+    // to tell "the comparison period is genuinely all zero" apart
+    // from "there's no data at all to compare against" (e.g. a
+    // same-period-last-year comparison reaching further back than
+    // the data actually goes), so the latter can show a warning
+    // instead of a silently misleading "0.0% change".
+    function hasDataInRange(dailyRows, start, end) {
+        return (dailyRows || []).some((r) => inRange(r.date, start, end));
+    }
+
     /* ==========================================================
        Daily rows -> KPI cards + trend chart
     ========================================================== */
 
-    function filterDailyRange(dailyRows, rangeKey, customRange) {
+    function filterDailyRange(dailyRows, rangeKey, customRange, compareMode = "previous") {
 
-        const { start, end, prevStart, prevEnd } = resolveRange(rangeKey, customRange);
+        const { start, end, prevStart, prevEnd } = resolveRange(rangeKey, customRange, compareMode);
 
         const current = dailyRows.filter((r) => inRange(r.date, start, end));
         const previous = dailyRows.filter((r) => inRange(r.date, prevStart, prevEnd));
@@ -634,10 +726,15 @@ window.THD = window.THD || {};
         return `<span class="insightNum ${sentiment}">${text}</span>`;
     }
 
-    function buildInsights(kpi, channels) {
+    // hasCompareData: skip every delta-dependent sentence (revenue
+    // change, biggest mover, CVR change) when the comparison window
+    // has no underlying data — see hasDataInRange — rather than
+    // reporting a misleading "decreased by 0.0%" derived from an
+    // all-zero previous period.
+    function buildInsights(kpi, channels, hasCompareData = true) {
         const insights = [];
 
-        if (kpi && kpi.revenue) {
+        if (hasCompareData && kpi && kpi.revenue) {
             const d = kpi.revenue.delta;
             const figure = highlight(`${Math.abs(d).toFixed(1)}%`, d >= 0 ? "pos" : "neg");
             const direction = window.I18N.t(d >= 0 ? "insight.increased" : "insight.decreased");
@@ -663,7 +760,7 @@ window.THD = window.THD || {};
             }
         }
 
-        if (kpi) {
+        if (hasCompareData && kpi) {
             const movers = [
                 { key: "users", labelKey: "insight.mover.users" },
                 { key: "sessions", labelKey: "insight.mover.sessions" },
@@ -681,7 +778,7 @@ window.THD = window.THD || {};
             }
         }
 
-        if (kpi && kpi.cvr) {
+        if (hasCompareData && kpi && kpi.cvr) {
             const d = kpi.cvr.delta;
             const figure = highlight(`${kpi.cvr.value.toFixed(2)}%`, d >= 0 ? "pos" : "neg");
             const direction = window.I18N.t(d >= 0 ? "insight.cvrImproved" : "insight.cvrDeclined");
@@ -1584,6 +1681,134 @@ window.THD = window.THD || {};
     }
 
     /* ==========================================================
+       Ads Performance
+       Spend is matched to GA4 sessions/revenue two ways:
+       - Platform-level (robust, always on): reuses the exact same
+         classifyPlatform() vendor split that already powers the
+         Traffic tab's "Ad Platform" grouping — ad spend tagged
+         platform "Google"/"Meta" lines up with GA4 rows that
+         classify as "Google Ads"/"Meta Ads", with no dependency
+         on UTM campaign naming being consistent. This is what the
+         top-line Spend/ROAS/CPA KPIs are built from.
+       - Campaign-level (finer, best-effort): only where BOTH the
+         ad spend feed and the GA4 sources feed carry a matching
+         campaign name (case/whitespace-insensitive). Spend with no
+         matching GA4 campaign still shows up in the table — as an
+         unmatched row, not silently dropped — since that itself is
+         useful signal that a campaign's UTM tagging needs a look.
+    ========================================================== */
+
+    const AD_PLATFORMS = ["Google", "Meta"];
+
+    function buildAdPerformance(adSpendRows, sourceRows, range) {
+        const spendInRange = (adSpendRows || []).filter((r) => inRange(r.date, range.start, range.end));
+        const sourcesInRange = (sourceRows || []).filter((r) => inRange(r.date, range.start, range.end));
+
+        const totals = AD_PLATFORMS.map((platform) => {
+            const platformSpendRows = spendInRange.filter((r) => r.platform === platform);
+            const spend = platformSpendRows.reduce((s, r) => s + r.spend, 0);
+            const impressions = platformSpendRows.reduce((s, r) => s + r.impressions, 0);
+            const clicks = platformSpendRows.reduce((s, r) => s + r.clicks, 0);
+
+            const adLabel = `${platform} Ads`;
+            const matchingSources = sourcesInRange.filter((r) => classifyPlatform(r.sourceMedium) === adLabel);
+            const sessions = matchingSources.reduce((s, r) => s + r.sessions, 0);
+            const purchases = matchingSources.reduce((s, r) => s + r.purchases, 0);
+            const revenue = matchingSources.reduce((s, r) => s + r.revenue, 0);
+
+            return {
+                platform,
+                spend, impressions, clicks,
+                ctr: impressions ? (clicks / impressions) * 100 : 0,
+                cpc: clicks ? spend / clicks : 0,
+                sessions, purchases, revenue,
+                cvr: sessions ? (purchases / sessions) * 100 : 0,
+                roas: spend ? revenue / spend : null,
+                cpa: purchases ? spend / purchases : null
+            };
+        }).filter((t) => t.spend > 0 || t.sessions > 0);
+
+        const blendedSpend = totals.reduce((s, t) => s + t.spend, 0);
+        const blendedRevenue = totals.reduce((s, t) => s + t.revenue, 0);
+        const blendedPurchases = totals.reduce((s, t) => s + t.purchases, 0);
+
+        const campaignSpend = {};
+        spendInRange.forEach((r) => {
+            const name = r.campaign || "(unnamed)";
+            const key = `${r.platform}::${name}`;
+            if (!campaignSpend[key]) campaignSpend[key] = { platform: r.platform, campaign: name, spend: 0, impressions: 0, clicks: 0 };
+            campaignSpend[key].spend += r.spend;
+            campaignSpend[key].impressions += r.impressions;
+            campaignSpend[key].clicks += r.clicks;
+        });
+
+        const campaignGA4 = {};
+        sourcesInRange.forEach((r) => {
+            if (!r.campaign) return;
+            const key = r.campaign.trim().toLowerCase();
+            if (!campaignGA4[key]) campaignGA4[key] = { sessions: 0, purchases: 0, revenue: 0 };
+            campaignGA4[key].sessions += r.sessions;
+            campaignGA4[key].purchases += r.purchases;
+            campaignGA4[key].revenue += r.revenue;
+        });
+
+        const campaigns = Object.values(campaignSpend).map((row) => {
+            const matched = campaignGA4[row.campaign.trim().toLowerCase()];
+            const sessions = matched ? matched.sessions : 0;
+            const purchases = matched ? matched.purchases : 0;
+            const revenue = matched ? matched.revenue : 0;
+            return {
+                platform: row.platform,
+                campaign: row.campaign,
+                spend: row.spend,
+                impressions: row.impressions,
+                clicks: row.clicks,
+                ctr: row.impressions ? (row.clicks / row.impressions) * 100 : 0,
+                cpc: row.clicks ? row.spend / row.clicks : 0,
+                sessions, purchases, revenue,
+                roas: row.spend ? revenue / row.spend : null,
+                cpa: purchases ? row.spend / purchases : null,
+                matched: !!matched
+            };
+        }).sort((a, b) => b.spend - a.spend);
+
+        const byDate = {};
+        spendInRange.forEach((r) => {
+            if (!byDate[r.date]) byDate[r.date] = { spend: 0, revenue: 0 };
+            byDate[r.date].spend += r.spend;
+        });
+        sourcesInRange.forEach((r) => {
+            if (!AD_PLATFORMS.some((p) => classifyPlatform(r.sourceMedium) === `${p} Ads`)) return;
+            if (!byDate[r.date]) byDate[r.date] = { spend: 0, revenue: 0 };
+            byDate[r.date].revenue += r.revenue;
+        });
+        const sortedDates = Object.keys(byDate).sort((a, b) => new Date(a) - new Date(b));
+
+        return {
+            totals,
+            campaigns,
+            blendedSpend,
+            blendedRevenue,
+            blendedRoas: blendedSpend ? blendedRevenue / blendedSpend : null,
+            blendedCpa: blendedPurchases ? blendedSpend / blendedPurchases : null,
+            trend: {
+                labels: sortedDates,
+                spend: sortedDates.map((d) => byDate[d].spend),
+                revenue: sortedDates.map((d) => byDate[d].revenue)
+            }
+        };
+    }
+
+    // Per-order detail for the selected range, most recent first —
+    // deliberately just filter+sort here; collapsing to a "Show
+    // All"-able slice is the UI's job (same split as landing pages).
+    function buildTransactionsList(transactionRows, range) {
+        return (transactionRows || [])
+            .filter((r) => inRange(r.date, range.start, range.end))
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    /* ==========================================================
        Moving Average
        Simple trailing-window average (default 7 days) used as an
        optional overlay on the trend chart to smooth out day-to-day
@@ -1622,6 +1847,7 @@ window.THD = window.THD || {};
         buildAnomalyInsights,
         buildChannelAnomalyInsights,
         resolveRange,
+        hasDataInRange,
         filterDailyRange,
         filterSourcesByDates,
         resolveLast30DayWindow,
@@ -1633,7 +1859,11 @@ window.THD = window.THD || {};
         buildTrafficComparison,
         buildChannelTrend,
         computeMovingAverage,
-        buildBusinessMonths
+        buildBusinessMonths,
+        loadAdSpend,
+        loadTransactions,
+        buildAdPerformance,
+        buildTransactionsList
     };
 
 })(window.THD);

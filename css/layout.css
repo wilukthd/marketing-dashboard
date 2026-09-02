@@ -310,6 +310,28 @@
 
 }
 
+.rangeCompareBar .rangeVsWarning{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    gap:6px;
+
+    color:var(--warning);
+
+    font-weight:600;
+
+}
+
+.rangeCompareBar .rangeVsWarning i{
+
+    width:15px;
+
+    height:15px;
+
+}
+
 
 /* ==========================================================
    Data Source Warning

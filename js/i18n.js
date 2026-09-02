@@ -75,6 +75,13 @@ window.I18N = (function () {
             "filter.apply": "Apply",
             "filter.allSources": "All Sources",
             "filter.comparePrevious": "Compare Previous",
+            "filter.compareYoy": "Compare Same Period Last Year",
+
+            "rangeCompare.lookingAt": "Looking at",
+            "rangeCompare.vsPrevious": "vs previous period",
+            "rangeCompare.vsYoy": "vs same period last year",
+            "rangeCompare.noCompareData": "No comparison data available for {start} – {end} (outside the available data range)",
+            "kpi.noCompareData": "N/A",
 
             "kpi.totalUsers": "Total Users",
             "kpi.sessions": "Sessions",
@@ -232,9 +239,6 @@ window.I18N = (function () {
             "settings.languageDesc": "Choose the display language for the dashboard. Saved on this device.",
             "settings.comingSoon": "More settings coming soon",
             "settings.comingSoonDesc": "Account, data source, and notification preferences will live here.",
-            "settings.goalsTitle": "Monthly Targets",
-            "settings.goalsDesc": "Shared across the team — set once here, and everyone sees the same progress bars on the Overview KPI cards. Leave a field blank to hide that card's progress bar.",
-            "settings.goalsSave": "Save Targets",
             "settings.goalsSaved": "Saved.",
             "settings.goalsError": "Couldn't save — check your connection and try again.",
             "goal.progress": "{percent}% of {target} target",
@@ -244,6 +248,8 @@ window.I18N = (function () {
             "dataWarning.sources": "Traffic Sources",
             "dataWarning.landingPages": "Top Landing Pages",
             "dataWarning.newRepeat": "New vs Repeat & AOV",
+            "dataWarning.adSpend": "Ads Performance (spend)",
+            "dataWarning.transactions": "Ads Performance (transactions)",
 
             "th.overallRevenue": "Total Revenue",
 
@@ -327,6 +333,13 @@ window.I18N = (function () {
             "filter.apply": "適用",
             "filter.allSources": "すべての流入元",
             "filter.comparePrevious": "前期間と比較",
+            "filter.compareYoy": "前年同期間と比較",
+
+            "rangeCompare.lookingAt": "対象期間：",
+            "rangeCompare.vsPrevious": "前期間と比較",
+            "rangeCompare.vsYoy": "前年同期間と比較",
+            "rangeCompare.noCompareData": "{start} – {end} の比較データが見つかりません（データ範囲外）",
+            "kpi.noCompareData": "対象外",
 
             "kpi.totalUsers": "総ユーザー数",
             "kpi.sessions": "セッション数",
@@ -484,9 +497,6 @@ window.I18N = (function () {
             "settings.languageDesc": "ダッシュボードの表示言語を選択します。このデバイスに保存されます。",
             "settings.comingSoon": "その他の設定は近日公開予定",
             "settings.comingSoonDesc": "アカウント・データソース・通知に関する設定を今後追加予定です。",
-            "settings.goalsTitle": "月間目標",
-            "settings.goalsDesc": "チーム全体で共有されます — ここで一度設定すると、Overviewの各KPIカードに同じ進捗バーが表示されます。空欄にするとその項目の進捗バーは非表示になります。",
-            "settings.goalsSave": "目標を保存",
             "settings.goalsSaved": "保存しました。",
             "settings.goalsError": "保存に失敗しました。接続を確認して再度お試しください。",
             "goal.progress": "目標 {target} に対して {percent}%",
@@ -496,6 +506,8 @@ window.I18N = (function () {
             "dataWarning.sources": "流入元データ",
             "dataWarning.landingPages": "ランディングページ",
             "dataWarning.newRepeat": "新規／リピーター・客単価",
+            "dataWarning.adSpend": "広告成果（広告費）",
+            "dataWarning.transactions": "広告成果（取引明細）",
 
             "th.overallRevenue": "総合売上",
 

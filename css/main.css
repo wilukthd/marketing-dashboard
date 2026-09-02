@@ -426,6 +426,12 @@ select:focus{
 
 }
 
+.neutral{
+
+    color:var(--text-light);
+
+}
+
 .textLight{
 
     color:var(--text-light);
@@ -608,86 +614,9 @@ select:focus{
 }
 
 
-/* ==========================================================
-   Goals Form (Settings page)
-========================================================== */
-
-.goalsForm{
-
-    display:grid;
-
-    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-
-    gap:16px 20px;
-
-    padding-top:4px;
-
-}
-
-.goalsFormRow{
-
-    display:flex;
-
-    flex-direction:column;
-
-    gap:6px;
-
-}
-
-.goalsFormRow label{
-
-    font-size:12.5px;
-
-    font-weight:600;
-
-    color:var(--text-light);
-
-}
-
-.goalsFormRow input[type="number"]{
-
-    background:var(--surface);
-
-    border:1px solid var(--border);
-
-    border-radius:8px;
-
-    padding:10px 12px;
-
-    font-family:var(--font-mono);
-
-    font-size:14px;
-
-    color:var(--text);
-
-    transition:.25s;
-
-}
-
-.goalsFormRow input[type="number"]:hover{
-
-    border-color:var(--primary);
-
-}
-
-.goalsFormRow input[type="number"]:focus{
-
-    outline:none;
-
-    border-color:var(--primary);
-
-}
-
-.goalsFormActions{
-
-    grid-column:1/-1;
-
-    display:flex;
-
-    align-items:center;
-
-    gap:14px;
-
-    margin-top:6px;
-
-}
+/* Goals Form (Settings page) CSS removed — the form markup itself
+   was pulled from index.html when the Monthly Targets feature was
+   paused before shipping (js/goals.js and the KPI card progress
+   bars are still in place, just disconnected — see js/app.js's
+   init() and thd-dashboard-changelog.md item 11 for how to bring
+   the whole thing back, form included). */
