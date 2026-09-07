@@ -159,6 +159,7 @@ window.I18N = (function () {
 
             "insights.title": "Key Insights",
             "insights.empty": "Not enough data yet to generate insights for this period.",
+            "insights.topLandingTitle": "Top Landing Pages Insights",
 
             "source.title": "Session Source / Medium",
             "source.filteredBy": "Filtered by",
@@ -421,6 +422,7 @@ window.I18N = (function () {
 
             "insights.title": "主なインサイト",
             "insights.empty": "この期間はインサイトを生成するのに十分なデータがありません。",
+            "insights.topLandingTitle": "急上昇ランディングページ インサイト",
 
             "source.title": "セッションの参照元 / メディア",
             "source.filteredBy": "絞り込み中：",

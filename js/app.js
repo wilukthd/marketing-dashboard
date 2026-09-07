@@ -577,10 +577,16 @@
         ];
 
         THD.ui.renderInsights(insightSentences, {
+            channelAnomalies,
+            onChannelAnomalyClick: onChannelAnomalyInsightClick
+        });
+
+        // Landing-page anomalies (today/yesterday spikes + the rolling
+        // 7-day riser) get their own Overview section now, below Key
+        // Insights — see renderTopLandingPageInsights in ui.js.
+        THD.ui.renderTopLandingPageInsights({
             riseInsight: risingPageInsight,
             onRiseClick: onRisingPageInsightClick,
-            channelAnomalies,
-            onChannelAnomalyClick: onChannelAnomalyInsightClick,
             pageSpikes,
             onPageSpikeClick: onRisingPageInsightClick
         });

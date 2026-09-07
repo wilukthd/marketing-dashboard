@@ -606,43 +606,28 @@ window.THD = window.THD || {};
        Key Insights
     ========================================================== */
 
-    // riseInsight/onRiseClick are optional — when present, the "rising
-    // landing page" insight (buildRisingLandingPageInsight in data.js)
-    // is appended as its own clickable <li>, styled distinctly so it
-    // reads as "click for detail" rather than a plain fact like the
-    // others in this list.
-    // opts: { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick, pageSpikes, onPageSpikeClick }
-    // riseInsight is the single Overview "rising landing page" callout
-    // (see buildRisingLandingPageInsight); channelAnomalies is zero or
-    // more Traffic Sources anomalies (see buildChannelAnomalyInsights);
-    // pageSpikes is zero or more "spiking today/yesterday" callouts
-    // (see buildTodayYesterdaySpikeInsights) — shown first, since a
-    // spike happening right now is the most time-sensitive of the
-    // three. All render as clickable list items, distinguished from
-    // plain insight text by the .insightClickable class, but wired up
-    // separately since they jump to different places (Landing Pages
-    // detail panel vs. the Traffic Sources channel-trend view).
+    // opts: { channelAnomalies, onChannelAnomalyClick }
+    // Key Insights is now KPI-focused only: the plain sentence-level
+    // insights (buildInsights/buildAnomalyInsights) plus zero or more
+    // Traffic Sources channel anomalies (see buildChannelAnomalyInsights)
+    // — channel-level, not landing-page-specific, so it stays here.
+    // Everything landing-page-related (the "rising landing page" callout
+    // and today/yesterday page spikes) lives in its own section now —
+    // see renderTopLandingPageInsights below — so a busy day with many
+    // spiking pages doesn't crowd out the KPI-level story here.
     function renderInsights(insights, opts) {
         opts = opts || {};
-        const { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick, pageSpikes, onPageSpikeClick } = opts;
-        const container = document.querySelector(".insightCard ul");
+        const { channelAnomalies, onChannelAnomalyClick } = opts;
+        const container = document.getElementById("keyInsightsList");
         if (!container) return;
 
         const items = [];
-
-        (pageSpikes || []).forEach((s, i) => {
-            items.push(`<li class="insightClickable" data-spike-idx="${i}">${s.sentence}</li>`);
-        });
 
         items.push(...(insights || []).map((text) => `<li>${text}</li>`));
 
         (channelAnomalies || []).forEach((a, i) => {
             items.push(`<li class="insightClickable" data-anomaly-idx="${i}">${a.sentence}</li>`);
         });
-
-        if (riseInsight) {
-            items.push(`<li class="insightClickable" id="risingPageInsightItem">${riseInsight.sentence}</li>`);
-        }
 
         if (!items.length) {
             container.innerHTML = `<li>${window.I18N.t("insights.empty")}</li>`;
@@ -657,6 +642,43 @@ window.THD = window.THD || {};
                 el.addEventListener("click", () => onChannelAnomalyClick(channelAnomalies[idx]));
             });
         }
+    }
+
+    // opts: { riseInsight, onRiseClick, pageSpikes, onPageSpikeClick }
+    // Groups the two landing-page-anomaly signals into their own
+    // Overview section, below Key Insights: pageSpikes (zero or more —
+    // see buildTodayYesterdaySpikeInsights) shown first since "spiking
+    // right now" is the most time-sensitive, then the single riseInsight
+    // (see buildRisingLandingPageInsight's rolling-7-day callout). Both
+    // render as clickable list items and jump to the same Landing Pages
+    // detail panel. The whole card hides itself when there's nothing to
+    // show, same pattern as the Landing Pages tab's own insights card
+    // (renderLandingPageInsights) — no empty-state text needed here.
+    function renderTopLandingPageInsights(opts) {
+        opts = opts || {};
+        const { riseInsight, onRiseClick, pageSpikes, onPageSpikeClick } = opts;
+        const card = document.getElementById("topLandingPageInsightsCard");
+        const container = document.getElementById("topLandingPageInsightsList");
+        if (!card || !container) return;
+
+        const items = [];
+
+        (pageSpikes || []).forEach((s, i) => {
+            items.push(`<li class="insightClickable" data-spike-idx="${i}">${s.sentence}</li>`);
+        });
+
+        if (riseInsight) {
+            items.push(`<li class="insightClickable" id="risingPageInsightItem">${riseInsight.sentence}</li>`);
+        }
+
+        if (!items.length) {
+            card.style.display = "none";
+            container.innerHTML = "";
+            return;
+        }
+
+        card.style.display = "";
+        container.innerHTML = items.join("");
 
         if (pageSpikes && pageSpikes.length && onPageSpikeClick) {
             container.querySelectorAll("[data-spike-idx]").forEach((el) => {
@@ -1427,6 +1449,7 @@ window.THD = window.THD || {};
         renderKpis,
         showInitialSkeletons,
         renderInsights,
+        renderTopLandingPageInsights,
         renderRangeCompare,
         renderDataSourceWarning,
         renderTrafficPeriodLabels,

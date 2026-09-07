@@ -953,10 +953,10 @@
 
 }
 
-/* The "rising landing page" insight (buildRisingLandingPageInsight)
-   is the only clickable item in this list — an inset highlight +
-   pointer cursor marks it as "click for detail" rather than a
-   plain fact like the others. */
+/* Shared by both insight cards (Key Insights and Top Landing Pages
+   Insights): an inset highlight + pointer cursor marks a clickable
+   item ("click for detail") apart from a plain fact like the others
+   in the same list. */
 .insightCard li.insightClickable{
 
     cursor:pointer;
