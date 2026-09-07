@@ -54,6 +54,7 @@
     // language change or device-filter change can refresh it in place
     // instead of leaving it showing stale numbers.
     let risingPageInsight = null;
+    let pageSpikes = []; // "spiking today/yesterday" callouts — see buildTodayYesterdaySpikeInsights
     let risingPanelActiveInsight = null;
     let risingPanelActiveGeneric = false;
 
@@ -445,6 +446,19 @@
                     if (isSpikeDay) totalSessions = Math.round(totalSessions * 1.8);
                 }
 
+                // Demo-only: a second, independent spike — on a
+                // different page, concentrated into a different source
+                // — landing exactly on "today" (daysFromEnd 0), so the
+                // Overview "spiking today/yesterday" insights
+                // (buildTodayYesterdaySpikeInsights) also have
+                // something real to surface out of the box, distinct
+                // from the 7-day riser demo above.
+                const todaySpikeSource = "line / social";
+                const isTodaySpikeDay = idx === 9 && daysFromEnd === 0;
+                if (isTodaySpikeDay) {
+                    totalSessions = Math.round(totalSessions * 3.2);
+                }
+
                 const totalPurchases = pageType === "system" ? 0 : (Math.random() < 0.5 ? Math.round(totalSessions * Math.random() * 0.05) : 0);
                 const totalRevenue = totalPurchases * (7000 + Math.random() * 6000);
 
@@ -452,7 +466,11 @@
                 // random weight (renormalized to sum to totalSessions
                 // exactly, remainder on the last source) — purchases
                 // and revenue follow each source's session share.
-                const weights = sources.map((s) => (isSpikeDay && s === spikeSource ? 4 + Math.random() * 2 : Math.random() + 0.1));
+                const weights = sources.map((s) => {
+                    if (isSpikeDay && s === spikeSource) return 4 + Math.random() * 2;
+                    if (isTodaySpikeDay && s === todaySpikeSource) return 4 + Math.random() * 2;
+                    return Math.random() + 0.1;
+                });
                 const weightSum = weights.reduce((a, b) => a + b, 0);
 
                 let assignedSessions = 0;
@@ -562,7 +580,9 @@
             riseInsight: risingPageInsight,
             onRiseClick: onRisingPageInsightClick,
             channelAnomalies,
-            onChannelAnomalyClick: onChannelAnomalyInsightClick
+            onChannelAnomalyClick: onChannelAnomalyInsightClick,
+            pageSpikes,
+            onPageSpikeClick: onRisingPageInsightClick
         });
 
         // Monthly Business Performance recomputed here too (rather
@@ -689,6 +709,7 @@
         // pre-formatted i18n string baked in at build time, same
         // reason the New/Repeat insights below get rebuilt too.
         risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
+        pageSpikes = THD.data.buildTodayYesterdaySpikeInsights(landingRows);
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();
         renderNewRepeatChartOnly();
@@ -913,6 +934,7 @@
         // first renderForRange call — renderForRange is what actually
         // passes it into THD.ui.renderInsights.
         risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
+        pageSpikes = THD.data.buildTodayYesterdaySpikeInsights(landingRows);
 
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();

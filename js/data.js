@@ -1381,6 +1381,107 @@ window.THD = window.THD || {};
     const RISING_PAGE_MIN_PREV_SESSIONS = 10;
     const RISING_PAGE_THRESHOLD_PCT = 100;
 
+    /* ==========================================================
+       Overview "Today/Yesterday Spike" Insights
+       A different question again from both the signal above (best
+       riser over a rolling 7 days) and buildLandingPageInsights'
+       own single-day-spike signal (the ONE biggest spike anywhere
+       in the last 30 days): this checks specifically whether TODAY
+       or YESTERDAY — the two most recent dates actually present in
+       the data, since GA4's own processing lag means "today" here
+       is whatever the freshest row is, not necessarily today's real
+       calendar date — was a spike day for ANY content page, and
+       surfaces every page that qualifies rather than only the
+       single biggest one. A spike from three days ago is old news
+       by the time the rolling-7-day riser signal would catch it;
+       the point here is "is something unusual happening right now",
+       for as many pages as that's actually true of today.
+    ========================================================== */
+
+    const TODAY_YESTERDAY_SPIKE_Z_THRESHOLD = 2;
+    const TODAY_YESTERDAY_SPIKE_MIN_MEAN = 3; // needs a real baseline, not near-zero noise
+
+    function buildTodayYesterdaySpikeInsights(landingRows) {
+        const win = resolveLast30DayWindow(landingRows);
+        if (!win) return [];
+
+        const contentRows = landingRows.filter((r) => r.date >= win.startStr && r.date <= win.endStr && r.pageType !== "system");
+        if (!contentRows.length) return [];
+
+        const todayStr = win.endStr;
+        const yesterdayDate = new Date(win.endStr);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+
+        const allDates = [];
+        for (let d = new Date(win.start); d <= win.end; d.setDate(d.getDate() + 1)) {
+            allDates.push(d.toISOString().slice(0, 10));
+        }
+
+        const byTitle = {};
+        contentRows.forEach((r) => {
+            const key = r.pageTitle || "(not set)";
+            if (!byTitle[key]) byTitle[key] = {};
+            byTitle[key][r.date] = (byTitle[key][r.date] || 0) + r.sessions;
+        });
+
+        const found = [];
+        Object.keys(byTitle).forEach((pageTitle) => {
+            const byDate = byTitle[pageTitle];
+            const values = allDates.map((d) => byDate[d] || 0);
+            const n = values.length;
+            if (n < 5) return;
+
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            if (mean < TODAY_YESTERDAY_SPIKE_MIN_MEAN) return;
+
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            if (!stdDev) return;
+
+            const dailySessions = allDates.map((d) => ({ date: d, sessions: byDate[d] || 0 }));
+
+            [["today", todayStr], ["yesterday", yesterdayStr]].forEach(([dayLabel, dateStr]) => {
+                const value = byDate[dateStr] || 0;
+                const z = (value - mean) / stdDev;
+                if (z >= TODAY_YESTERDAY_SPIKE_Z_THRESHOLD) {
+                    found.push({ pageTitle, dayLabel, date: dateStr, value, mean, dailySessions });
+                }
+            });
+        });
+
+        // Today's spikes first, then yesterday's; within each day, the
+        // most surprising (furthest above its own typical day) first.
+        found.sort((a, b) => {
+            if (a.dayLabel !== b.dayLabel) return a.dayLabel === "today" ? -1 : 1;
+            return (b.value / b.mean) - (a.value / a.mean);
+        });
+
+        // Shaped to match buildRisingLandingPageInsight's return value
+        // (pageTitle/dailySessions/spikeDate/spikeValue/current/
+        // previous) so the exact same click-through — jump to Landing
+        // Pages, open the highlight panel, render the mini chart, open
+        // that day's source breakdown — works for these too with no
+        // separate handler needed. spikeSummary:true tells
+        // renderLandingRisingPanel to show "spiked on {date}" phrasing
+        // instead of the rising-insight's "this week vs last week" one,
+        // since that framing would be wrong for a single-day spike.
+        return found.map((f) => ({
+            pageTitle: f.pageTitle,
+            spikeDate: f.date,
+            spikeValue: f.value,
+            dailySessions: f.dailySessions,
+            current: f.value,
+            baseline: f.mean,
+            spikeSummary: true,
+            sentence: window.I18N.t(f.dayLabel === "today" ? "landingInsight.spikeToday" : "landingInsight.spikeYesterday", {
+                title: `<strong>${f.pageTitle}</strong>`,
+                figure: highlight(Math.round(f.value).toLocaleString("en-US"), "pos"),
+                mean: Math.round(f.mean).toLocaleString("en-US")
+            })
+        }));
+    }
+
     function buildRisingLandingPageInsight(landingRows) {
         const win = resolveLast30DayWindow(landingRows);
         if (!win) return null;
@@ -1855,6 +1956,7 @@ window.THD = window.THD || {};
         aggregateLandingPages,
         buildLandingPageInsights,
         buildRisingLandingPageInsight,
+        buildTodayYesterdaySpikeInsights,
         buildLandingPageDetail,
         buildTrafficComparison,
         buildChannelTrend,

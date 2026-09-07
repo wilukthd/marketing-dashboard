@@ -407,12 +407,26 @@ window.THD = window.THD || {};
         const summaryEl = document.getElementById("landingRisingPanelSummary");
         const spikeEl = document.getElementById("landingRisingPanelSpike");
 
-        if (iconEl) iconEl.textContent = generic ? "📊" : "📈";
-        if (labelEl) labelEl.textContent = window.I18N.t(generic ? "landing.pageDetailTitle" : "landing.risingPanelTitle");
+        if (iconEl) iconEl.textContent = insight.spikeSummary ? "⚡" : (generic ? "📊" : "📈");
+        if (labelEl) labelEl.textContent = window.I18N.t(insight.spikeSummary ? "landing.spikePanelTitle" : (generic ? "landing.pageDetailTitle" : "landing.risingPanelTitle"));
         if (titleEl) titleEl.textContent = insight.pageTitle;
 
         if (summaryEl) {
-            if (insight.changePct === null || insight.changePct === undefined) {
+            if (insight.spikeSummary) {
+                // A single-day spike vs. this page's own typical day —
+                // deliberately not framed as "this week vs last week"
+                // like the branches below, since that comparison isn't
+                // what triggered this insight (see
+                // buildTodayYesterdaySpikeInsights in data.js).
+                const changePct = insight.baseline ? ((insight.current - insight.baseline) / insight.baseline) * 100 : 0;
+                const figure = `<span class="insightNum pos">+${Math.round(changePct)}%</span>`;
+                summaryEl.innerHTML = window.I18N.t("landing.spikePanelSummary", {
+                    current: Math.round(insight.current).toLocaleString("en-US"),
+                    baseline: Math.round(insight.baseline).toLocaleString("en-US"),
+                    date: insight.spikeDate,
+                    figure
+                });
+            } else if (insight.changePct === null || insight.changePct === undefined) {
                 summaryEl.innerHTML = window.I18N.t("landing.risingPanelWeekNew", {
                     current: Math.round(insight.current).toLocaleString("en-US")
                 });
@@ -597,21 +611,30 @@ window.THD = window.THD || {};
     // is appended as its own clickable <li>, styled distinctly so it
     // reads as "click for detail" rather than a plain fact like the
     // others in this list.
-    // opts: { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick }
+    // opts: { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick, pageSpikes, onPageSpikeClick }
     // riseInsight is the single Overview "rising landing page" callout
     // (see buildRisingLandingPageInsight); channelAnomalies is zero or
-    // more Traffic Sources anomalies (see buildChannelAnomalyInsights)
-    // — both render as clickable list items, distinguished from plain
-    // insight text by the .insightClickable class, but wired up
+    // more Traffic Sources anomalies (see buildChannelAnomalyInsights);
+    // pageSpikes is zero or more "spiking today/yesterday" callouts
+    // (see buildTodayYesterdaySpikeInsights) — shown first, since a
+    // spike happening right now is the most time-sensitive of the
+    // three. All render as clickable list items, distinguished from
+    // plain insight text by the .insightClickable class, but wired up
     // separately since they jump to different places (Landing Pages
     // detail panel vs. the Traffic Sources channel-trend view).
     function renderInsights(insights, opts) {
         opts = opts || {};
-        const { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick } = opts;
+        const { riseInsight, onRiseClick, channelAnomalies, onChannelAnomalyClick, pageSpikes, onPageSpikeClick } = opts;
         const container = document.querySelector(".insightCard ul");
         if (!container) return;
 
-        const items = (insights || []).map((text) => `<li>${text}</li>`);
+        const items = [];
+
+        (pageSpikes || []).forEach((s, i) => {
+            items.push(`<li class="insightClickable" data-spike-idx="${i}">${s.sentence}</li>`);
+        });
+
+        items.push(...(insights || []).map((text) => `<li>${text}</li>`));
 
         (channelAnomalies || []).forEach((a, i) => {
             items.push(`<li class="insightClickable" data-anomaly-idx="${i}">${a.sentence}</li>`);
@@ -632,6 +655,13 @@ window.THD = window.THD || {};
             container.querySelectorAll("[data-anomaly-idx]").forEach((el) => {
                 const idx = Number(el.dataset.anomalyIdx);
                 el.addEventListener("click", () => onChannelAnomalyClick(channelAnomalies[idx]));
+            });
+        }
+
+        if (pageSpikes && pageSpikes.length && onPageSpikeClick) {
+            container.querySelectorAll("[data-spike-idx]").forEach((el) => {
+                const idx = Number(el.dataset.spikeIdx);
+                el.addEventListener("click", () => onPageSpikeClick(pageSpikes[idx]));
             });
         }
 
