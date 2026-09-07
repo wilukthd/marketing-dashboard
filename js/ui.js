@@ -647,12 +647,16 @@ window.THD = window.THD || {};
     // opts: { riseInsight, onRiseClick, pageSpikes, onPageSpikeClick }
     // Groups the two landing-page-anomaly signals into their own
     // Overview section, below Key Insights: pageSpikes (zero or more —
-    // see buildTodayYesterdaySpikeInsights) shown first since "spiking
-    // right now" is the most time-sensitive, then the single riseInsight
-    // (see buildRisingLandingPageInsight's rolling-7-day callout). Both
-    // render as clickable list items and jump to the same Landing Pages
-    // detail panel. The whole card hides itself when there's nothing to
-    // show, same pattern as the Landing Pages tab's own insights card
+    // see buildTodayYesterdaySpikeInsights) and the single riseInsight
+    // (see buildRisingLandingPageInsight's rolling-7-day callout).
+    // Combined into one list and sorted by session count (`current`)
+    // descending, so whichever page actually had the biggest influx
+    // leads regardless of which detector caught it, rather than always
+    // listing today's spikes, then yesterday's, then the riser, in
+    // that fixed order irrespective of size. Both item types render as
+    // clickable list items and jump to the same Landing Pages detail
+    // panel. The whole card hides itself when there's nothing to show,
+    // same pattern as the Landing Pages tab's own insights card
     // (renderLandingPageInsights) — no empty-state text needed here.
     function renderTopLandingPageInsights(opts) {
         opts = opts || {};
@@ -661,36 +665,27 @@ window.THD = window.THD || {};
         const container = document.getElementById("topLandingPageInsightsList");
         if (!card || !container) return;
 
-        const items = [];
+        const combined = (pageSpikes || []).map((s) => ({ kind: "spike", data: s }));
+        if (riseInsight) combined.push({ kind: "rise", data: riseInsight });
 
-        (pageSpikes || []).forEach((s, i) => {
-            items.push(`<li class="insightClickable" data-spike-idx="${i}">${s.sentence}</li>`);
-        });
+        combined.sort((a, b) => (b.data.current || 0) - (a.data.current || 0));
 
-        if (riseInsight) {
-            items.push(`<li class="insightClickable" id="risingPageInsightItem">${riseInsight.sentence}</li>`);
-        }
-
-        if (!items.length) {
+        if (!combined.length) {
             card.style.display = "none";
             container.innerHTML = "";
             return;
         }
 
         card.style.display = "";
-        container.innerHTML = items.join("");
+        container.innerHTML = combined.map((item) => `<li class="insightClickable">${item.data.sentence}</li>`).join("");
 
-        if (pageSpikes && pageSpikes.length && onPageSpikeClick) {
-            container.querySelectorAll("[data-spike-idx]").forEach((el) => {
-                const idx = Number(el.dataset.spikeIdx);
-                el.addEventListener("click", () => onPageSpikeClick(pageSpikes[idx]));
+        container.querySelectorAll("li.insightClickable").forEach((el, i) => {
+            const item = combined[i];
+            el.addEventListener("click", () => {
+                if (item.kind === "spike" && onPageSpikeClick) onPageSpikeClick(item.data);
+                if (item.kind === "rise" && onRiseClick) onRiseClick(item.data);
             });
-        }
-
-        if (riseInsight && onRiseClick) {
-            const el = document.getElementById("risingPageInsightItem");
-            if (el) el.addEventListener("click", () => onRiseClick(riseInsight));
-        }
+        });
     }
 
     /* ==========================================================
