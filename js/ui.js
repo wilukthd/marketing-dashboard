@@ -16,7 +16,10 @@ window.THD = window.THD || {};
     const fmtYenCompact = (n) => "¥" + (n / 1e6).toFixed(2) + "M";
     const fmtNumber = (n) => Math.round(n).toLocaleString("en-US");
     const fmtPercent = (n) => n.toFixed(2) + "%";
-    const fmtDelta = (n) => (n > 0 ? "▲ " : n < 0 ? "▼ " : "– ") + Math.abs(n).toFixed(1) + "%";
+    const fmtDelta = (n) => (n === null || n === undefined)
+        ? window.I18N.t("traffic.new")
+        : (n > 0 ? "▲ " : n < 0 ? "▼ " : "– ") + Math.abs(n).toFixed(1) + "%";
+    const fmtPts = (n) => (n > 0 ? "▲ " : n < 0 ? "▼ " : "– ") + Math.abs(n).toFixed(2) + "pt";
     const fmtISODate = (d) => {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -193,8 +196,10 @@ window.THD = window.THD || {};
 
             if (deltaEl) {
                 deltaEl.classList.remove("positive", "negative", "neutral");
-                if (hasCompareData) {
-                    deltaEl.textContent = fmtDelta(data.delta);
+                if (hasCompareData && data.delta !== null) {
+                    // CVR reads in points (6.07% -> 6.79% = +0.72pt).
+                    const usePts = key === "cvr" && data.deltaPts !== null && data.deltaPts !== undefined;
+                    deltaEl.textContent = usePts ? fmtPts(data.deltaPts) : fmtDelta(data.delta);
                     deltaEl.classList.add(data.delta >= 0 ? "positive" : "negative");
                 } else {
                     // Comparison window has no underlying data at all
@@ -916,10 +921,14 @@ window.THD = window.THD || {};
         const isActive = !!activeLabel && activeLabel === row.label;
         const displayLabel = window.I18N.channelLabel(row.label);
 
+        // More unattributed traffic is a tracking problem, not growth —
+        // flip its colors so a jump reads as the warning it is.
+        const upIsBad = row.label === "(not set)";
         let deltaHtml = "—";
         if (prevSessions > 0) {
             const delta = ((curSessions - prevSessions) / prevSessions) * 100;
-            deltaHtml = `<span class="deltaBadge ${delta >= 0 ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
+            const good = upIsBad ? delta <= 0 : delta >= 0;
+            deltaHtml = `<span class="deltaBadge ${good ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
         } else if (curSessions > 0) {
             deltaHtml = `<span class="deltaBadge positive">${window.I18N.t("traffic.new")}</span>`;
         }
@@ -1231,7 +1240,11 @@ window.THD = window.THD || {};
     ========================================================== */
 
     function wireRefreshButton(onRefresh) {
-        const btn = document.querySelector(".primaryButton");
+        // By id: the passcode gate's Unlock button is also a
+        // .primaryButton and comes first in the DOM, so the old
+        // querySelector(".primaryButton") wired THAT instead and the
+        // header Refresh button never did anything.
+        const btn = document.getElementById("refreshBtn");
         if (!btn) return;
 
         btn.addEventListener("click", () => {

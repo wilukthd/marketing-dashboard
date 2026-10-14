@@ -83,7 +83,7 @@ window.I18N = (function () {
             "rangeCompare.noCompareData": "No comparison data available for {start} – {end} (outside the available data range)",
             "kpi.noCompareData": "N/A",
 
-            "kpi.totalUsers": "Total Users",
+            "kpi.totalUsers": "Users (daily sum)",
             "kpi.sessions": "Sessions",
             "kpi.purchases": "Ecommerce Purchases",
             "kpi.revenue": "Total Revenue",
@@ -133,7 +133,7 @@ window.I18N = (function () {
             "landingInsight.spike": "{title} had an unusually high {figure} sessions on {date}, compared to its typical {mean} per day.",
             "landingInsight.spikeToday": "{title} is spiking today — {figure} sessions vs. a typical {mean}.",
             "landingInsight.spikeYesterday": "{title} spiked yesterday — {figure} sessions vs. a typical {mean}.",
-            "landingInsight.overviewRising": "📈 {title} is up {figure} this week vs. last week — click to see when it happened.",
+            "landingInsight.overviewRising": "📈 {title} is up {figure} over the last 7 days ({previous} → {current} sessions vs. the 7 days before).",
             "landing.empty": "No landing page data for this window.",
             "landing.notSet": "(not set)",
 
@@ -171,7 +171,7 @@ window.I18N = (function () {
 
             "th.sourceMediumCol": "Session Source / Medium",
             "th.sessions": "Sessions",
-            "th.totalUsers": "Total Users",
+            "th.totalUsers": "Users (daily sum)",
             "th.ecommercePurchases": "Ecommerce Purchases",
             "th.totalRevenue": "Total Revenue",
             "th.cvr": "CVR",
@@ -346,7 +346,7 @@ window.I18N = (function () {
             "rangeCompare.noCompareData": "{start} – {end} の比較データが見つかりません（データ範囲外）",
             "kpi.noCompareData": "対象外",
 
-            "kpi.totalUsers": "総ユーザー数",
+            "kpi.totalUsers": "延べユーザー数",
             "kpi.sessions": "セッション数",
             "kpi.purchases": "EC購入数",
             "kpi.revenue": "総売上",
@@ -396,7 +396,7 @@ window.I18N = (function () {
             "landingInsight.spike": "{title}は{date}に{figure}セッションと、通常の1日あたり{mean}セッションに比べて突出して多くなりました。",
             "landingInsight.spikeToday": "{title} が本日急上昇中 — {figure} セッション（通常 {mean}）。",
             "landingInsight.spikeYesterday": "{title} が前日急上昇 — {figure} セッション（通常 {mean}）。",
-            "landingInsight.overviewRising": "📈 {title}が今週{figure}増加しています。クリックするといつ急増したか確認できます。",
+            "landingInsight.overviewRising": "📈 {title}が直近7日間で{figure}増加（前の7日間 {previous} → {current} セッション）。",
             "landing.empty": "この期間のランディングページデータはありません。",
             "landing.notSet": "（未設定）",
 
@@ -434,7 +434,7 @@ window.I18N = (function () {
 
             "th.sourceMediumCol": "セッションの参照元 / メディア",
             "th.sessions": "セッション数",
-            "th.totalUsers": "総ユーザー数",
+            "th.totalUsers": "延べユーザー数",
             "th.ecommercePurchases": "EC購入数",
             "th.totalRevenue": "総売上",
             "th.cvr": "CVR",
@@ -575,6 +575,8 @@ window.I18N = (function () {
             "Referral": "参照",
             "Display": "ディスプレイ",
             "Social": "ソーシャル",
+            "Paid Social": "有料ソーシャル",
+            "Affiliates": "アフィリエイト",
             "Other": "その他",
             "(not set)": "（未設定）",
             "Google Ads": "Google 広告",

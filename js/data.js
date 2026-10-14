@@ -79,8 +79,21 @@ window.THD = window.THD || {};
         // worth checking rather than assuming away).
         // Columns: orderId, date, sourceMedium, campaign, revenue,
         // newOrRepeat ("new" or "repeat").
-        TRANSACTIONS_CSV_URL: ""
+        TRANSACTIONS_CSV_URL: "",
+
+        // Conversion-rate target shown on the CVR figure (hit/miss).
+        // Change it here until the paused Goals feature (js/goals.js)
+        // ships and takes over.
+        CVR_TARGET: 6.5
     };
+
+    // Google's published-CSV endpoint is cached, so a plain re-fetch on
+    // "Refresh" can hand back the same file — a throwaway query param
+    // forces a fresh copy.
+    function bustCache(url) {
+        if (!url) return url;
+        return url + (url.includes("?") ? "&" : "?") + "_t=" + Date.now();
+    }
 
     /* ==========================================================
        CSV fetch helper
@@ -92,7 +105,7 @@ window.THD = window.THD || {};
                 reject(new Error("No URL configured"));
                 return;
             }
-            Papa.parse(url, {
+            Papa.parse(bustCache(url), {
                 download: true,
                 header: true,
                 dynamicTyping: true,
@@ -114,7 +127,7 @@ window.THD = window.THD || {};
                 reject(new Error("No URL configured"));
                 return;
             }
-            Papa.parse(url, {
+            Papa.parse(bustCache(url), {
                 download: true,
                 header: false,
                 dynamicTyping: true,
@@ -415,16 +428,30 @@ window.THD = window.THD || {};
         // gaps, ad blockers stripping referrers, etc.) — kept as its
         // own bucket rather than folded into "Other" so it's visible
         // instead of quietly inflating a generic catch-all.
-        if (source === "(not set)" || medium === "(not set)") return "(not set)";
+        if (isUnattributed(source, medium)) return "(not set)";
 
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
         if (medium === "organic") return "Organic Search";
-        if (medium === "cpc" || medium === "ppc" || medium === "paid" || medium === "paidsearch") return "Paid Search";
-        if (medium === "email") return "Email";
+        // Paid social has to be checked before plain "paid"/"social" —
+        // Meta's own auto-tagging sends "paid_social", which used to
+        // fall all the way through to "Other".
+        if (/^(paid[_\- ]?social|social[_\- ]?paid|paidsocial|social[_\- ]?ads?)$/.test(medium)) return "Paid Social";
+        if (medium === "cpc" || medium === "ppc" || medium === "paid" || medium === "paidsearch" || medium === "paid_search") return "Paid Search";
+        if (medium === "email" || medium === "e-mail" || medium === "newsletter" || medium === "mail") return "Email";
+        if (medium === "affiliate" || medium === "affiliates") return "Affiliates";
         if (medium === "referral") return "Referral";
-        if (medium === "display" || medium === "cpm" || medium === "banner") return "Display";
-        if (medium === "social") return "Social";
+        if (medium === "display" || medium === "cpm" || medium === "banner" || medium === "interstitial") return "Display";
+        if (medium === "social" || medium === "social-network" || medium === "social-media" || medium === "sm") return "Social";
         return "Other";
+    }
+
+    // GA4 reports missing attribution two ways: "(not set)" (broken
+    // UTMs, cross-domain gaps) and "(data not available)" (consent mode
+    // / thresholding). Both mean "we don't know where this came from",
+    // so they share one bucket instead of the second hiding in "Other".
+    function isUnattributed(source, medium) {
+        const blank = (v) => v === "(not set)" || v === "(data not available)";
+        return blank(source) || blank(medium);
     }
 
     /* ==========================================================
@@ -464,7 +491,7 @@ window.THD = window.THD || {};
         const source = parts[0] || "";
         const medium = parts[1] || "";
 
-        if (source === "(not set)" || medium === "(not set)") return "(not set)";
+        if (isUnattributed(source, medium)) return "(not set)";
 
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
 
@@ -576,21 +603,40 @@ window.THD = window.THD || {};
         return copy;
     }
 
+    // "YYYY-MM-DD" -> local midnight. new Date("2026-10-01") parses as
+    // UTC midnight, which lands on the PREVIOUS local day for anyone
+    // viewing from a timezone behind UTC — this keeps every row on the
+    // calendar date it was exported for, wherever the viewer is.
+    function parseLocalDate(dateStr) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr));
+        if (!m) return startOfDay(new Date(dateStr));
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
+
     function daysAgo(n, from) {
         const d = startOfDay(from || new Date());
         d.setDate(d.getDate() - n);
         return d;
     }
 
+    // Multi-day ranges end YESTERDAY, not today: today's row is still
+    // filling up (GA4 shows a partial day), so including it compared a
+    // part-day against a window of full days and dragged every delta
+    // and daily average down. "Today" is the one range that still
+    // shows today — flagged partial so the UI can say so.
     const RANGE_DEFS = {
-        "today": () => ({ start: startOfDay(new Date()), end: startOfDay(new Date()) }),
+        "today": () => ({ start: startOfDay(new Date()), end: startOfDay(new Date()), partial: true }),
         "yesterday": () => ({ start: daysAgo(1), end: daysAgo(1) }),
-        "7d": () => ({ start: daysAgo(6), end: startOfDay(new Date()) }),
-        "14d": () => ({ start: daysAgo(13), end: startOfDay(new Date()) }),
-        "30d": () => ({ start: daysAgo(29), end: startOfDay(new Date()) }),
+        "7d": () => ({ start: daysAgo(7), end: daysAgo(1) }),
+        "14d": () => ({ start: daysAgo(14), end: daysAgo(1) }),
+        "30d": () => ({ start: daysAgo(30), end: daysAgo(1) }),
         "month": () => {
             const now = new Date();
-            return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: startOfDay(now) };
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            // On the 1st there are no complete days yet this month —
+            // fall back to today-so-far rather than an empty range.
+            if (now.getDate() === 1) return { start, end: startOfDay(now), partial: true };
+            return { start, end: daysAgo(1) };
         },
         "lastMonth": () => {
             const now = new Date();
@@ -598,11 +644,13 @@ window.THD = window.THD || {};
             const end = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of previous month
             return { start, end: startOfDay(end) };
         },
-        "3m": () => ({ start: daysAgo(89), end: startOfDay(new Date()) }),
-        "6m": () => ({ start: daysAgo(179), end: startOfDay(new Date()) }),
+        "3m": () => ({ start: daysAgo(90), end: daysAgo(1) }),
+        "6m": () => ({ start: daysAgo(180), end: daysAgo(1) }),
         "year": () => {
             const now = new Date();
-            return { start: new Date(now.getFullYear(), 0, 1), end: startOfDay(now) };
+            const start = new Date(now.getFullYear(), 0, 1);
+            if (now.getMonth() === 0 && now.getDate() === 1) return { start, end: startOfDay(now), partial: true };
+            return { start, end: daysAgo(1) };
         },
         "lastYear": () => {
             const y = new Date().getFullYear() - 1;
@@ -622,13 +670,14 @@ window.THD = window.THD || {};
     // custom Jun 1–Sep 2 2026 range compares to Jun 1–Sep 2 2025, not
     // to the 94 days immediately before it.
     function resolveRange(rangeKey, customRange, compareMode = "previous") {
-        let start, end;
+        let start, end, partial = false;
         if (rangeKey === "custom" && customRange && customRange.start && customRange.end) {
             start = startOfDay(customRange.start);
             end = startOfDay(customRange.end);
+            partial = end >= startOfDay(new Date());
         } else {
             const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
-            ({ start, end } = def());
+            ({ start, end, partial = false } = def());
         }
 
         const spanDays = Math.round((end - start) / 86400000) + 1;
@@ -643,11 +692,11 @@ window.THD = window.THD || {};
             prevStart = daysAgo(spanDays - 1, prevEnd);
         }
 
-        return { start, end, spanDays, prevStart, prevEnd, compareMode };
+        return { start, end, spanDays, prevStart, prevEnd, compareMode, partial };
     }
 
     function inRange(dateStr, start, end) {
-        const d = startOfDay(new Date(dateStr));
+        const d = parseLocalDate(dateStr);
         return d >= start && d <= end;
     }
 
@@ -673,7 +722,6 @@ window.THD = window.THD || {};
         const previous = dailyRows.filter((r) => inRange(r.date, prevStart, prevEnd));
 
         const sum = (rows, key) => rows.reduce((acc, r) => acc + r[key], 0);
-        const pctDelta = (curr, prev) => (prev ? ((curr - prev) / prev) * 100 : 0);
 
         const curUsers = sum(current, "users");
         const curSessions = sum(current, "sessions");
@@ -687,6 +735,8 @@ window.THD = window.THD || {};
 
         const curCvr = curSessions ? (curPurchases / curSessions) * 100 : 0;
         const prevCvr = prevSessions ? (prevPurchases / prevSessions) * 100 : 0;
+        const curAov = curPurchases ? curRevenue / curPurchases : 0;
+        const prevAov = prevPurchases ? prevRevenue / prevPurchases : 0;
         const dayCount = current.length || 1;
 
         return {
@@ -703,9 +753,26 @@ window.THD = window.THD || {};
                 sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / dayCount },
                 purchases: { value: curPurchases, delta: pctDelta(curPurchases, prevPurchases), daily: curPurchases / dayCount },
                 revenue: { value: curRevenue, delta: pctDelta(curRevenue, prevRevenue), daily: curRevenue / dayCount },
-                cvr: { value: curCvr, delta: pctDelta(curCvr, prevCvr), daily: 6.50 }
+                aov: { value: curAov, delta: pctDelta(curAov, prevAov), previous: prevAov },
+                // CVR change is reported in percentage POINTS (deltaPts),
+                // which is how it's usually read — "6.07% -> 6.79%" is
+                // +0.72pt, not "+11.9%". delta (relative) is kept for
+                // the trend arrow's direction and the insight ranking.
+                cvr: {
+                    value: curCvr,
+                    delta: pctDelta(curCvr, prevCvr),
+                    deltaPts: prevSessions ? curCvr - prevCvr : null,
+                    target: CONFIG.CVR_TARGET,
+                    daily: CONFIG.CVR_TARGET
+                }
             }
         };
+    }
+
+    // null (not 0) when there's nothing to compare against, so the UI
+    // can say "new" instead of a misleading "0.0%".
+    function pctDelta(curr, prev) {
+        return prev ? ((curr - prev) / prev) * 100 : null;
     }
 
     /* ==========================================================
@@ -734,7 +801,7 @@ window.THD = window.THD || {};
     function buildInsights(kpi, channels, hasCompareData = true) {
         const insights = [];
 
-        if (hasCompareData && kpi && kpi.revenue) {
+        if (hasCompareData && kpi && kpi.revenue && kpi.revenue.delta !== null) {
             const d = kpi.revenue.delta;
             const figure = highlight(`${Math.abs(d).toFixed(1)}%`, d >= 0 ? "pos" : "neg");
             const direction = window.I18N.t(d >= 0 ? "insight.increased" : "insight.decreased");
@@ -768,7 +835,8 @@ window.THD = window.THD || {};
             ];
             let biggest = null;
             movers.forEach(({ key, labelKey }) => {
-                const d = kpi[key] ? kpi[key].delta : 0;
+                const d = kpi[key] ? kpi[key].delta : null;
+                if (d === null) return;
                 if (!biggest || Math.abs(d) > Math.abs(biggest.delta)) biggest = { labelKey, delta: d };
             });
             if (biggest) {
@@ -778,7 +846,7 @@ window.THD = window.THD || {};
             }
         }
 
-        if (hasCompareData && kpi && kpi.cvr) {
+        if (hasCompareData && kpi && kpi.cvr && kpi.cvr.delta !== null) {
             const d = kpi.cvr.delta;
             const figure = highlight(`${kpi.cvr.value.toFixed(2)}%`, d >= 0 ? "pos" : "neg");
             const direction = window.I18N.t(d >= 0 ? "insight.cvrImproved" : "insight.cvrDeclined");
@@ -979,6 +1047,8 @@ window.THD = window.THD || {};
        exact same grouping (platform/channel) currently on screen.
     ========================================================== */
 
+    const CHANNEL_ANOMALY_MIN_MEAN = 20; // sessions/day
+
     function buildChannelAnomalyInsights(sourceRows, channels, groupBy, range) {
         if (!channels || !channels.length || !range) return [];
 
@@ -991,6 +1061,9 @@ window.THD = window.THD || {};
             if (n < ANOMALY_MIN_DAYS) return;
 
             const mean = values.reduce((a, b) => a + b, 0) / n;
+            // Tiny channels swing wildly in relative terms (2 -> 6
+            // sessions is a "spike" by z-score) — skip them.
+            if (mean < CHANNEL_ANOMALY_MIN_MEAN) return;
             const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
             const stdDev = Math.sqrt(variance);
             if (!stdDev) return;
@@ -1399,7 +1472,12 @@ window.THD = window.THD || {};
     ========================================================== */
 
     const TODAY_YESTERDAY_SPIKE_Z_THRESHOLD = 2;
-    const TODAY_YESTERDAY_SPIKE_MIN_MEAN = 3; // needs a real baseline, not near-zero noise
+    const TODAY_YESTERDAY_SPIKE_MIN_MEAN = 5; // needs a real baseline, not near-zero noise
+    // A spike also has to be big in absolute terms — 8 sessions vs a
+    // usual 3 clears the z-score bar but isn't worth anyone's time,
+    // and at the old thresholds ~80 pages qualified on a normal day.
+    const TODAY_YESTERDAY_SPIKE_MIN_SESSIONS = 30;
+    const TODAY_YESTERDAY_SPIKE_MIN_RATIO = 2; // at least 2x the page's usual day
 
     function buildTodayYesterdaySpikeInsights(landingRows) {
         const win = resolveLast30DayWindow(landingRows);
@@ -1444,11 +1522,23 @@ window.THD = window.THD || {};
             [["today", todayStr], ["yesterday", yesterdayStr]].forEach(([dayLabel, dateStr]) => {
                 const value = byDate[dateStr] || 0;
                 const z = (value - mean) / stdDev;
-                if (z >= TODAY_YESTERDAY_SPIKE_Z_THRESHOLD) {
+                if (z >= TODAY_YESTERDAY_SPIKE_Z_THRESHOLD &&
+                    value >= TODAY_YESTERDAY_SPIKE_MIN_SESSIONS &&
+                    value >= mean * TODAY_YESTERDAY_SPIKE_MIN_RATIO) {
                     found.push({ pageTitle, dayLabel, date: dateStr, value, mean, dailySessions });
                 }
             });
         });
+
+        // One entry per page: a page that spiked both days used to be
+        // listed twice. Keep whichever day was the bigger jump.
+        const bestByPage = {};
+        found.forEach((f) => {
+            const prev = bestByPage[f.pageTitle];
+            if (!prev || f.value / f.mean > prev.value / prev.mean) bestByPage[f.pageTitle] = f;
+        });
+        found.length = 0;
+        found.push(...Object.values(bestByPage));
 
         // Today's spikes first, then yesterday's; within each day, the
         // most surprising (furthest above its own typical day) first.
@@ -1516,7 +1606,9 @@ window.THD = window.THD || {};
 
         const sentence = window.I18N.t("landingInsight.overviewRising", {
             title: `<strong>${best.pageTitle}</strong>`,
-            figure: highlight(`+${Math.round(best.changePct)}%`, "pos")
+            figure: highlight(`+${Math.round(best.changePct)}%`, "pos"),
+            previous: Math.round(best.previous).toLocaleString("en-US"),
+            current: Math.round(best.current).toLocaleString("en-US")
         });
 
         return {
