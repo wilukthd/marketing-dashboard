@@ -519,23 +519,37 @@ body[data-view="overview"] .rangeCompareBar{
 
 .vital:first-child{ border-left:none; padding-left:0; }
 
-.vital::before{
+/* "On the chart" marker. This used to be a top rule that also slid
+   in on hover, so the plotted cards looked like a hover animation
+   that got stuck. Now it's an explicit chip, and hover only tints. */
 
-    content:"";
+.vitalOnChart{
+
+    display:none;
     position:absolute;
-    left:0;
-    right:0;
-    top:-1px;
-    height:2px;
-    background:var(--vital);
-    transform:scaleX(0);
-    transform-origin:left;
-    transition:transform .3s;
+    top:17px;
+    right:12px;
+    align-items:center;
+    gap:5px;
+    white-space:nowrap;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:.02em;
+    color:var(--vital);
 
 }
 
-.vital.isPlotted::before,
-.vital:hover::before{ transform:scaleX(1); }
+.vitalOnChart::before{
+
+    content:"";
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--vital);
+
+}
+
+.vital.isPlotted .vitalOnChart{ display:inline-flex; }
 
 .vital:hover{ background:var(--surface-2); }
 
@@ -1064,7 +1078,6 @@ body[data-view="overview"] .rangeCompareBar{
 @media(prefers-reduced-motion:reduce){
 
     .story{ animation:none; }
-    .vital::before,
     .storyOpen{ transition:none; }
 
 }
@@ -1152,5 +1165,12 @@ body[data-view="overview"] .rangeCompareBar{
     .trendCard,
     .trafficChannelTrendWrap,
     .landingRisingPanel{ scroll-margin-top:112px; }
+
+}
+
+/* Narrow vital cards: the on-chart marker shrinks to just its dot. */
+@media(max-width:1180px){
+
+    .vitalOnChart{ font-size:0; gap:0; }
 
 }

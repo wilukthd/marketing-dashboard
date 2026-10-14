@@ -242,7 +242,7 @@
 
     function onVitalPick(vital) {
         if (!vital) return;
-        if (vital.chart) THD.ui.plotMetric(vital.chart);
+        if (vital.chart) THD.ui.plotMetric(vital.chart, true);
         else THD.ui.switchToView("sales", THD.charts.resizeCharts); // order value lives on the Sales tab
     }
 

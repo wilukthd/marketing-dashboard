@@ -1558,7 +1558,7 @@ window.THD = window.THD || {};
             return `
                 <button class="vital${plotted ? " isPlotted" : ""}" type="button" data-vital="${v.key}" style="--vital:var(--m-${v.key})"
                         ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
-                    <span class="vitalLabel">${window.I18N.t(v.labelKey)}</span>
+                    <span class="vitalLabel">${window.I18N.t(v.labelKey)}${v.chart ? `<span class="vitalOnChart">${window.I18N.t("brief.vital.onChart")}</span>` : ""}</span>
                     <span class="vitalValue">${v.fmt(data.value)}</span>
                     <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData, partial)}${targetHtml}</span>
                     ${sparkSvg(values, { target, w: 140, h: 34 })}
@@ -1576,16 +1576,27 @@ window.THD = window.THD || {};
     // Turns one metric's checkbox on (if it isn't already) and lets the
     // existing change listener re-render the chart — keeps the vitals
     // and the chart's own toggles as one source of truth.
-    function plotMetric(metric) {
+    // toggle: true = clicking an already-plotted metric removes it
+    // (vital signs); false = always add it (story click-throughs).
+    function plotMetric(metric, toggle) {
         const container = document.getElementById("metricToggles");
         if (!container) return;
         const cb = container.querySelector(`.metricToggle[data-metric="${metric}"] input`);
         if (!cb) return;
+        if (toggle && cb.checked) {
+            cb.checked = false;
+            cb.dispatchEvent(new Event("change"));
+            syncVitalsPlotted();
+            return;
+        }
         if (!cb.checked) {
             cb.checked = true;
             cb.dispatchEvent(new Event("change"));
         }
         syncVitalsPlotted();
+        // Story click-throughs jump to the chart; toggling vitals stays
+        // put so several can be switched on in a row.
+        if (toggle) return;
         const card = document.getElementById("trendCard");
         if (card) card.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
     }
