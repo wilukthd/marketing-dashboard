@@ -713,6 +713,7 @@
     }
 
     function renderTrendOnly() {
+        THD.ui.syncVitalsPlotted();
         const filtered = lastFiltered || THD.data.filterDailyRange(dailyRows, currentRange, currentCustomRange, compareMode);
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
             showTrendOverlay: THD.ui.getTrendOverlayState()
@@ -743,8 +744,9 @@
         if (applyBtn) {
             applyBtn.addEventListener("click", () => {
                 if (!startInput.value || !endInput.value) return;
-                const start = new Date(startInput.value);
-                const end = new Date(endInput.value);
+                // (6) local dates — new Date("YYYY-MM-DD") is UTC midnight
+                const start = THD.data.parseLocalDate(startInput.value);
+                const end = THD.data.parseLocalDate(endInput.value);
                 if (start > end) return;
                 renderForRange("custom", { start, end });
             });
@@ -973,6 +975,7 @@
         ]);
 
         dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows();
+        THD.data.setLatestDataDate(latestDataDate(dailyRows));
         sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
         landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
         adSpendRows = liveAdSpend && liveAdSpend.length ? liveAdSpend : buildDummyAdSpend();

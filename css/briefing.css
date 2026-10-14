@@ -1143,3 +1143,14 @@ body[data-view="overview"] .rangeCompareBar{
 [data-theme="dark"] .modernTable thead{ background:var(--surface-2); }
 [data-theme="dark"] .modernTable tbody tr:nth-child(even){ background:color-mix(in srgb, var(--surface) 70%, var(--surface-2)); }
 [data-theme="dark"] .modernTable tbody tr:hover{ background:var(--signal-light); }
+
+@media(max-width:720px){
+
+    /* the top bar wraps to two rows here (~100px) */
+    .chartCard,
+    .tableCard,
+    .trendCard,
+    .trafficChannelTrendWrap,
+    .landingRisingPanel{ scroll-margin-top:112px; }
+
+}

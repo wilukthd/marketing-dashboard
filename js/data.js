@@ -674,6 +674,13 @@ window.THD = window.THD || {};
     // one year back, regardless of which range is selected — e.g. a
     // custom Jun 1–Sep 2 2026 range compares to Jun 1–Sep 2 2025, not
     // to the 94 days immediately before it.
+    // Set by app.js once the daily feed loads (see setLatestDataDate).
+    let latestDataDate = null;
+
+    function setLatestDataDate(d) {
+        latestDataDate = d ? startOfDay(d) : null;
+    }
+
     function resolveRange(rangeKey, customRange, compareMode = "previous") {
         let start, end, partial = false;
         if (rangeKey === "custom" && customRange && customRange.start && customRange.end) {
@@ -683,6 +690,13 @@ window.THD = window.THD || {};
         } else {
             const def = RANGE_DEFS[rangeKey] || RANGE_DEFS["month"];
             ({ start, end, partial = false } = def());
+        }
+
+        // (2) GA4 exports can lag: if yesterday hasn't landed yet, a
+        // "last 7 days" ending yesterday would really hold 6 days and
+        // be compared with 7. Clamp to the last date in the data.
+        if (!partial && latestDataDate && end > latestDataDate && latestDataDate >= start) {
+            end = new Date(latestDataDate);
         }
 
         const spanDays = Math.round((end - start) / 86400000) + 1;
@@ -817,7 +831,7 @@ window.THD = window.THD || {};
             const totalRevenue = channels.reduce((sum, c) => sum + c.revenue, 0);
             const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
             const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
-            const label = `<strong>${window.I18N.channelLabel(topByRevenue.label)}</strong>`;
+            const label = `<strong>${escapeHtml(window.I18N.channelLabel(topByRevenue.label))}</strong>`;
             insights.push(window.I18N.t("insight.topChannelRevenue", { label, figure: highlight(share + "%", "neutral") }));
 
             const notSet = channels.find((c) => c.label === "(not set)");
@@ -826,7 +840,7 @@ window.THD = window.THD || {};
                 const notSetShare = totalSessions ? Math.round((notSet.sessions / totalSessions) * 100) : 0;
                 if (notSetShare >= 5) {
                     const figure = highlight(notSetShare + "%", "neg");
-                    const notSetLabel = `<strong>${window.I18N.channelLabel("(not set)")}</strong>`;
+                    const notSetLabel = `<strong>${escapeHtml(window.I18N.channelLabel("(not set)"))}</strong>`;
                     insights.push(window.I18N.t("insight.notSetShare", { figure, notSet: notSetLabel }));
                 }
             }
@@ -1113,7 +1127,7 @@ window.THD = window.THD || {};
             const verb = window.I18N.t(a.direction === "spike" ? "anomaly.spike" : "anomaly.drop");
             const figure = highlight(Math.round(a.value).toLocaleString("en-US"), a.direction === "spike" ? "pos" : "neg");
             const sentence = window.I18N.t("anomaly.sentence", {
-                metric: `<strong>${window.I18N.channelLabel(a.channel)}</strong>`,
+                metric: `<strong>${escapeHtml(window.I18N.channelLabel(a.channel))}</strong>`,
                 verb,
                 date: a.date,
                 figure,
@@ -1163,14 +1177,25 @@ window.THD = window.THD || {};
     // }
     function buildBriefing(input) {
         const t = window.I18N.t;
-        const chLabel = (l) => window.I18N.channelLabel(l);
+        const chLabel = (l) => escapeHtml(window.I18N.channelLabel(l));
         const { kpi, hasCompareData, channels = [], comparisonRows = [], range } = input;
         const stories = [];
+
+        // (1) Nothing in the window yet (e.g. "Today" before the first
+        // export lands) — say so instead of "Revenue ¥0, −100%" and a
+        // "CVR 0.00% below target" lead story.
+        if (!kpi.sessions || !kpi.sessions.value) {
+            return { headline: { main: t("brief.headline.empty"), dek: "" }, stories: [] };
+        }
+        // A partial day (Today, or the 1st of the month) compared against
+        // full days isn't a fair fight — keep the numbers, drop the
+        // comparisons that would read as a collapse.
+        const fairCompare = hasCompareData && !(range && range.partial);
 
         const channelSpark = (label) => {
             if (!input.sourceRows || !range) return null;
             const trend = buildChannelTrend(input.sourceRows, label, input.groupBy, range);
-            return { values: trend.series.sessions.current, compare: trend.series.sessions.previous };
+            return { values: trend.series.sessions.current, compare: trend.series.sessions.previous, labels: trend.labels };
         };
 
         const siteCvr = kpi.cvr.value;
@@ -1179,7 +1204,10 @@ window.THD = window.THD || {};
 
         // ---- 1. Tracking gap: unattributed sessions ----
         const notSetRow = comparisonRows.find((r) => r.label === "(not set)");
-        if (notSetRow && notSetRow.current && totalSessions) {
+        // Skipped on a partial day: GA4 reports the freshest hours as
+        // "(not set)" until attribution is processed (often 70%+ of
+        // today), which is lag, not a broken tracker.
+        if (notSetRow && notSetRow.current && totalSessions && !(range && range.partial)) {
             const cur = notSetRow.current.sessions;
             const prev = notSetRow.previous ? notSetRow.previous.sessions : 0;
             const share = (cur / totalSessions) * 100;
@@ -1203,7 +1231,7 @@ window.THD = window.THD || {};
         }
 
         // ---- 2. CVR vs target ----
-        if (kpi.cvr && kpi.cvr.target) {
+        if (kpi.cvr && kpi.cvr.target && fairCompare) {
             const gap = kpi.cvr.value - kpi.cvr.target;
             const below = gap < 0;
             stories.push({
@@ -1322,7 +1350,7 @@ window.THD = window.THD || {};
                 title: t(spike ? "brief.chDay.spikeTitle" : "brief.chDay.dropTitle", { date: a.date, label: chLabel(a.channel) }),
                 body: t("brief.day.body", { value: fmtInt(a.value), mean: fmtInt(a.mean) }),
                 stat: (a.value / (a.mean || 1)).toFixed(1) + "×",
-                spark: spark ? { ...spark, highlight: (input.labels || []).indexOf(a.date) } : null,
+                spark: spark ? { ...spark, highlight: spark.labels.indexOf(a.date) } : null,
                 action: { type: "channel", channel: a.channel },
                 score: 45 + Math.min(Math.abs(a.z) * 3, 10)
             });
@@ -1340,7 +1368,7 @@ window.THD = window.THD || {};
         });
 
         // ---- 6. Average order value ----
-        if (hasCompareData && kpi.aov && kpi.aov.delta !== null && Math.abs(kpi.aov.delta) >= BRIEF_AOV_MOVE_PCT) {
+        if (fairCompare && kpi.aov && kpi.aov.delta !== null && Math.abs(kpi.aov.delta) >= BRIEF_AOV_MOVE_PCT) {
             const up = kpi.aov.delta > 0;
             stories.push({
                 id: "aov",
@@ -1407,7 +1435,8 @@ window.THD = window.THD || {};
 
     function buildHeadline(input, stories) {
         const t = window.I18N.t;
-        const { kpi, hasCompareData, channels = [] } = input;
+        const { kpi, channels = [] } = input;
+        const hasCompareData = input.hasCompareData && !(input.range && input.range.partial);
         const rev = kpi.revenue;
 
         let main;
@@ -1422,7 +1451,7 @@ window.THD = window.THD || {};
 
         const parts = [];
         const totalRevenue = channels.reduce((s, c) => s + c.revenue, 0);
-        const top = channels.slice().sort((a, b) => b.revenue - a.revenue)[0];
+        const top = channels.filter((c) => c.label !== "(not set)").sort((a, b) => b.revenue - a.revenue)[0];
         if (top && totalRevenue) {
             parts.push(t("brief.dek.topChannel", {
                 label: window.I18N.channelLabel(top.label),
@@ -1603,7 +1632,7 @@ window.THD = window.THD || {};
         if (biggestMover && Math.abs(biggestMover.change) >= 20) {
             const key = biggestMover.change >= 0 ? "landingInsight.rising" : "landingInsight.cooling";
             insights.push(window.I18N.t(key, {
-                title: `<strong>${biggestMover.pageTitle}</strong>`,
+                title: `<strong>${escapeHtml(biggestMover.pageTitle)}</strong>`,
                 figure: highlight(Math.abs(biggestMover.change).toFixed(0) + "%", biggestMover.change >= 0 ? "pos" : "neg")
             }));
         }
@@ -1633,7 +1662,7 @@ window.THD = window.THD || {};
                 : window.I18N.t("landing.pc");
             const figure = Math.max(biggestMismatch.spShare, 100 - biggestMismatch.spShare);
             insights.push(window.I18N.t("landingInsight.deviceMismatch", {
-                title: `<strong>${biggestMismatch.pageTitle}</strong>`,
+                title: `<strong>${escapeHtml(biggestMismatch.pageTitle)}</strong>`,
                 device: deviceLabel,
                 figure: highlight(figure.toFixed(0) + "%", "neutral")
             }));
@@ -1676,7 +1705,7 @@ window.THD = window.THD || {};
         });
         if (biggestSpike) {
             insights.push(window.I18N.t("landingInsight.spike", {
-                title: `<strong>${biggestSpike.pageTitle}</strong>`,
+                title: `<strong>${escapeHtml(biggestSpike.pageTitle)}</strong>`,
                 date: biggestSpike.date,
                 figure: highlight(Math.round(biggestSpike.value).toLocaleString("en-US"), "pos"),
                 mean: Math.round(biggestSpike.mean).toLocaleString("en-US")
@@ -1892,7 +1921,7 @@ window.THD = window.THD || {};
             baseline: f.mean,
             spikeSummary: true,
             sentence: window.I18N.t(f.dayLabel === "today" ? "landingInsight.spikeToday" : "landingInsight.spikeYesterday", {
-                title: `<strong>${f.pageTitle}</strong>`,
+                title: `<strong>${escapeHtml(f.pageTitle)}</strong>`,
                 figure: highlight(Math.round(f.value).toLocaleString("en-US"), "pos"),
                 mean: Math.round(f.mean).toLocaleString("en-US")
             })
@@ -1932,7 +1961,7 @@ window.THD = window.THD || {};
         const { dailySessions, mean, spikeDate, spikeValue } = buildLandingPageDailySeries(contentRows, win, best.pageTitle);
 
         const sentence = window.I18N.t("landingInsight.overviewRising", {
-            title: `<strong>${best.pageTitle}</strong>`,
+            title: `<strong>${escapeHtml(best.pageTitle)}</strong>`,
             figure: highlight(`+${Math.round(best.changePct)}%`, "pos"),
             previous: Math.round(best.previous).toLocaleString("en-US"),
             current: Math.round(best.current).toLocaleString("en-US")
@@ -2371,6 +2400,8 @@ window.THD = window.THD || {};
         buildAnomalyInsights,
         buildChannelAnomalyInsights,
         buildBriefing,
+        setLatestDataDate,
+        parseLocalDate,
         resolveRange,
         hasDataInRange,
         filterDailyRange,

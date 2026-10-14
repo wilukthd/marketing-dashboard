@@ -1582,12 +1582,19 @@ window.THD = window.THD || {};
             cb.checked = true;
             cb.dispatchEvent(new Event("change"));
         }
-        document.querySelectorAll(".vital").forEach((b) => {
-            const def = VITALS.find((v) => v.key === b.dataset.vital);
-            b.classList.toggle("isPlotted", !!(def && def.chart && getCheckedMetrics().includes(def.chart)));
-        });
+        syncVitalsPlotted();
         const card = document.getElementById("trendCard");
         if (card) card.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }
+
+    // Keeps each vital's "plotted" underline in step with the chart's
+    // own checkboxes, however they were toggled.
+    function syncVitalsPlotted() {
+        const checked = getCheckedMetrics();
+        document.querySelectorAll(".vital").forEach((b) => {
+            const def = VITALS.find((v) => v.key === b.dataset.vital);
+            b.classList.toggle("isPlotted", !!(def && def.chart && checked.includes(def.chart)));
+        });
     }
 
     function renderBriefHeader(range, hasCompareData, dataAsOf) {
@@ -1664,6 +1671,7 @@ window.THD = window.THD || {};
         renderBriefHeader,
         renderVitals,
         plotMetric,
+        syncVitalsPlotted,
         renderLastUpdate,
         renderKpis,
         showInitialSkeletons,

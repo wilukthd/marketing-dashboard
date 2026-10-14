@@ -61,7 +61,9 @@
        print their current value/checked state, which is exactly
        the filter/toggle information worth keeping in the export. */
     .sidebar,
-    button{
+    .topbar,
+    .storyOpen,
+    button:not(.vital){
 
         display:none !important;
 
