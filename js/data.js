@@ -711,7 +711,10 @@ window.THD = window.THD || {};
             prevStart = daysAgo(spanDays - 1, prevEnd);
         }
 
-        return { start, end, spanDays, prevStart, prevEnd, compareMode, partial };
+        // isYoy: the comparison window really is "same dates last year" —
+        // either chosen explicitly, or implied by a year-level range.
+        const isYoy = compareMode === "yoy" || YEAR_ALIGNED_RANGES.has(rangeKey);
+        return { start, end, spanDays, prevStart, prevEnd, compareMode, partial, isYoy };
     }
 
     function inRange(dateStr, start, end) {
@@ -1242,7 +1245,10 @@ window.THD = window.THD || {};
                     cvr: kpi.cvr.value.toFixed(2), target: kpi.cvr.target.toFixed(2)
                 }),
                 body: kpi.cvr.deltaPts !== null && hasCompareData
-                    ? t("brief.cvr.body", { pts: (kpi.cvr.deltaPts >= 0 ? "+" : "−") + Math.abs(kpi.cvr.deltaPts).toFixed(2) })
+                    ? t("brief.cvr.body", {
+                        pts: (kpi.cvr.deltaPts >= 0 ? "+" : "−") + Math.abs(kpi.cvr.deltaPts).toFixed(2),
+                        vs: t(range && range.isYoy ? "brief.vs.yoy" : "brief.vs.prev")
+                    })
                     : "",
                 stat: (gap >= 0 ? "+" : "−") + Math.abs(gap).toFixed(2) + "pt",
                 spark: { values: input.series.cvr, target: kpi.cvr.target },
@@ -1443,7 +1449,8 @@ window.THD = window.THD || {};
         if (hasCompareData && rev.delta !== null) {
             main = t(rev.delta >= 0 ? "brief.headline.up" : "brief.headline.down", {
                 revenue: `<span class="hlNum">${fmtYenShort(rev.value)}</span>`,
-                delta: `<span class="hlDelta ${rev.delta >= 0 ? "pos" : "neg"}">${fmtPctSigned(rev.delta)}</span>`
+                delta: `<span class="hlDelta ${rev.delta >= 0 ? "pos" : "neg"}">${fmtPctSigned(rev.delta)}</span>`,
+                vs: t(input.range && input.range.isYoy ? "brief.vs.yoy" : "brief.vs.prev")
             });
         } else {
             main = t("brief.headline.flat", { revenue: `<span class="hlNum">${fmtYenShort(rev.value)}</span>` });

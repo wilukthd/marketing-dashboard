@@ -580,7 +580,7 @@
         lastFiltered = filtered;
         THD.ui.renderKpis(filtered.kpi, hasCompareData);
         THD.ui.renderBriefHeader(range, hasCompareData, latestDataDate(effectiveDailyRows));
-        THD.ui.renderVitals(filtered.kpi, filtered.series, hasCompareData, onVitalPick);
+        THD.ui.renderVitals(filtered.kpi, filtered.series, hasCompareData, onVitalPick, range.partial);
         THD.ui.renderRangeCompare(range, hasCompareData);
         THD.ui.renderTrafficPeriodLabels(range);
 

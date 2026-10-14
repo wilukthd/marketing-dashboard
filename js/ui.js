@@ -55,7 +55,7 @@ window.THD = window.THD || {};
                 </span>
             `;
         } else {
-            const compareLabelKey = range.compareMode === "yoy" ? "rangeCompare.vsYoy" : "rangeCompare.vsPrevious";
+            const compareLabelKey = range.isYoy ? "rangeCompare.vsYoy" : "rangeCompare.vsPrevious";
             el.innerHTML = `
                 <i data-lucide="calendar-range"></i>
                 ${lookingAt}
@@ -1525,19 +1525,22 @@ window.THD = window.THD || {};
         { key: "users", labelKey: "brief.vital.users", fmt: fmtNumber, chart: "users" }
     ];
 
-    function vitalDeltaHtml(key, data, hasCompareData) {
+    function vitalDeltaHtml(key, data, hasCompareData, partial) {
+        // A partial day vs full days isn't a real comparison (−90% at 10am).
+        if (partial) return `<span class="vitalDelta neutral">${window.I18N.t("brief.vital.partial")}</span>`;
         if (!hasCompareData) return `<span class="vitalDelta neutral">${window.I18N.t("kpi.noCompareData")}</span>`;
+        // CVR reads in points, and a points change exists even when the
+        // relative change doesn't (0% -> 5% is +5.00pt, not "new").
+        if (key === "cvr" && Number.isFinite(data.deltaPts)) {
+            return `<span class="vitalDelta ${data.deltaPts >= 0 ? "pos" : "neg"}">${fmtPts(data.deltaPts)}</span>`;
+        }
         if (data.delta === null || data.delta === undefined) return `<span class="vitalDelta neutral">${window.I18N.t("brief.vital.new")}</span>`;
-        const cls = data.delta >= 0 ? "pos" : "neg";
-        const text = key === "cvr" && data.deltaPts !== null && data.deltaPts !== undefined
-            ? fmtPts(data.deltaPts)
-            : fmtDelta(data.delta);
-        return `<span class="vitalDelta ${cls}">${text}</span>`;
+        return `<span class="vitalDelta ${data.delta >= 0 ? "pos" : "neg"}">${fmtDelta(data.delta)}</span>`;
     }
 
     // series: filterDailyRange(...).series — aov's daily series is
     // derived here (revenue / purchases per day).
-    function renderVitals(kpi, series, hasCompareData, onPick) {
+    function renderVitals(kpi, series, hasCompareData, onPick, partial) {
         const el = document.getElementById("vitals");
         if (!el || !kpi) return;
         const aovSeries = (series.revenue || []).map((r, i) => (series.purchases[i] ? r / series.purchases[i] : 0));
@@ -1557,7 +1560,7 @@ window.THD = window.THD || {};
                         ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
                     <span class="vitalLabel">${window.I18N.t(v.labelKey)}</span>
                     <span class="vitalValue">${v.fmt(data.value)}</span>
-                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData)}${targetHtml}</span>
+                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData, partial)}${targetHtml}</span>
                     ${sparkSvg(values, { target, w: 140, h: 34 })}
                 </button>`;
         }).join("");
@@ -1606,7 +1609,7 @@ window.THD = window.THD || {};
         if (rangeEl) rangeEl.textContent = window.I18N.t("brief.kickerRange", { start: fmt(range.start), end: fmt(range.end) });
         if (cmpEl) {
             cmpEl.textContent = hasCompareData
-                ? window.I18N.t(range.compareMode === "yoy" ? "brief.kickerYoy" : "brief.kickerCompare", { start: fmt(range.prevStart), end: fmt(range.prevEnd) })
+                ? window.I18N.t(range.isYoy ? "brief.kickerYoy" : "brief.kickerCompare", { start: fmt(range.prevStart), end: fmt(range.prevEnd) })
                 : window.I18N.t("rangeCompare.noCompareData", { start: fmtISODate(range.prevStart), end: fmtISODate(range.prevEnd) });
             cmpEl.classList.toggle("isWarning", !hasCompareData);
         }
