@@ -603,6 +603,11 @@ window.THD = window.THD || {};
         return copy;
     }
 
+    // Local midnight Date -> "YYYY-MM-DD" (the inverse of parseLocalDate).
+    function toLocalDateKey(d) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
     // "YYYY-MM-DD" -> local midnight. new Date("2026-10-01") parses as
     // UTC midnight, which lands on the PREVIOUS local day for anyone
     // viewing from a timezone behind UTC — this keeps every row on the
@@ -995,6 +1000,10 @@ window.THD = window.THD || {};
                 const z = (v - mean) / stdDev;
                 if (Math.abs(z) >= ANOMALY_Z_THRESHOLD) {
                     anomalies.push({
+                        key,
+                        index: i,
+                        value: v,
+                        mean,
                         metric: window.I18N.t(ANOMALY_METRIC_I18N_KEYS[key] || key),
                         date: labels[i],
                         valueText: format(v),
@@ -1112,6 +1121,324 @@ window.THD = window.THD || {};
             });
             return { ...a, sentence };
         });
+    }
+
+    /* ==========================================================
+       Briefing (Overview)
+       Turns everything already computed for the selected period
+       into (1) a one-line headline + supporting sentence and
+       (2) a ranked list of "stories" — what changed, why it
+       matters, and where to look next. Each story carries its own
+       small series for a sparkline and an `action` the UI can hand
+       back to app.js for the click-through, so the Overview reads
+       top to bottom like a morning briefing instead of a grid of
+       numbers the reader has to interpret themselves.
+
+       Scores are deliberately simple and fixed per story type
+       (tracking problems > conversion problems > spikes > FYIs),
+       nudged by size, so the ordering is predictable and easy to
+       tune here rather than emerging from an opaque formula.
+    ========================================================== */
+
+    const BRIEF_MIN_CHANNEL_SESSIONS = 300;   // ignore tiny channels for efficiency stories
+    const BRIEF_LOW_CVR_RATIO = 0.4;          // < 40% of site CVR = "not converting"
+    const BRIEF_HIGH_CVR_RATIO = 2;           // >= 2x site CVR = "high-efficiency"
+    const BRIEF_AOV_MOVE_PCT = 10;            // AOV change worth mentioning
+
+    function fmtYenShort(v) {
+        if (Math.abs(v) >= 1e6) return "¥" + (v / 1e6).toFixed(1) + "M";
+        if (Math.abs(v) >= 1e4) return "¥" + Math.round(v / 1e3).toLocaleString("en-US") + "k";
+        return "¥" + Math.round(v).toLocaleString("en-US");
+    }
+    const fmtInt = (v) => Math.round(v).toLocaleString("en-US");
+    const fmtPctSigned = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%";
+
+    // input: {
+    //   kpi, hasCompareData, labels, series,        — from filterDailyRange
+    //   channels,                                   — deriveTrafficBreakdown(current).channels
+    //   comparisonRows,                             — buildTrafficComparison()
+    //   channelAnomalies,                           — buildChannelAnomalyInsights()
+    //   risingPage, pageSpikes,                     — landing-page detectors
+    //   sourceRows, groupBy, range                  — for per-channel sparklines
+    // }
+    function buildBriefing(input) {
+        const t = window.I18N.t;
+        const chLabel = (l) => window.I18N.channelLabel(l);
+        const { kpi, hasCompareData, channels = [], comparisonRows = [], range } = input;
+        const stories = [];
+
+        const channelSpark = (label) => {
+            if (!input.sourceRows || !range) return null;
+            const trend = buildChannelTrend(input.sourceRows, label, input.groupBy, range);
+            return { values: trend.series.sessions.current, compare: trend.series.sessions.previous };
+        };
+
+        const siteCvr = kpi.cvr.value;
+        const totalRevenue = channels.reduce((s, c) => s + c.revenue, 0);
+        const totalSessions = channels.reduce((s, c) => s + c.sessions, 0);
+
+        // ---- 1. Tracking gap: unattributed sessions ----
+        const notSetRow = comparisonRows.find((r) => r.label === "(not set)");
+        if (notSetRow && notSetRow.current && totalSessions) {
+            const cur = notSetRow.current.sessions;
+            const prev = notSetRow.previous ? notSetRow.previous.sessions : 0;
+            const share = (cur / totalSessions) * 100;
+            const growth = prev ? ((cur - prev) / prev) * 100 : null;
+            const jumped = growth !== null && growth >= 100 && cur >= 200;
+            if (share >= 5 || jumped) {
+                stories.push({
+                    id: "tracking",
+                    tone: "alert",
+                    kicker: t("brief.kicker.tracking"),
+                    title: jumped
+                        ? t("brief.tracking.jumpTitle", { prev: fmtInt(prev), cur: fmtInt(cur) })
+                        : t("brief.tracking.shareTitle", { share: share.toFixed(0) }),
+                    body: t("brief.tracking.body", { share: share.toFixed(1) }),
+                    stat: jumped ? fmtPctSigned(growth) : share.toFixed(0) + "%",
+                    spark: channelSpark("(not set)"),
+                    action: { type: "channel", channel: "(not set)" },
+                    score: 95 + Math.min(share, 20)
+                });
+            }
+        }
+
+        // ---- 2. CVR vs target ----
+        if (kpi.cvr && kpi.cvr.target) {
+            const gap = kpi.cvr.value - kpi.cvr.target;
+            const below = gap < 0;
+            stories.push({
+                id: "cvrTarget",
+                tone: below ? "bad" : "good",
+                kicker: t("brief.kicker.conversion"),
+                title: t(below ? "brief.cvr.belowTitle" : "brief.cvr.aboveTitle", {
+                    cvr: kpi.cvr.value.toFixed(2), target: kpi.cvr.target.toFixed(2)
+                }),
+                body: kpi.cvr.deltaPts !== null && hasCompareData
+                    ? t("brief.cvr.body", { pts: (kpi.cvr.deltaPts >= 0 ? "+" : "−") + Math.abs(kpi.cvr.deltaPts).toFixed(2) })
+                    : "",
+                stat: (gap >= 0 ? "+" : "−") + Math.abs(gap).toFixed(2) + "pt",
+                spark: { values: input.series.cvr, target: kpi.cvr.target },
+                action: { type: "metric", metric: "cvr" },
+                score: below ? 80 + Math.min(Math.abs(gap) * 10, 15) : 25
+            });
+        }
+
+        // ---- 3. Channel efficiency: traffic that doesn't convert / converts unusually well ----
+        if (siteCvr > 0) {
+            const eligible = channels.filter((c) => c.sessions >= BRIEF_MIN_CHANNEL_SESSIONS && c.label !== "(not set)" && c.label !== "Direct");
+            const weak = eligible
+                .filter((c) => c.cvr < siteCvr * BRIEF_LOW_CVR_RATIO)
+                .sort((a, b) => b.sessions - a.sessions)[0];
+            if (weak) {
+                const row = comparisonRows.find((r) => r.label === weak.label);
+                const prev = row && row.previous ? row.previous.sessions : 0;
+                const growth = prev ? ((weak.sessions - prev) / prev) * 100 : null;
+                stories.push({
+                    id: "weakChannel",
+                    tone: "bad",
+                    kicker: t("brief.kicker.channel"),
+                    title: t("brief.weak.title", { label: chLabel(weak.label), cvr: weak.cvr.toFixed(2) }),
+                    body: t(growth !== null && growth > 20 ? "brief.weak.bodyGrowing" : "brief.weak.body", {
+                        sessions: fmtInt(weak.sessions),
+                        growth: growth !== null ? fmtPctSigned(growth) : "",
+                        revenue: fmtYenShort(weak.revenue),
+                        site: siteCvr.toFixed(2)
+                    }),
+                    stat: weak.cvr.toFixed(2) + "%",
+                    spark: channelSpark(weak.label),
+                    action: { type: "channel", channel: weak.label },
+                    score: 70 + Math.min((weak.sessions / Math.max(totalSessions, 1)) * 100, 15)
+                });
+            }
+            const strong = eligible
+                .filter((c) => c.cvr >= siteCvr * BRIEF_HIGH_CVR_RATIO)
+                .sort((a, b) => b.revenue - a.revenue)[0];
+            if (strong) {
+                stories.push({
+                    id: "strongChannel",
+                    tone: "good",
+                    kicker: t("brief.kicker.channel"),
+                    title: t("brief.strong.title", { label: chLabel(strong.label), cvr: strong.cvr.toFixed(2) }),
+                    body: t("brief.strong.body", {
+                        site: siteCvr.toFixed(2),
+                        revenue: fmtYenShort(strong.revenue),
+                        share: totalRevenue ? ((strong.revenue / totalRevenue) * 100).toFixed(0) : "0"
+                    }),
+                    stat: (strong.cvr / siteCvr).toFixed(1) + "×",
+                    spark: channelSpark(strong.label),
+                    action: { type: "channel", channel: strong.label },
+                    score: 40
+                });
+            }
+        }
+
+        // ---- 4. Day-level spikes/drops in the headline metrics ----
+        const trimmed = excludeToday(input.labels || [], {
+            sessions: (input.series || {}).sessions || [],
+            revenue: (input.series || {}).revenue || [],
+            purchases: (input.series || {}).purchases || []
+        });
+        const seenDays = new Set();
+        const dayStories = {}; // date label -> story, so channel spikes on the same day can explain it
+        detectAnomalies(trimmed.labels, trimmed.series).forEach((a) => {
+            // One story per day — a revenue spike usually comes with a
+            // purchases spike on the same day; that's one event.
+            if (seenDays.has(a.date) || seenDays.size >= 2) return;
+            seenDays.add(a.date);
+            const isRevenue = a.key === "revenue";
+            const fmt = isRevenue ? fmtYenShort : fmtInt;
+            const spike = a.direction === "spike";
+            stories.push(dayStories[a.date] = {
+                id: "dayAnomaly-" + a.date,
+                tone: spike ? "good" : "bad",
+                kicker: t("brief.kicker.day"),
+                title: t(spike ? "brief.day.spikeTitle" : "brief.day.dropTitle", { date: a.date, metric: a.metric }),
+                body: t("brief.day.body", { value: fmt(a.value), mean: fmt(a.mean) }),
+                stat: (a.value / (a.mean || 1)).toFixed(1) + "×",
+                spark: { values: trimmed.series[a.key], highlight: a.index },
+                action: { type: "metric", metric: a.key },
+                score: 55 + Math.min(Math.abs(a.z) * 4, 15)
+            });
+        });
+
+        // ---- 5. Channel-level spikes (skip channels already covered above) ----
+        // A channel spiking on the same day as a site-wide spike is the
+        // EXPLANATION of that spike, not a separate story — fold it in
+        // as "driven by …" instead of listing it again below.
+        const covered = new Set(stories.filter((s) => s.action && s.action.channel).map((s) => s.action.channel));
+        const drivers = {};
+        (input.channelAnomalies || []).forEach((a) => {
+            if (a.direction === "spike" && dayStories[a.date]) {
+                (drivers[a.date] = drivers[a.date] || []).push(a);
+                return;
+            }
+            if (covered.has(a.channel)) return;
+            const spike = a.direction === "spike";
+            const spark = channelSpark(a.channel);
+            stories.push({
+                id: "channelAnomaly-" + a.channel,
+                tone: spike ? "info" : "bad",
+                kicker: t("brief.kicker.channel"),
+                title: t(spike ? "brief.chDay.spikeTitle" : "brief.chDay.dropTitle", { date: a.date, label: chLabel(a.channel) }),
+                body: t("brief.day.body", { value: fmtInt(a.value), mean: fmtInt(a.mean) }),
+                stat: (a.value / (a.mean || 1)).toFixed(1) + "×",
+                spark: spark ? { ...spark, highlight: (input.labels || []).indexOf(a.date) } : null,
+                action: { type: "channel", channel: a.channel },
+                score: 45 + Math.min(Math.abs(a.z) * 3, 10)
+            });
+        });
+
+        Object.keys(drivers).forEach((date) => {
+            const story = dayStories[date];
+            const list = drivers[date].map((a) => t("brief.day.driverItem", {
+                label: chLabel(a.channel), mean: fmtInt(a.mean), value: fmtInt(a.value)
+            })).join(t("brief.dek.sep"));
+            story.body += " " + t("brief.day.drivers", { list });
+            // Clicking now opens the biggest driver's channel trend —
+            // the most useful next step for "why did this day spike".
+            story.action = { type: "channel", channel: drivers[date][0].channel };
+        });
+
+        // ---- 6. Average order value ----
+        if (hasCompareData && kpi.aov && kpi.aov.delta !== null && Math.abs(kpi.aov.delta) >= BRIEF_AOV_MOVE_PCT) {
+            const up = kpi.aov.delta > 0;
+            stories.push({
+                id: "aov",
+                tone: up ? "good" : "bad",
+                kicker: t("brief.kicker.basket"),
+                title: t(up ? "brief.aov.upTitle" : "brief.aov.downTitle", { pct: fmtPctSigned(kpi.aov.delta) }),
+                body: t("brief.aov.body", { prev: fmtYenShort(kpi.aov.previous), cur: fmtYenShort(kpi.aov.value) }),
+                stat: fmtYenShort(kpi.aov.value),
+                spark: null,
+                action: { type: "view", view: "sales" },
+                score: 50
+            });
+        }
+
+        // ---- 7. Landing pages: the 7-day riser + today/yesterday spikes, one story each ----
+        if (input.risingPage) {
+            const r = input.risingPage;
+            stories.push({
+                id: "risingPage",
+                tone: "info",
+                kicker: t("brief.kicker.page"),
+                title: t("brief.rise.title", { title: escapeHtml(shortPageTitle(r.pageTitle)) }),
+                body: t("brief.rise.body", { prev: fmtInt(r.previous), cur: fmtInt(r.current) }),
+                stat: "+" + Math.round(r.changePct) + "%",
+                spark: { values: (r.dailySessions || []).map((d) => d.sessions), highlight: (r.dailySessions || []).findIndex((d) => d.date === r.spikeDate) },
+                action: { type: "page", insight: r },
+                score: 52
+            });
+        }
+        const spikes = (input.pageSpikes || []).filter((p) => !input.risingPage || p.pageTitle !== input.risingPage.pageTitle);
+        if (spikes.length) {
+            const top = spikes[0];
+            stories.push({
+                id: "pageSpikes",
+                tone: "info",
+                kicker: t("brief.kicker.page"),
+                title: spikes.length === 1
+                    ? t("brief.spikes.oneTitle", { title: escapeHtml(shortPageTitle(top.pageTitle)) })
+                    : t("brief.spikes.manyTitle", { n: spikes.length }),
+                body: spikes.slice(0, 3).map((p) => t("brief.spikes.item", {
+                    title: escapeHtml(shortPageTitle(p.pageTitle)), value: fmtInt(p.spikeValue), mean: fmtInt(p.baseline)
+                })).join("<br>"),
+                stat: fmtInt(top.spikeValue),
+                spark: { values: (top.dailySessions || []).map((d) => d.sessions), highlight: (top.dailySessions || []).findIndex((d) => d.date === top.spikeDate) },
+                action: { type: "page", insight: top },
+                score: 48
+            });
+        }
+
+        stories.sort((a, b) => b.score - a.score);
+
+        return { headline: buildHeadline(input, stories), stories };
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    // Product titles all end in "｜トータルヘルスデザイン公式ショップWEB本店"
+    // (or " | Thd公式ブログ") — the store suffix is noise in a headline.
+    function shortPageTitle(title) {
+        return String(title || "").split(/[｜|]/)[0].trim() || title;
+    }
+
+    function buildHeadline(input, stories) {
+        const t = window.I18N.t;
+        const { kpi, hasCompareData, channels = [] } = input;
+        const rev = kpi.revenue;
+
+        let main;
+        if (hasCompareData && rev.delta !== null) {
+            main = t(rev.delta >= 0 ? "brief.headline.up" : "brief.headline.down", {
+                revenue: `<span class="hlNum">${fmtYenShort(rev.value)}</span>`,
+                delta: `<span class="hlDelta ${rev.delta >= 0 ? "pos" : "neg"}">${fmtPctSigned(rev.delta)}</span>`
+            });
+        } else {
+            main = t("brief.headline.flat", { revenue: `<span class="hlNum">${fmtYenShort(rev.value)}</span>` });
+        }
+
+        const parts = [];
+        const totalRevenue = channels.reduce((s, c) => s + c.revenue, 0);
+        const top = channels.slice().sort((a, b) => b.revenue - a.revenue)[0];
+        if (top && totalRevenue) {
+            parts.push(t("brief.dek.topChannel", {
+                label: window.I18N.channelLabel(top.label),
+                share: Math.round((top.revenue / totalRevenue) * 100)
+            }));
+        }
+        if (hasCompareData && kpi.purchases.delta !== null && kpi.aov && kpi.aov.delta !== null) {
+            parts.push(t("brief.dek.drivers", {
+                orders: fmtPctSigned(kpi.purchases.delta),
+                aov: fmtPctSigned(kpi.aov.delta)
+            }));
+        }
+        const firstWarning = stories.find((s) => s.tone === "alert" || s.tone === "bad");
+        if (firstWarning) parts.push(t("brief.dek.watch", { title: firstWarning.title }));
+
+        return { main, dek: parts.join(t("brief.dek.sep")) };
     }
 
     /* ==========================================================
@@ -1789,8 +2116,12 @@ window.THD = window.THD || {};
             const prevDate = new Date(range.prevStart);
             prevDate.setDate(prevDate.getDate() + i);
 
-            const curKey = curDate.toISOString().slice(0, 10);
-            const prevKey = prevDate.toISOString().slice(0, 10);
+            // Local-date keys: range dates are local midnights, and
+            // toISOString() converts to UTC first — in Japan (UTC+9)
+            // that turned Oct 13 into "2026-10-12", shifting every
+            // channel trend and channel anomaly by one day.
+            const curKey = toLocalDateKey(curDate);
+            const prevKey = toLocalDateKey(prevDate);
             const cur = byDate[curKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
             const prev = byDate[prevKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
 
@@ -1824,7 +2155,7 @@ window.THD = window.THD || {};
     ========================================================== */
 
     function businessMonthOf(dateStr) {
-        const d = new Date(dateStr);
+        const d = parseLocalDate(dateStr);
         let month = d.getMonth(); // 0-indexed
         let year = d.getFullYear();
         if (d.getDate() >= 21) {
@@ -2039,6 +2370,7 @@ window.THD = window.THD || {};
         detectAnomalies,
         buildAnomalyInsights,
         buildChannelAnomalyInsights,
+        buildBriefing,
         resolveRange,
         hasDataInRange,
         filterDailyRange,

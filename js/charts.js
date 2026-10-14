@@ -15,13 +15,20 @@ window.THD = window.THD || {};
     // Read fresh at render time (not cached) so charts pick up the
     // right palette whether they're being created for the first time
     // or re-rendered after a dark/light theme toggle.
+    // Pulled from the CSS tokens (css/briefing.css) so the charts
+    // always match the page, in either theme, without a second copy
+    // of the palette living here.
+    function cssVar(name, fallback) {
+        const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        return v || fallback;
+    }
+
     function getChartColors() {
-        const dark = document.documentElement.getAttribute("data-theme") === "dark";
         return {
-            grid: dark ? "#2B2E38" : "#E9EAED",
-            textLight: dark ? "#9498A6" : "#6B6F7B",
-            text: dark ? "#EDEEF2" : "#14151A",
-            surface: dark ? "#1C1E27" : "#FFFFFF"
+            grid: cssVar("--border", "#E4DCCF"),
+            textLight: cssVar("--text-light", "#6E675C"),
+            text: cssVar("--text", "#1B1813"),
+            surface: cssVar("--surface", "#FFFDF9")
         };
     }
 
@@ -33,12 +40,18 @@ window.THD = window.THD || {};
     // together, and none of them collide with the brand signal
     // color (#FF5A2E), which is reserved for interactive/highlight
     // use only (see the rising-day bar highlight further down).
+    // color is a getter so it re-reads the --m-* token on every render
+    // (i.e. follows the light/dark theme).
+    const metricEntry = (key, fallback, format) => ({
+        get color() { return cssVar(`--m-${key}`, fallback); },
+        format
+    });
     const METRIC_CONFIG = {
-        users: { color: "#2B59FF", format: (v) => Math.round(v).toLocaleString("en-US") },
-        sessions: { color: "#0EA5A5", format: (v) => Math.round(v).toLocaleString("en-US") },
-        purchases: { color: "#0F9D63", format: (v) => Math.round(v).toLocaleString("en-US") },
-        revenue: { color: "#D6336C", format: (v) => "¥" + Math.round(v).toLocaleString("en-US") },
-        cvr: { color: "#7C4DFF", format: (v) => v.toFixed(2) + "%" }
+        users: metricEntry("users", "#3456BF", (v) => Math.round(v).toLocaleString("en-US")),
+        sessions: metricEntry("sessions", "#0F8A8A", (v) => Math.round(v).toLocaleString("en-US")),
+        purchases: metricEntry("purchases", "#2B7A4B", (v) => Math.round(v).toLocaleString("en-US")),
+        revenue: metricEntry("revenue", "#B8325E", (v) => "¥" + Math.round(v).toLocaleString("en-US")),
+        cvr: metricEntry("cvr", "#6B47D6", (v) => v.toFixed(2) + "%")
     };
 
     // Reuses the same dictionary keys as the KPI cards, so a metric's
@@ -55,7 +68,7 @@ window.THD = window.THD || {};
         return window.I18N.t(METRIC_LABEL_KEYS[key] || key);
     }
 
-    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.font.family = "'Inter', 'Noto Sans JP', sans-serif";
 
     /* ==========================================================
        Trend Chart

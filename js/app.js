@@ -62,6 +62,7 @@
     // click handler / metric toggle can recompute without redoing the
     // whole period's work.
     let currentRangeObj = null;
+    let lastFiltered = null; // last filterDailyRange result — reused by metric toggles so the chart keeps the source filter
     let currentEffectiveSourceRows = [];
     let currentGroupBy = "platform";
 
@@ -215,6 +216,43 @@
             const panel = document.getElementById("landingRisingPanel");
             if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
         }));
+    }
+
+    /* ==========================================================
+       Briefing click-throughs
+       Story cards and vital signs on the Overview hand back a
+       small action object (see buildBriefing in data.js); these
+       route each one into the drill-down that already exists for
+       it, so the briefing is a front door to the old views rather
+       than a parallel set of screens.
+    ========================================================== */
+
+    function onBriefAction(action) {
+        if (!action) return;
+        if (action.type === "channel") {
+            onChannelAnomalyInsightClick({ channel: action.channel });
+        } else if (action.type === "page") {
+            onRisingPageInsightClick(action.insight);
+        } else if (action.type === "metric") {
+            THD.ui.plotMetric(action.metric);
+        } else if (action.type === "view") {
+            THD.ui.switchToView(action.view, THD.charts.resizeCharts);
+        }
+    }
+
+    function onVitalPick(vital) {
+        if (!vital) return;
+        if (vital.chart) THD.ui.plotMetric(vital.chart);
+        else THD.ui.switchToView("sales", THD.charts.resizeCharts); // order value lives on the Sales tab
+    }
+
+    // Most recent date actually present in the data — what "today"
+    // really means for a GA4 export that lags by up to a day.
+    function latestDataDate(rows) {
+        if (!rows || !rows.length) return null;
+        const last = rows[rows.length - 1].date;
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(last);
+        return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
     }
 
     /* ==========================================================
@@ -539,7 +577,10 @@
             : THD.data.buildDailyRowsFromSources(effectiveSourceRows);
 
         const filtered = THD.data.filterDailyRange(effectiveDailyRows, rangeKey, currentCustomRange, compareMode);
+        lastFiltered = filtered;
         THD.ui.renderKpis(filtered.kpi, hasCompareData);
+        THD.ui.renderBriefHeader(range, hasCompareData, latestDataDate(effectiveDailyRows));
+        THD.ui.renderVitals(filtered.kpi, filtered.series, hasCompareData, onVitalPick);
         THD.ui.renderRangeCompare(range, hasCompareData);
         THD.ui.renderTrafficPeriodLabels(range);
 
@@ -570,6 +611,21 @@
         renderChannelTrendOrDoughnuts();
 
         const channelAnomalies = THD.data.buildChannelAnomalyInsights(effectiveSourceRows, trafficCurrent.channels, groupBy, range);
+
+        THD.ui.renderBriefing(THD.data.buildBriefing({
+            kpi: filtered.kpi,
+            hasCompareData,
+            labels: filtered.labels,
+            series: filtered.series,
+            channels: trafficCurrent.channels,
+            comparisonRows: lastTrafficComparisonRows,
+            channelAnomalies,
+            risingPage: risingPageInsight,
+            pageSpikes,
+            sourceRows: effectiveSourceRows,
+            groupBy,
+            range
+        }), onBriefAction);
 
         const insightSentences = [
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels, hasCompareData),
@@ -657,7 +713,7 @@
     }
 
     function renderTrendOnly() {
-        const filtered = THD.data.filterDailyRange(dailyRows, currentRange, currentCustomRange);
+        const filtered = lastFiltered || THD.data.filterDailyRange(dailyRows, currentRange, currentCustomRange, compareMode);
         THD.charts.renderTrendChart(filtered.labels, filtered.series, THD.ui.getCheckedMetrics(), {
             showTrendOverlay: THD.ui.getTrendOverlayState()
         });
@@ -748,6 +804,7 @@
 
         window.I18N.applyStatic();
         window.I18N.wireLanguageToggle(onLanguageChange);
+        document.body.dataset.view = "overview";
 
         THD.ui.showInitialSkeletons();
         THD.ui.renderLastUpdate();

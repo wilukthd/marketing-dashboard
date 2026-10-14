@@ -1,0 +1,1145 @@
+/* ==========================================================
+   THD Analytics
+   Briefing Theme (v3)
+
+   Loaded last, on top of the original stylesheets. Two jobs:
+
+   1. A new identity for the whole app — "morning paper":
+      warm paper surface, ink text, an editorial serif for
+      headlines (Noto Serif JP), and hairline rules instead of
+      floating cards. The vermilion signal color from v2 stays as
+      the brand accent; four "tone" colors carry meaning in the
+      story feed (alert / watch / good / FYI).
+
+   2. The layout shift from a fixed sidebar to a slim top bar,
+      plus every component of the Overview briefing (headline,
+      vital signs, story feed).
+
+   Everything is token-driven, so dark mode (bottom of file)
+   only has to redefine the tokens.
+========================================================== */
+
+:root{
+
+    --font-display:'Noto Serif JP','Hiragino Mincho ProN','Yu Mincho',serif;
+    --font-ui:'Inter','Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
+    --font-body:var(--font-ui);
+
+    --paper:#F5F1EA;
+    --bg:var(--paper);
+    --surface:#FFFDF9;
+    --surface-2:#FBF7F0;
+    --ink:#1B1813;
+    --text:#1B1813;
+    --text-light:#6E675C;
+    --text-faint:#A39B8E;
+    --border:#E4DCCF;
+    --rule:#1B1813;
+
+    --signal:#E2471D;
+    --signal-light:#FBE3D8;
+
+    --tone-alert:#C9361A;
+    --tone-alert-bg:#FBE1D8;
+    --tone-bad:#A86A12;
+    --tone-bad-bg:#F8ECD3;
+    --tone-good:#2B7A4B;
+    --tone-good-bg:#DDF0E2;
+    --tone-info:#3456BF;
+    --tone-info-bg:#E2E8FA;
+
+    --m-users:#3456BF;
+    --m-sessions:#0F8A8A;
+    --m-purchases:#2B7A4B;
+    --m-revenue:#B8325E;
+    --m-cvr:#6B47D6;
+    --m-aov:#A86A12;
+
+    --success:var(--tone-good);
+    --success-light:var(--tone-good-bg);
+    --danger:var(--tone-alert);
+    --danger-light:var(--tone-alert-bg);
+
+    --radius:12px;
+    --shadow-sm:none;
+    --shadow-md:0 10px 30px rgba(27,24,19,.08);
+
+    --page-max:1180px;
+    --gutter:28px;
+
+}
+
+
+/* ==========================================================
+   Base
+========================================================== */
+
+body{
+
+    background:var(--bg);
+    font-family:var(--font-ui);
+    -webkit-font-smoothing:antialiased;
+
+}
+
+h1,h2,h3,h4{
+
+    font-family:var(--font-display);
+    letter-spacing:.01em;
+
+}
+
+.app{
+
+    display:block;
+
+}
+
+
+/* ==========================================================
+   Top Bar
+========================================================== */
+
+.topbar{
+
+    position:sticky;
+    top:0;
+    z-index:150;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:saturate(1.2) blur(10px);
+    -webkit-backdrop-filter:saturate(1.2) blur(10px);
+    border-bottom:1px solid var(--border);
+
+}
+
+.topbarInner{
+
+    max-width:var(--page-max);
+    margin:0 auto;
+    padding:0 var(--gutter);
+    height:62px;
+    display:flex;
+    align-items:center;
+    gap:28px;
+
+}
+
+.topbar .logo{
+
+    padding:0;
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    flex-shrink:0;
+
+}
+
+.topbar .logo h1{
+
+    color:var(--ink);
+    font-size:22px;
+    font-weight:900;
+    letter-spacing:.04em;
+
+}
+
+.topbar .logo span{
+
+    display:inline;
+    color:var(--signal);
+    font-family:var(--font-ui);
+    font-size:11px;
+    letter-spacing:.14em;
+
+}
+
+.topbar .sidebarMenu{
+
+    flex-direction:row;
+    padding:0;
+    gap:4px;
+    flex:1;
+    min-width:0;
+    overflow-x:auto;
+    scrollbar-width:none;
+
+}
+
+.topbar .sidebarMenu::-webkit-scrollbar{ display:none; }
+
+.topbar .sidebarMenu a{
+
+    flex:0 0 auto;
+    flex-direction:row;
+    gap:7px;
+    padding:8px 12px;
+    border-radius:999px;
+    color:var(--text-light);
+    font-size:13.5px;
+    font-weight:500;
+
+}
+
+.topbar .sidebarMenu a span{ display:inline; font-size:inherit; }
+
+.topbar .sidebarMenu a svg{ width:16px; height:16px; }
+
+.topbar .sidebarMenu a:hover{
+
+    background:var(--surface-2);
+    color:var(--text);
+
+}
+
+.topbar .sidebarMenu a.active{
+
+    background:var(--ink);
+    color:var(--paper);
+
+}
+
+.topbar .sidebarMenu a.active::before{ display:none; }
+
+.topbarActions{
+
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-shrink:0;
+
+}
+
+.topbarActions .updateCard{
+
+    text-align:right;
+    line-height:1.25;
+    margin-right:4px;
+
+}
+
+.topbarActions .updateCard small{
+
+    color:var(--text-faint);
+    font-size:10.5px;
+
+}
+
+.topbarActions .updateCard strong{
+
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:500;
+
+}
+
+.iconButton{
+
+    width:36px;
+    height:36px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--text);
+    cursor:pointer;
+    transition:.2s;
+
+}
+
+.iconButton:hover{ border-color:var(--text-light); }
+
+.iconButton svg{ width:16px; height:16px; }
+
+.primaryButton{
+
+    border-radius:999px;
+    padding:9px 16px;
+    font-family:var(--font-ui);
+    font-size:13px;
+    box-shadow:none;
+    border:none;
+    cursor:pointer;
+
+}
+
+.primaryButton svg{ width:15px; height:15px; }
+
+.secondaryButton{
+
+    border-radius:999px;
+    font-family:var(--font-ui);
+
+}
+
+
+/* ==========================================================
+   Main column
+========================================================== */
+
+.mainContent,
+.app .mainContent{
+
+    margin:0 auto;
+    max-width:var(--page-max);
+    padding:26px var(--gutter) 96px;
+
+}
+
+.pageHeader{
+
+    margin-bottom:18px;
+
+}
+
+.pageHeader h2{
+
+    font-size:30px;
+    font-weight:700;
+
+}
+
+body[data-view="overview"] .pageHeader,
+body[data-view="overview"] .rangeCompareBar{
+
+    display:none;
+
+}
+
+/* Filters read as a quiet row of pills rather than form fields. */
+
+.filterSection{
+
+    gap:8px;
+    margin-bottom:18px;
+
+}
+
+.filterSection select,
+.chartTools select,
+.customRangeInputs input[type="date"]{
+
+    border-radius:999px;
+    padding:8px 34px 8px 14px;
+    font-size:13px;
+    background-color:var(--surface);
+    border-color:var(--border);
+
+}
+
+.rangeCompareBar{
+
+    background:transparent;
+    color:var(--text-light);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:8px 16px;
+    margin-top:-6px;
+
+}
+
+.rangeCompareBar strong{ color:var(--text); }
+
+.dataSourceWarning{
+
+    border-radius:var(--radius);
+
+}
+
+/* Cards on the other tabs: flatter, warmer. */
+
+.chartCard,
+.tableCard,
+.insightCard{
+
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:none;
+
+}
+
+.chartCard:hover{ border-color:var(--border); }
+
+.chartHeader h3,
+.tableHeader h3,
+.sectionTitle h3{
+
+    font-size:19px;
+    font-weight:700;
+
+}
+
+
+/* ==========================================================
+   Briefing — headline
+========================================================== */
+
+.brief{
+
+    padding:10px 0 26px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:6px;
+
+}
+
+.briefKicker{
+
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px 14px;
+    font-size:12px;
+    font-weight:500;
+    color:var(--text-light);
+    letter-spacing:.02em;
+    margin-bottom:14px;
+
+}
+
+.briefKicker #briefRange{
+
+    color:var(--signal);
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+
+}
+
+.briefKicker .briefCompare.isWarning{ color:var(--tone-bad); }
+
+.briefKicker .briefAsOf{
+
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    padding:2px 8px;
+    border:1px solid var(--border);
+    border-radius:999px;
+
+}
+
+.briefHeadline{
+
+    font-size:clamp(28px, 4.4vw, 50px);
+    line-height:1.22;
+    font-weight:900;
+    letter-spacing:-.005em;
+    max-width:20em;
+    color:var(--ink);
+    text-wrap:balance;
+
+}
+
+.briefHeadline .hlNum{
+
+    font-feature-settings:"tnum";
+    white-space:nowrap;
+
+}
+
+.briefHeadline .hlDelta{
+
+    white-space:nowrap;
+    padding:0 .08em;
+    background-repeat:no-repeat;
+    background-size:100% .38em;
+    background-position:0 88%;
+
+}
+
+.briefHeadline .hlDelta.pos{
+
+    color:var(--tone-good);
+    background-image:linear-gradient(var(--tone-good-bg), var(--tone-good-bg));
+
+}
+
+.briefHeadline .hlDelta.neg{
+
+    color:var(--tone-alert);
+    background-image:linear-gradient(var(--tone-alert-bg), var(--tone-alert-bg));
+
+}
+
+.briefDek{
+
+    margin-top:14px;
+    font-size:16.5px;
+    line-height:1.7;
+    color:var(--text-light);
+    max-width:56em;
+
+}
+
+.briefPartial{
+
+    margin-top:10px;
+    font-size:12.5px;
+    color:var(--tone-bad);
+
+}
+
+
+/* ==========================================================
+   Briefing — vital signs
+   A ruled strip, not a grid of cards: six figures separated
+   by hairlines, each with its own sparkline.
+========================================================== */
+
+.vitals{
+
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    border-bottom:1px solid var(--border);
+    margin-bottom:34px;
+
+}
+
+.vital{
+
+    --vital:var(--text);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:2px;
+    text-align:left;
+    padding:16px 16px 12px;
+    border:none;
+    border-left:1px solid var(--border);
+    background:transparent;
+    color:var(--text);
+    font:inherit;
+    cursor:pointer;
+    transition:background .2s;
+    min-width:0;
+
+}
+
+.vital:first-child{ border-left:none; padding-left:0; }
+
+.vital::before{
+
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    top:-1px;
+    height:2px;
+    background:var(--vital);
+    transform:scaleX(0);
+    transform-origin:left;
+    transition:transform .3s;
+
+}
+
+.vital.isPlotted::before,
+.vital:hover::before{ transform:scaleX(1); }
+
+.vital:hover{ background:var(--surface-2); }
+
+.vital:focus-visible{ outline:2px solid var(--signal); outline-offset:-2px; }
+
+.vitalLabel{
+
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--text-light);
+    letter-spacing:.04em;
+
+}
+
+.vitalValue{
+
+    font-family:var(--font-mono);
+    font-size:21px;
+    font-weight:500;
+    font-feature-settings:"tnum";
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+
+}
+
+.vitalFoot{
+
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px 8px;
+    align-items:center;
+    font-size:11.5px;
+    min-height:18px;
+
+}
+
+.vitalDelta{
+
+    font-family:var(--font-mono);
+    font-weight:600;
+
+}
+
+.vitalDelta.pos{ color:var(--tone-good); }
+.vitalDelta.neg{ color:var(--tone-alert); }
+.vitalDelta.neutral{ color:var(--text-faint); }
+
+.vitalTarget{
+
+    font-size:10.5px;
+    padding:1px 7px;
+    border-radius:999px;
+
+}
+
+.vitalTarget.hit{ background:var(--tone-good-bg); color:var(--tone-good); }
+.vitalTarget.miss{ background:var(--tone-alert-bg); color:var(--tone-alert); }
+
+.vital .spark{
+
+    width:100%;
+    height:34px;
+    margin-top:6px;
+    --spark:var(--vital);
+
+}
+
+
+/* ==========================================================
+   Sparklines (shared by vitals and stories)
+========================================================== */
+
+.spark{ display:block; overflow:visible; }
+
+.spark .sparkLine{
+
+    fill:none;
+    stroke:var(--spark, var(--text-light));
+    stroke-width:1.6;
+    stroke-linejoin:round;
+    stroke-linecap:round;
+    vector-effect:non-scaling-stroke;
+
+}
+
+.spark .sparkArea{
+
+    fill:var(--spark, var(--text-light));
+    opacity:.08;
+    stroke:none;
+
+}
+
+.spark .sparkCompare{
+
+    fill:none;
+    stroke:var(--text-faint);
+    stroke-width:1.2;
+    stroke-dasharray:3 3;
+    vector-effect:non-scaling-stroke;
+
+}
+
+.spark .sparkTarget{
+
+    stroke:var(--text-faint);
+    stroke-width:1;
+    stroke-dasharray:2 3;
+    vector-effect:non-scaling-stroke;
+
+}
+
+.spark .sparkDot{
+
+    fill:var(--spark, var(--text-light));
+    stroke:var(--surface);
+    stroke-width:1.5;
+
+}
+
+.spark .sparkDot.isHighlight{
+
+    fill:var(--signal);
+
+}
+
+
+/* ==========================================================
+   Briefing — story feed
+========================================================== */
+
+.storyFeed{
+
+    margin-bottom:40px;
+
+}
+
+.feedHeader{
+
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:12px;
+    border-bottom:2px solid var(--rule);
+
+}
+
+.feedHeader h3{
+
+    font-size:22px;
+    font-weight:900;
+
+}
+
+.feedHeader small{
+
+    color:var(--text-light);
+    font-size:12.5px;
+
+}
+
+.storyList{
+
+    list-style:none;
+    counter-reset:story;
+
+}
+
+.story{
+
+    --tone:var(--text-light);
+    --tone-bg:var(--surface-2);
+    counter-increment:story;
+    position:relative;
+    display:grid;
+    grid-template-columns:52px minmax(0,1fr) 190px;
+    gap:6px 22px;
+    padding:22px 14px 22px 0;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+    transition:background .2s;
+    animation:storyIn .45s cubic-bezier(.2,.7,.2,1) both;
+
+}
+
+.story:nth-child(2){ animation-delay:.04s; }
+.story:nth-child(3){ animation-delay:.08s; }
+.story:nth-child(4){ animation-delay:.12s; }
+.story:nth-child(5){ animation-delay:.16s; }
+.story:nth-child(n+6){ animation-delay:.2s; }
+
+@keyframes storyIn{
+
+    from{ opacity:0; transform:translateY(8px); }
+    to{ opacity:1; transform:none; }
+
+}
+
+.story::before{
+
+    content:counter(story, decimal-leading-zero);
+    font-family:var(--font-display);
+    font-size:26px;
+    font-weight:900;
+    line-height:1;
+    color:var(--tone);
+    padding-top:2px;
+    text-align:right;
+
+}
+
+.story:hover{ background:var(--surface-2); }
+
+.story:focus-visible{ outline:2px solid var(--signal); outline-offset:-2px; }
+
+.story.tone-alert{ --tone:var(--tone-alert); --tone-bg:var(--tone-alert-bg); }
+.story.tone-bad{ --tone:var(--tone-bad); --tone-bg:var(--tone-bad-bg); }
+.story.tone-good{ --tone:var(--tone-good); --tone-bg:var(--tone-good-bg); }
+.story.tone-info{ --tone:var(--tone-info); --tone-bg:var(--tone-info-bg); }
+
+.storyMeta{
+
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:7px;
+
+}
+
+.storyTone{
+
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.06em;
+    color:var(--tone);
+    background:var(--tone-bg);
+    padding:3px 9px 3px 7px;
+    border-radius:999px;
+
+}
+
+.storyTone svg{ width:13px; height:13px; }
+
+.storyKicker{
+
+    font-size:11.5px;
+    color:var(--text-faint);
+    letter-spacing:.04em;
+
+}
+
+.storyTitle{
+
+    font-size:19px;
+    line-height:1.45;
+    font-weight:700;
+    color:var(--ink);
+    text-wrap:pretty;
+
+}
+
+.storyBody{
+
+    margin-top:6px;
+    font-size:14px;
+    line-height:1.75;
+    color:var(--text-light);
+    max-width:46em;
+
+}
+
+.storySide{
+
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    --spark:var(--tone);
+
+}
+
+.storyStat{
+
+    font-family:var(--font-mono);
+    font-size:24px;
+    font-weight:500;
+    color:var(--tone);
+    font-feature-settings:"tnum";
+    line-height:1.1;
+    white-space:nowrap;
+
+}
+
+.storySide .spark{ width:160px; height:44px; }
+
+.storyOpen{
+
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-size:12px;
+    font-weight:600;
+    color:var(--signal);
+    opacity:0;
+    transform:translateX(-4px);
+    transition:.2s;
+
+}
+
+.storyOpen svg{ width:14px; height:14px; }
+
+.story:hover .storyOpen,
+.story:focus-visible .storyOpen{ opacity:1; transform:none; }
+
+/* The lead story gets the front-page treatment. */
+
+.story.isLead{
+
+    grid-template-columns:52px minmax(0,1fr) 230px;
+    padding-top:28px;
+    padding-bottom:28px;
+
+}
+
+.story.isLead .storyTitle{
+
+    font-size:clamp(21px, 2.4vw, 27px);
+    font-weight:900;
+    line-height:1.4;
+
+}
+
+.story.isLead .storyBody{ font-size:15px; }
+
+.story.isLead .storyStat{ font-size:32px; }
+
+.story.isLead .storySide .spark{ width:220px; height:60px; }
+
+.storyEmpty{
+
+    padding:28px 0;
+    color:var(--text-light);
+
+}
+
+
+/* ==========================================================
+   Briefing — trend + all-insights
+========================================================== */
+
+.trendCard{
+
+    margin-bottom:22px;
+
+}
+
+.allInsights{
+
+    margin-bottom:30px;
+    border-top:1px solid var(--border);
+
+}
+
+.allInsights summary{
+
+    cursor:pointer;
+    list-style:none;
+    padding:16px 0;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--text-light);
+
+}
+
+.allInsights summary::-webkit-details-marker{ display:none; }
+
+.allInsights summary::before{
+
+    content:"＋";
+    display:inline-block;
+    width:1.4em;
+    color:var(--signal);
+
+}
+
+.allInsights[open] summary::before{ content:"－"; }
+
+.allInsights .insightCard{ margin-bottom:14px; }
+
+.insightNum.pos{ color:var(--tone-good); }
+.insightNum.neg{ color:var(--tone-alert); }
+
+
+/* ==========================================================
+   Passcode gate — same paper identity
+========================================================== */
+
+.passcodeGate{
+
+    background:var(--paper);
+
+}
+
+.passcodeCard{
+
+    background:var(--surface);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow-md);
+
+}
+
+.passcodeLogo h1{ color:var(--ink); }
+
+
+/* ==========================================================
+   Responsive
+========================================================== */
+
+@media(max-width:1020px){
+
+    .vitals{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+
+    .vital:nth-child(3n+1){ border-left:none; padding-left:0; }
+
+    .vital:nth-child(n+4){ border-top:1px solid var(--border); }
+
+    .topbarActions .updateCard{ display:none; }
+
+}
+
+@media(max-width:900px){
+
+    /* undo the old sidebar's collapsed-rail rules */
+    .topbar .logo span{ display:inline; }
+    .topbar .sidebarMenu span{ display:inline; }
+
+}
+
+@media(max-width:720px){
+
+    :root{ --gutter:16px; }
+
+    .topbarInner{
+
+        height:auto;
+        flex-wrap:wrap;
+        gap:6px 12px;
+        padding-top:10px;
+        padding-bottom:8px;
+
+    }
+
+    .topbar .logo{ order:1; }
+
+    .topbarActions{ order:2; margin-left:auto; }
+
+    .topbarActions .primaryButton span{ display:none; }
+
+    .topbarActions .primaryButton{ padding:9px 11px; }
+
+    .topbar .sidebarMenu{
+
+        order:3;
+        flex:1 0 100%;
+        margin:0 -4px;
+
+    }
+
+    .topbar .sidebarMenu a{ padding:7px 11px; font-size:12.5px; }
+
+    .vitals{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+    .vital:nth-child(n){ border-left:none; padding-left:0; border-top:none; }
+
+    .vital:nth-child(2n){ border-left:1px solid var(--border); padding-left:14px; }
+
+    .vital:nth-child(n+3){ border-top:1px solid var(--border); }
+
+    .story,
+    .story.isLead{
+
+        grid-template-columns:34px minmax(0,1fr);
+        padding-right:0;
+
+    }
+
+    .story::before{ font-size:20px; }
+
+    .storySide{
+
+        grid-column:2;
+        flex-direction:row;
+        align-items:center;
+        justify-content:space-between;
+        flex-wrap:wrap;
+
+    }
+
+    .storySide .spark,
+    .story.isLead .storySide .spark{ width:120px; height:36px; }
+
+    .storyOpen{ opacity:1; transform:none; }
+
+    .feedHeader{ flex-direction:column; gap:2px; }
+
+}
+
+@media(max-width:640px){
+
+    /* the old stylesheet turned .sidebar into a bottom tab bar here —
+       the top bar handles navigation now, so neutralize the leftovers */
+    .topbar .sidebarMenu{ justify-content:flex-start; }
+    .topbar .sidebarMenu a{ flex:0 0 auto; flex-direction:row; text-align:left; }
+    .topbar .logo{ display:flex; }
+    .mainContent,
+    .app .mainContent{ padding:18px var(--gutter) 64px; margin-left:0; }
+
+}
+
+@media(prefers-reduced-motion:reduce){
+
+    .story{ animation:none; }
+    .vital::before,
+    .storyOpen{ transition:none; }
+
+}
+
+
+/* ==========================================================
+   Dark — "night edition"
+========================================================== */
+
+[data-theme="dark"]{
+
+    --paper:#13120F;
+    --bg:var(--paper);
+    --surface:#1B1915;
+    --surface-2:#211F1A;
+    --ink:#F1ECE2;
+    --text:#ECE6DB;
+    --text-light:#A39B8D;
+    --text-faint:#6F685D;
+    --border:#2F2B24;
+    --rule:#ECE6DB;
+
+    --signal:#FF6A3D;
+    --signal-light:#3A1F14;
+
+    --tone-alert:#FF7A5C;
+    --tone-alert-bg:#3A1C14;
+    --tone-bad:#E0A548;
+    --tone-bad-bg:#352812;
+    --tone-good:#5CC98A;
+    --tone-good-bg:#16301F;
+    --tone-info:#86A3FF;
+    --tone-info-bg:#1C2440;
+
+    --m-users:#86A3FF;
+    --m-sessions:#4FC6C6;
+    --m-purchases:#5CC98A;
+    --m-revenue:#F07AA0;
+    --m-cvr:#A88BFF;
+    --m-aov:#E0A548;
+
+    --shadow-md:0 10px 30px rgba(0,0,0,.45);
+
+}
+
+[data-theme="dark"] .topbar .sidebarMenu a.active{
+
+    background:var(--ink);
+    color:var(--paper);
+
+}
+
+
+/* Sections that get scrolled to programmatically (story/vital
+   click-throughs) land below the sticky top bar, not under it. */
+.chartCard,
+.tableCard,
+.trendCard,
+.trafficChannelTrendWrap,
+.landingRisingPanel{
+
+    scroll-margin-top:84px;
+
+}
+
+@media(max-width:720px){
+
+    /* five tabs fit on a phone without icons */
+    .topbar .sidebarMenu a svg{ display:none; }
+
+}
+
+/* Tables: the v2 dark theme hard-coded cool blue-grays — warm them to match. */
+.modernTable thead{ background:var(--surface-2); }
+
+[data-theme="dark"] .modernTable thead{ background:var(--surface-2); }
+[data-theme="dark"] .modernTable tbody tr:nth-child(even){ background:color-mix(in srgb, var(--surface) 70%, var(--surface-2)); }
+[data-theme="dark"] .modernTable tbody tr:hover{ background:var(--signal-light); }

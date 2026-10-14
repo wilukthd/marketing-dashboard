@@ -83,8 +83,10 @@ window.THD = window.THD || {};
         if (!status.sources) keys.push("dataWarning.sources");
         if (!status.landingPages) keys.push("dataWarning.landingPages");
         if (!status.newRepeat) keys.push("dataWarning.newRepeat");
-        if (!status.adSpend) keys.push("dataWarning.adSpend");
-        if (!status.transactions) keys.push("dataWarning.transactions");
+        // Ads/transactions only matter once their tab exists — until then
+        // nothing on screen uses them, so a warning would just be noise.
+        if (THD.ui.renderAdsKpis && !status.adSpend) keys.push("dataWarning.adSpend");
+        if (THD.ui.renderTransactionsTable && !status.transactions) keys.push("dataWarning.transactions");
 
         if (!keys.length) {
             el.style.display = "none";
@@ -1308,6 +1310,8 @@ window.THD = window.THD || {};
         views.forEach((v) => v.classList.toggle("viewHidden", v.dataset.view !== target));
 
         applyHeaderText(target);
+        document.body.dataset.view = target;
+        window.scrollTo({ top: 0 });
 
         // Charts inside the newly-shown view were sized while hidden
         // and need a beat for layout to settle before they can
@@ -1452,7 +1456,214 @@ window.THD = window.THD || {};
         btn.addEventListener("click", onClick);
     }
 
+    /* ==========================================================
+       Briefing (Overview)
+       Three layers, read top to bottom:
+         1. The headline — one sentence about revenue plus a
+            supporting line (built in data.js buildBriefing).
+         2. Vital signs — six compact figures with sparklines.
+            Clicking one plots it in the trend chart further down.
+         3. The story feed — ranked "what changed and why" cards.
+            Clicking a card hands its `action` back to app.js,
+            which routes it into the existing drill-downs (channel
+            trend, landing-page panel, a metric on the chart…).
+       Sparklines are hand-drawn inline SVG (no Chart.js instance
+       per card) so a dozen of them stay cheap to re-render on
+       every range change.
+    ========================================================== */
+
+    // values: number[]; opts: { highlight, compare, target, w, h }
+    function sparkSvg(values, opts) {
+        opts = opts || {};
+        const w = opts.w || 120;
+        const h = opts.h || 36;
+        const pad = 3;
+        const vals = (values || []).filter((v) => Number.isFinite(v));
+        if (vals.length < 2) return "";
+
+        const all = vals.concat((opts.compare || []).filter((v) => Number.isFinite(v)));
+        if (Number.isFinite(opts.target)) all.push(opts.target);
+        const min = Math.min(...all);
+        const max = Math.max(...all);
+        const span = max - min || 1;
+        const x = (i, n) => pad + (i * (w - pad * 2)) / Math.max(n - 1, 1);
+        const y = (v) => h - pad - ((v - min) / span) * (h - pad * 2);
+        const path = (arr) => arr.map((v, i) => `${i ? "L" : "M"}${x(i, arr.length).toFixed(1)},${y(v).toFixed(1)}`).join("");
+
+        let svg = `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true" preserveAspectRatio="none">`;
+        if (opts.compare && opts.compare.length > 1) {
+            svg += `<path class="sparkCompare" d="${path(opts.compare.slice(0, values.length))}"/>`;
+        }
+        if (Number.isFinite(opts.target)) {
+            svg += `<line class="sparkTarget" x1="${pad}" x2="${w - pad}" y1="${y(opts.target).toFixed(1)}" y2="${y(opts.target).toFixed(1)}"/>`;
+        }
+        const area = `${path(values)}L${x(values.length - 1, values.length).toFixed(1)},${h - pad}L${pad},${h - pad}Z`;
+        svg += `<path class="sparkArea" d="${area}"/>`;
+        svg += `<path class="sparkLine" d="${path(values)}"/>`;
+        const hi = Number.isInteger(opts.highlight) && opts.highlight >= 0 && opts.highlight < values.length
+            ? opts.highlight
+            : values.length - 1;
+        svg += `<circle class="sparkDot${hi === opts.highlight ? " isHighlight" : ""}" cx="${x(hi, values.length).toFixed(1)}" cy="${y(values[hi]).toFixed(1)}" r="3"/>`;
+        svg += "</svg>";
+        return svg;
+    }
+
+    const fmtYenShort = (v) => {
+        if (Math.abs(v) >= 1e6) return "¥" + (v / 1e6).toFixed(2) + "M";
+        if (Math.abs(v) >= 1e4) return "¥" + Math.round(v / 1e3).toLocaleString("en-US") + "k";
+        return "¥" + Math.round(v).toLocaleString("en-US");
+    };
+
+    // Order matters: what a reader scans first. users is last since
+    // it's a daily sum (see kpi.totalUsers label), not unique people.
+    const VITALS = [
+        { key: "revenue", labelKey: "brief.vital.revenue", fmt: fmtYenShort, chart: "revenue" },
+        { key: "purchases", labelKey: "brief.vital.purchases", fmt: fmtNumber, chart: "purchases" },
+        { key: "aov", labelKey: "brief.vital.aov", fmt: (v) => "¥" + Math.round(v).toLocaleString("en-US"), chart: null },
+        { key: "cvr", labelKey: "brief.vital.cvr", fmt: fmtPercent, chart: "cvr" },
+        { key: "sessions", labelKey: "brief.vital.sessions", fmt: fmtNumber, chart: "sessions" },
+        { key: "users", labelKey: "brief.vital.users", fmt: fmtNumber, chart: "users" }
+    ];
+
+    function vitalDeltaHtml(key, data, hasCompareData) {
+        if (!hasCompareData) return `<span class="vitalDelta neutral">${window.I18N.t("kpi.noCompareData")}</span>`;
+        if (data.delta === null || data.delta === undefined) return `<span class="vitalDelta neutral">${window.I18N.t("brief.vital.new")}</span>`;
+        const cls = data.delta >= 0 ? "pos" : "neg";
+        const text = key === "cvr" && data.deltaPts !== null && data.deltaPts !== undefined
+            ? fmtPts(data.deltaPts)
+            : fmtDelta(data.delta);
+        return `<span class="vitalDelta ${cls}">${text}</span>`;
+    }
+
+    // series: filterDailyRange(...).series — aov's daily series is
+    // derived here (revenue / purchases per day).
+    function renderVitals(kpi, series, hasCompareData, onPick) {
+        const el = document.getElementById("vitals");
+        if (!el || !kpi) return;
+        const aovSeries = (series.revenue || []).map((r, i) => (series.purchases[i] ? r / series.purchases[i] : 0));
+        const checked = getCheckedMetrics();
+
+        el.innerHTML = VITALS.map((v) => {
+            const data = kpi[v.key];
+            if (!data) return "";
+            const values = v.key === "aov" ? aovSeries : series[v.key];
+            const target = v.key === "cvr" && data.target ? data.target : null;
+            const targetHtml = target
+                ? `<span class="vitalTarget ${data.value >= target ? "hit" : "miss"}">${window.I18N.t("brief.vital.target", { target: fmtPercent(target) })}</span>`
+                : "";
+            const plotted = v.chart && checked.includes(v.chart);
+            return `
+                <button class="vital${plotted ? " isPlotted" : ""}" type="button" data-vital="${v.key}" style="--vital:var(--m-${v.key})"
+                        ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
+                    <span class="vitalLabel">${window.I18N.t(v.labelKey)}</span>
+                    <span class="vitalValue">${v.fmt(data.value)}</span>
+                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData)}${targetHtml}</span>
+                    ${sparkSvg(values, { target, w: 140, h: 34 })}
+                </button>`;
+        }).join("");
+
+        el.querySelectorAll(".vital").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const def = VITALS.find((v) => v.key === btn.dataset.vital);
+                if (onPick) onPick(def);
+            });
+        });
+    }
+
+    // Turns one metric's checkbox on (if it isn't already) and lets the
+    // existing change listener re-render the chart — keeps the vitals
+    // and the chart's own toggles as one source of truth.
+    function plotMetric(metric) {
+        const container = document.getElementById("metricToggles");
+        if (!container) return;
+        const cb = container.querySelector(`.metricToggle[data-metric="${metric}"] input`);
+        if (!cb) return;
+        if (!cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event("change"));
+        }
+        document.querySelectorAll(".vital").forEach((b) => {
+            const def = VITALS.find((v) => v.key === b.dataset.vital);
+            b.classList.toggle("isPlotted", !!(def && def.chart && getCheckedMetrics().includes(def.chart)));
+        });
+        const card = document.getElementById("trendCard");
+        if (card) card.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }
+
+    function renderBriefHeader(range, hasCompareData, dataAsOf) {
+        const rangeEl = document.getElementById("briefRange");
+        const cmpEl = document.getElementById("briefCompare");
+        const asOfEl = document.getElementById("briefAsOf");
+        const partialEl = document.getElementById("briefPartial");
+        const fmt = (d) => window.I18N.formatDayLabel(d);
+        if (rangeEl) rangeEl.textContent = window.I18N.t("brief.kickerRange", { start: fmt(range.start), end: fmt(range.end) });
+        if (cmpEl) {
+            cmpEl.textContent = hasCompareData
+                ? window.I18N.t(range.compareMode === "yoy" ? "brief.kickerYoy" : "brief.kickerCompare", { start: fmt(range.prevStart), end: fmt(range.prevEnd) })
+                : window.I18N.t("rangeCompare.noCompareData", { start: fmtISODate(range.prevStart), end: fmtISODate(range.prevEnd) });
+            cmpEl.classList.toggle("isWarning", !hasCompareData);
+        }
+        if (asOfEl) asOfEl.textContent = dataAsOf ? window.I18N.t("brief.dataAsOf", { date: fmt(dataAsOf) }) : "";
+        if (partialEl) partialEl.style.display = range.partial ? "" : "none";
+    }
+
+    const TONE_ICONS = { alert: "alert-octagon", bad: "trending-down", good: "trending-up", info: "sparkles" };
+
+    function storyHtml(story, index) {
+        const spark = story.spark && story.spark.values
+            ? sparkSvg(story.spark.values, { highlight: story.spark.highlight, compare: story.spark.compare, target: story.spark.target, w: 160, h: 44 })
+            : "";
+        return `
+            <li class="story tone-${story.tone}${index === 0 ? " isLead" : ""}" data-story-idx="${index}" tabindex="0" role="button">
+                <div class="storyMain">
+                    <div class="storyMeta">
+                        <span class="storyTone"><i data-lucide="${TONE_ICONS[story.tone] || "dot"}"></i>${window.I18N.t("brief.tone." + story.tone)}</span>
+                        <span class="storyKicker">${story.kicker}</span>
+                    </div>
+                    <h4 class="storyTitle">${story.title}</h4>
+                    ${story.body ? `<p class="storyBody">${story.body}</p>` : ""}
+                </div>
+                <div class="storySide">
+                    <div class="storyStat">${story.stat || ""}</div>
+                    ${spark}
+                    <span class="storyOpen">${window.I18N.t("brief.open")} <i data-lucide="arrow-right"></i></span>
+                </div>
+            </li>`;
+    }
+
+    // briefing: { headline: {main, dek}, stories: [] } from THD.data.buildBriefing
+    function renderBriefing(briefing, onAction) {
+        const headlineEl = document.getElementById("briefHeadline");
+        const dekEl = document.getElementById("briefDek");
+        const list = document.getElementById("storyList");
+        if (!briefing) return;
+
+        if (headlineEl) headlineEl.innerHTML = briefing.headline.main;
+        if (dekEl) dekEl.innerHTML = briefing.headline.dek;
+
+        if (!list) return;
+        if (!briefing.stories.length) {
+            list.innerHTML = `<li class="storyEmpty">${window.I18N.t("brief.feedEmpty")}</li>`;
+            return;
+        }
+        list.innerHTML = briefing.stories.map(storyHtml).join("");
+        if (window.lucide) lucide.createIcons();
+
+        list.querySelectorAll(".story").forEach((li) => {
+            const story = briefing.stories[Number(li.dataset.storyIdx)];
+            const go = () => { if (onAction && story.action) onAction(story.action); };
+            li.addEventListener("click", go);
+            li.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+            });
+        });
+    }
+
     THD.ui = {
+        renderBriefing,
+        renderBriefHeader,
+        renderVitals,
+        plotMetric,
         renderLastUpdate,
         renderKpis,
         showInitialSkeletons,

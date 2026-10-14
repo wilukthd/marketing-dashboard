@@ -24,7 +24,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700;900&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
@@ -36,13 +36,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css?v=26">
-    <link rel="stylesheet" href="css/layout.css?v=26">
-    <link rel="stylesheet" href="css/cards.css?v=26">
-    <link rel="stylesheet" href="css/charts.css?v=26">
-    <link rel="stylesheet" href="css/tables.css?v=26">
-    <link rel="stylesheet" href="css/dark.css?v=26">
-    <link rel="stylesheet" href="css/print.css?v=26" media="print">
+    <link rel="stylesheet" href="css/main.css?v=27">
+    <link rel="stylesheet" href="css/layout.css?v=27">
+    <link rel="stylesheet" href="css/cards.css?v=27">
+    <link rel="stylesheet" href="css/charts.css?v=27">
+    <link rel="stylesheet" href="css/tables.css?v=27">
+    <link rel="stylesheet" href="css/dark.css?v=27">
+    <link rel="stylesheet" href="css/briefing.css?v=27">
+    <link rel="stylesheet" href="css/print.css?v=27" media="print">
 
 </head>
 
@@ -81,12 +82,14 @@
 <div class="app">
 
 <!-- ======================================================
-SIDEBAR
+TOP BAR
+Replaces the old fixed sidebar. Nav links keep the
+.sidebarMenu a[data-view] hooks ui.js already wires.
 ======================================================= -->
 
-<aside class="sidebar">
+<header class="topbar">
 
-    <div>
+    <div class="topbarInner">
 
         <div class="logo">
 
@@ -96,63 +99,56 @@ SIDEBAR
 
         </div>
 
-        <nav class="sidebarMenu">
+        <nav class="sidebarMenu" aria-label="Sections">
 
             <a href="#" class="active" data-view="overview">
-
-                <i data-lucide="layout-dashboard"></i>
-
-                <span data-i18n="nav.overview">Overview</span>
-
+                <i data-lucide="newspaper"></i>
+                <span data-i18n="nav.overview">Briefing</span>
             </a>
 
             <a href="#" data-view="traffic">
-
                 <i data-lucide="activity"></i>
-
                 <span data-i18n="nav.traffic">Traffic</span>
-
             </a>
 
             <a href="#" data-view="sales">
-
-                <i data-lucide="shopping-cart"></i>
-
+                <i data-lucide="shopping-bag"></i>
                 <span data-i18n="nav.sales">Sales</span>
-
             </a>
 
             <a href="#" data-view="notes">
-
                 <i data-lucide="sticky-note"></i>
-
                 <span data-i18n="nav.notes">Notes</span>
-
             </a>
 
             <a href="#" data-view="settings">
-
                 <i data-lucide="settings"></i>
-
                 <span data-i18n="nav.settings">Settings</span>
-
             </a>
 
         </nav>
 
-    </div>
+        <div class="topbarActions">
 
-    <div class="sidebarBottom">
+            <div class="updateCard">
+                <small data-i18n="header.lastUpdate">Last Update</small>
+                <strong id="lastUpdate">--</strong>
+            </div>
 
-        <div class="version" data-i18n="sidebar.version">
+            <button class="iconButton" id="exportPdfBtn" data-i18n-title="header.exportPdf" title="Export PDF">
+                <i data-lucide="file-down"></i>
+            </button>
 
-            Version 0.1
+            <button class="primaryButton" id="refreshBtn">
+                <i data-lucide="refresh-cw"></i>
+                <span data-i18n="header.refresh">Refresh</span>
+            </button>
 
         </div>
 
     </div>
 
-</aside>
+</header>
 
 
 
@@ -179,42 +175,6 @@ MAIN
             Marketing performance at a glance
 
         </p>
-
-    </div>
-
-    <div class="headerRight">
-
-        <div class="updateCard">
-
-            <small data-i18n="header.lastUpdate">
-
-                Last Update
-
-            </small>
-
-            <strong id="lastUpdate">
-
-                --
-
-            </strong>
-
-        </div>
-
-        <button class="secondaryButton" id="exportPdfBtn">
-
-            <i data-lucide="file-down"></i>
-
-            <span data-i18n="header.exportPdf">Export PDF</span>
-
-        </button>
-
-        <button class="primaryButton" id="refreshBtn">
-
-            <i data-lucide="refresh-cw"></i>
-
-            <span data-i18n="header.refresh">Refresh</span>
-
-        </button>
 
     </div>
 
@@ -294,324 +254,89 @@ MAIN
 
 <div class="dashboardView" data-view="overview">
 
-<!-- ================= KPI ================= -->
+<!-- ================= BRIEFING HERO ================= -->
 
-<section class="kpiGrid">
+<section class="brief" id="brief">
 
-    <article class="card kpiCard users" data-kpi="users">
+    <p class="briefKicker">
+        <span id="briefRange">--</span>
+        <span class="briefCompare" id="briefCompare"></span>
+        <span class="briefAsOf" id="briefAsOf"></span>
+    </p>
 
-        <div class="cardTop">
+    <h2 class="briefHeadline" id="briefHeadline"><span class="skeletonBlock" style="width:70%"></span></h2>
 
-            <span data-i18n="kpi.totalUsers">Total Users</span>
+    <p class="briefDek" id="briefDek"></p>
 
-            <i data-lucide="users"></i>
-
-        </div>
-
-        <h3 data-field="value">--</h3>
-
-        <div class="cardBottom">
-
-            <div>
-
-                <strong data-field="delta">--</strong>
-
-                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
-
-            </div>
-
-            <div>
-
-                <small data-i18n="kpi.avgDay">Avg / Day</small>
-
-                <strong data-field="daily">--</strong>
-
-            </div>
-
-        </div>
-
-        <div class="kpiGoalProgress" data-goal="users" style="display:none;">
-
-            <div class="kpiGoalBar">
-
-                <div class="kpiGoalBarFill" data-field="goalFill"></div>
-
-            </div>
-
-            <small data-field="goalLabel"></small>
-
-        </div>
-
-    </article>
-
-
-
-    <article class="card kpiCard sessions" data-kpi="sessions">
-
-        <div class="cardTop">
-
-            <span data-i18n="kpi.sessions">Sessions</span>
-
-            <i data-lucide="activity"></i>
-
-        </div>
-
-        <h3 data-field="value">--</h3>
-
-        <div class="cardBottom">
-
-            <div>
-
-                <strong data-field="delta">--</strong>
-
-                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
-
-            </div>
-
-            <div>
-
-                <small data-i18n="kpi.avgDay">Avg / Day</small>
-
-                <strong data-field="daily">--</strong>
-
-            </div>
-
-        </div>
-
-        <div class="kpiGoalProgress" data-goal="sessions" style="display:none;">
-
-            <div class="kpiGoalBar">
-
-                <div class="kpiGoalBarFill" data-field="goalFill"></div>
-
-            </div>
-
-            <small data-field="goalLabel"></small>
-
-        </div>
-
-    </article>
-
-
-
-    <article class="card kpiCard purchases" data-kpi="purchases">
-
-        <div class="cardTop">
-
-            <span data-i18n="kpi.purchases">Ecommerce Purchases</span>
-
-            <i data-lucide="shopping-cart"></i>
-
-        </div>
-
-        <h3 data-field="value">--</h3>
-
-        <div class="cardBottom">
-
-            <div>
-
-                <strong data-field="delta">--</strong>
-
-                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
-
-            </div>
-
-            <div>
-
-                <small data-i18n="kpi.dailyAvg">Daily Avg</small>
-
-                <strong data-field="daily">--</strong>
-
-            </div>
-
-        </div>
-
-        <div class="kpiGoalProgress" data-goal="purchases" style="display:none;">
-
-            <div class="kpiGoalBar">
-
-                <div class="kpiGoalBarFill" data-field="goalFill"></div>
-
-            </div>
-
-            <small data-field="goalLabel"></small>
-
-        </div>
-
-    </article>
-
-
-
-    <article class="card kpiCard revenue" data-kpi="revenue">
-
-        <div class="cardTop">
-
-            <span data-i18n="kpi.revenue">Total Revenue</span>
-
-            <i data-lucide="wallet"></i>
-
-        </div>
-
-        <h3 data-field="value">--</h3>
-
-        <div class="cardBottom">
-
-            <div>
-
-                <strong data-field="delta">--</strong>
-
-                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
-
-            </div>
-
-            <div>
-
-                <small data-i18n="kpi.dailyAvg">Daily Avg</small>
-
-                <strong data-field="daily">--</strong>
-
-            </div>
-
-        </div>
-
-        <div class="kpiGoalProgress" data-goal="revenue" style="display:none;">
-
-            <div class="kpiGoalBar">
-
-                <div class="kpiGoalBarFill" data-field="goalFill"></div>
-
-            </div>
-
-            <small data-field="goalLabel"></small>
-
-        </div>
-
-    </article>
-
-
-
-    <article class="card kpiCard cvr" data-kpi="cvr">
-
-        <div class="cardTop">
-
-            <span data-i18n="kpi.cvr">CVR</span>
-
-            <i data-lucide="target"></i>
-
-        </div>
-
-        <h3 data-field="value">--</h3>
-
-        <div class="cardBottom">
-
-            <div>
-
-                <strong data-field="delta">--</strong>
-
-                <small data-i18n="kpi.vsPrevious">vs Previous Period</small>
-
-            </div>
-
-            <div>
-
-                <small data-i18n="kpi.goal">Goal</small>
-
-                <strong data-field="daily">--</strong>
-
-            </div>
-
-        </div>
-
-        <div class="kpiGoalProgress" data-goal="cvr" style="display:none;">
-
-            <div class="kpiGoalBar">
-
-                <div class="kpiGoalBarFill" data-field="goalFill"></div>
-
-            </div>
-
-            <small data-field="goalLabel"></small>
-
-        </div>
-
-    </article>
+    <p class="briefPartial" id="briefPartial" style="display:none;" data-i18n="brief.kickerPartial">Today is still being counted.</p>
 
 </section>
 
+<!-- ================= VITAL SIGNS ================= -->
+<!-- Each vital is a button: clicking it plots that metric in the
+     trend chart below (same toggles as #metricToggles). -->
 
+<section class="vitals" id="vitals" aria-label="Vital signs"></section>
+
+<!-- ================= STORY FEED ================= -->
+
+<section class="storyFeed">
+
+    <div class="feedHeader">
+        <h3 data-i18n="brief.feedTitle">What changed</h3>
+        <small data-i18n="brief.feedSub">Ranked by how much it needs your attention</small>
+    </div>
+
+    <ol class="storyList" id="storyList"></ol>
+
+</section>
 
 <!-- ================= MAIN CHART ================= -->
 
-<section class="chartCard">
+<section class="chartCard trendCard" id="trendCard">
 
     <div class="chartHeader">
 
         <div>
 
-            <h3 data-i18n="trend.title">
+            <h3 data-i18n="brief.trendTitle">
 
-                Metrics Trend
+                The numbers behind it
 
             </h3>
-
-            <small data-i18n="trend.subtitle">
-
-                Select a Date Range Above
-
-            </small>
 
         </div>
 
         <div class="metricToggles" id="metricToggles">
 
             <label class="metricToggle" data-metric="users">
-
-                <input type="checkbox" checked>
-
-                <span class="metricDot" style="background:#2B59FF"></span>
-
+                <input type="checkbox">
+                <span class="metricDot" style="background:var(--m-users)"></span>
                 <span data-i18n="kpi.totalUsers">Total Users</span>
-
             </label>
 
             <label class="metricToggle" data-metric="sessions">
-
-                <input type="checkbox">
-
-                <span class="metricDot" style="background:#0EA5A5"></span>
-
+                <input type="checkbox" checked>
+                <span class="metricDot" style="background:var(--m-sessions)"></span>
                 <span data-i18n="kpi.sessions">Sessions</span>
-
             </label>
 
             <label class="metricToggle" data-metric="purchases">
-
-                <input type="checkbox" checked>
-
-                <span class="metricDot" style="background:#0F9D63"></span>
-
+                <input type="checkbox">
+                <span class="metricDot" style="background:var(--m-purchases)"></span>
                 <span data-i18n="kpi.purchases">Ecommerce Purchases</span>
-
             </label>
 
             <label class="metricToggle" data-metric="revenue">
-
-                <input type="checkbox">
-
-                <span class="metricDot" style="background:#D6336C"></span>
-
+                <input type="checkbox" checked>
+                <span class="metricDot" style="background:var(--m-revenue)"></span>
                 <span data-i18n="kpi.revenue">Total Revenue</span>
-
             </label>
 
             <label class="metricToggle" data-metric="cvr">
-
                 <input type="checkbox">
-
-                <span class="metricDot" style="background:#7C4DFF"></span>
-
+                <span class="metricDot" style="background:var(--m-cvr)"></span>
                 <span data-i18n="kpi.cvr">CVR</span>
-
             </label>
 
         </div>
@@ -637,6 +362,40 @@ MAIN
     </div>
 
 </section>
+
+<!-- ================= ALL INSIGHTS (collapsed) ================= -->
+<!-- The original sentence lists, kept for anyone who wants the
+     full text version — the story feed above is built from the
+     same detectors. -->
+
+<details class="allInsights">
+
+    <summary data-i18n="brief.allInsights">Every insight, as a list</summary>
+
+    <section class="insightCard">
+
+        <div class="sectionTitle">
+            <h3 data-i18n="insights.title">Key Insights</h3>
+        </div>
+
+        <ul id="keyInsightsList">
+            <li>Loading insights…</li>
+        </ul>
+
+    </section>
+
+    <section class="insightCard" id="topLandingPageInsightsCard">
+
+        <div class="sectionTitle">
+            <h3 data-i18n="insights.topLandingTitle">Top Landing Pages Insights</h3>
+        </div>
+
+        <ul id="topLandingPageInsightsList">
+        </ul>
+
+    </section>
+
+</details>
 
 </div>
 
@@ -884,49 +643,7 @@ MAIN
 
 
 
-<!-- ================= INSIGHTS ================= -->
 
-<div class="dashboardView" data-view="overview">
-
-<section class="insightCard">
-
-    <div class="sectionTitle">
-
-        <h3 data-i18n="insights.title">
-
-            Key Insights
-
-        </h3>
-
-    </div>
-
-    <ul id="keyInsightsList">
-
-        <li>Loading insights…</li>
-
-    </ul>
-
-</section>
-
-<section class="insightCard" id="topLandingPageInsightsCard">
-
-    <div class="sectionTitle">
-
-        <h3 data-i18n="insights.topLandingTitle">
-
-            Top Landing Pages Insights
-
-        </h3>
-
-    </div>
-
-    <ul id="topLandingPageInsightsList">
-
-    </ul>
-
-</section>
-
-</div>
 
 
 
@@ -1464,19 +1181,19 @@ MAIN
 
 </script>
 
-<script src="js/i18n.js?v=26"></script>
-<script src="js/gate.js?v=26"></script>
-<script src="js/charts.js?v=26"></script>
-<script src="js/ui.js?v=26"></script>
-<script src="js/data.js?v=26"></script>
-<script src="js/export.js?v=26"></script>
+<script src="js/i18n.js?v=27"></script>
+<script src="js/gate.js?v=27"></script>
+<script src="js/charts.js?v=27"></script>
+<script src="js/ui.js?v=27"></script>
+<script src="js/data.js?v=27"></script>
+<script src="js/export.js?v=27"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/notes.js?v=26"></script>
+<script src="js/notes.js?v=27"></script>
 <!-- js/goals.js (Monthly Targets) — built for v2 but paused before ship,
      see thd-dashboard-changelog.md. Re-add this tag plus the wiring
      commented out in app.js's init() to bring it back. -->
-<script src="js/app.js?v=26"></script>
+<script src="js/app.js?v=27"></script>
 
 </body>
 </html>
