@@ -1408,3 +1408,12 @@ body[data-view="overview"] .rangeCompareBar{
     color:var(--text-faint);
 
 }
+
+/* Docked chart spacing: the header is empty here (title + toggles
+   hidden), and the base .trendOverlayRow's -16px top margin — meant to
+   tuck it under a title — pulled the controls up into the vital cards. */
+.vitals + .trendCard{ padding-top:22px; }
+
+.vitals + .trendCard .chartHeader{ display:none; }
+
+.vitals + .trendCard .trendOverlayRow{ margin:0 0 14px; }
