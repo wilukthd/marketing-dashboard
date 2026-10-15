@@ -1680,7 +1680,220 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Customer Flow (Sales tab) — replaces the old 100%-stacked
+       new/repeat share bars, where ~90% of every bar was the same
+       repeat-customer purple and the part that actually moves (new
+       customers, 5–15%) was a sliver at the bottom.
+
+       Deliberately a different visual grammar from every other
+       chart in the app (those are Chart.js lines/areas/bars in the
+       metric colors): ink dots and hollow rings, monochrome, drawn
+       as inline SVG — so nobody mistakes it for "another revenue
+       chart".
+         • New customers: a dumbbell per month — filled dot = this
+           year, ring = same month last year, connector colored by
+           whether it's up or down. Acquisition is the question here,
+           and last year is the honest baseline (seasonality).
+         • Repeat orders: slim ink columns with a dashed median line.
+         • Above both: three headline figures and auto-written notes
+           for the months that matter (biggest drop, the peak).
+    ========================================================== */
+
+    const svgEsc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+    // "2025年9月" -> "9月", "Sep 2025" -> "Sep"; year shown separately on January.
+    function shortMonth(period) {
+        const ja = /^(\d{4})年(\d{1,2})月/.exec(period);
+        if (ja) return { month: ja[2] + "月", year: ja[1], isJan: ja[2] === "1" };
+        const en = /^([A-Za-z]{3})\w*\s+(\d{4})/.exec(period);
+        if (en) return { month: en[1], year: en[2], isJan: en[1] === "Jan" };
+        return { month: period, year: "", isJan: false };
+    }
+
+    function niceMax(v) {
+        if (v <= 0) return 1;
+        const mag = Math.pow(10, Math.floor(Math.log10(v)));
+        const n = v / mag;
+        return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+    }
+
+    const CF = { w: 640, h: 210, padL: 44, padR: 12, padT: 18, padB: 34 };
+
+    function cfFrame(n, max, months) {
+        const innerW = CF.w - CF.padL - CF.padR;
+        const innerH = CF.h - CF.padT - CF.padB;
+        const step = innerW / n;
+        const x = (i) => CF.padL + step * (i + 0.5);
+        const y = (v) => CF.padT + innerH - (v / max) * innerH;
+        let g = "";
+        [0, 0.5, 1].forEach((f) => {
+            const v = max * f;
+            g += `<line class="cfGrid" x1="${CF.padL}" x2="${CF.w - CF.padR}" y1="${y(v)}" y2="${y(v)}"/>`;
+            g += `<text class="cfTick" x="${CF.padL - 8}" y="${y(v) + 3.5}" text-anchor="end">${fmtNumber(v)}</text>`;
+        });
+        months.forEach((m, i) => {
+            g += `<text class="cfMonth" x="${x(i)}" y="${CF.h - CF.padB + 15}" text-anchor="middle">${svgEsc(m.month)}</text>`;
+            if (m.isJan || i === 0) g += `<text class="cfYear" x="${x(i)}" y="${CF.h - CF.padB + 28}" text-anchor="middle">${svgEsc(m.year)}</text>`;
+        });
+        return { x, y, step, grid: g };
+    }
+
+    function newCustomerSvg(rows, lastYear, months, marks) {
+        const max = niceMax(Math.max(...rows.map((r) => r.newOrders), ...lastYear.filter(Number.isFinite)) * 1.08);
+        const f = cfFrame(rows.length, max, months);
+        let s = f.grid;
+        rows.forEach((r, i) => {
+            const cx = f.x(i);
+            const ly = lastYear[i];
+            const tip = `${months[i].month}: ${fmtNumber(r.newOrders)}` + (Number.isFinite(ly) ? ` (${window.I18N.t("customers.lastYear")} ${fmtNumber(ly)})` : "");
+            s += `<g class="cfMonthGroup"><title>${svgEsc(tip)}</title>`;
+            s += `<rect class="cfHit" x="${cx - f.step / 2}" y="${CF.padT}" width="${f.step}" height="${CF.h - CF.padT - CF.padB}"/>`;
+            if (Number.isFinite(ly)) {
+                const up = r.newOrders >= ly;
+                s += `<line class="cfLink ${up ? "up" : "down"}" x1="${cx}" x2="${cx}" y1="${f.y(ly)}" y2="${f.y(r.newOrders)}"/>`;
+                s += `<circle class="cfRing" cx="${cx}" cy="${f.y(ly)}" r="4.5"/>`;
+            }
+            s += `<circle class="cfDot${marks[i] ? " isMarked" : ""}${isOpenMonth(r) ? " isOpen" : ""}" cx="${cx}" cy="${f.y(r.newOrders)}" r="5.5"/>`;
+            if (marks[i] || i === rows.length - 1) {
+                s += `<text class="cfValue" x="${cx}" y="${f.y(Math.max(r.newOrders, Number.isFinite(ly) ? ly : 0)) - 10}" text-anchor="middle">${fmtNumber(r.newOrders)}</text>`;
+            }
+            s += "</g>";
+        });
+        return `<svg class="cfSvg" viewBox="0 0 ${CF.w} ${CF.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${svgEsc(window.I18N.t("customers.newTitle"))}">${s}</svg>`;
+    }
+
+    function repeatOrdersSvg(rows, months) {
+        const vals = rows.map((r) => r.repeatOrders);
+        const max = niceMax(Math.max(...vals) * 1.08);
+        const f = cfFrame(rows.length, max, months);
+        const sorted = vals.slice().sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        const closedVals = vals.filter((_, i) => !isOpenMonth(rows[i]));
+        const minIdx = closedVals.length ? vals.indexOf(Math.min(...closedVals)) : -1;
+        const barW = Math.min(14, f.step * 0.36);
+        let s = f.grid;
+        s += `<line class="cfMedian" x1="${CF.padL}" x2="${CF.w - CF.padR}" y1="${f.y(median)}" y2="${f.y(median)}"/>`;
+        s += `<text class="cfMedianLabel" x="${CF.padL + 4}" y="${f.y(median) - 5}" text-anchor="start">${svgEsc(window.I18N.t("customers.median", { value: fmtNumber(median) }))}</text>`;
+        rows.forEach((r, i) => {
+            const cx = f.x(i);
+            const top = f.y(r.repeatOrders);
+            const last = i === rows.length - 1;
+            s += `<g><title>${svgEsc(`${months[i].month}: ${fmtNumber(r.repeatOrders)}`)}</title>`;
+            s += `<rect class="cfCol${last ? " isLatest" : ""}${i === minIdx ? " isLow" : ""}${isOpenMonth(r) ? " isOpen" : ""}" x="${cx - barW / 2}" y="${top}" width="${barW}" height="${f.y(0) - top}" rx="${barW / 2}"/>`;
+            if (last || i === minIdx) s += `<text class="cfValue" x="${cx}" y="${top - 7}" text-anchor="middle">${fmtNumber(r.repeatOrders)}</text>`;
+            s += "</g>";
+        });
+        return `<svg class="cfSvg" viewBox="0 0 ${CF.w} ${CF.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${svgEsc(window.I18N.t("customers.repeatTitle"))}">${s}</svg>`;
+    }
+
+    // Business months close on the 20th (see businessMonthOf in data.js);
+    // a row whose month hasn't closed yet is still filling up.
+    function isOpenMonth(r) {
+        if (!r || !Number.isFinite(r.year) || !Number.isFinite(r.month)) return false;
+        return new Date() <= new Date(r.year, r.month - 1, 20, 23, 59, 59);
+    }
+
+    const pctChange = (cur, prev) => (prev ? ((cur - prev) / prev) * 100 : null);
+    const signedPct = (v) => (v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(0) + "%");
+
+    // recentRows: the 13 months on screen; fullRows: all history (for last-year baselines)
+    function renderCustomerFlow(recentRows, fullRows) {
+        const statsEl = document.getElementById("custStats");
+        const notesEl = document.getElementById("custNotes");
+        const newEl = document.getElementById("custNewChart");
+        const repEl = document.getElementById("custRepeatChart");
+        if (!newEl || !repEl || !recentRows || !recentRows.length) return;
+
+        const full = fullRows && fullRows.length ? fullRows : recentRows;
+        const offset = full.length - recentRows.length;
+        const lastYear = recentRows.map((_, i) => {
+            const ly = full[offset + i - 12];
+            return ly ? ly.newOrders : NaN;
+        });
+        const lastYearRepeat = recentRows.map((_, i) => {
+            const ly = full[offset + i - 12];
+            return ly ? ly.repeatOrders : NaN;
+        });
+        const months = recentRows.map((r) => shortMonth(r.period));
+        const t = window.I18N.t;
+
+        // ---- notes: biggest month-on-month drop in new customers, and the peak ----
+        // Computed over CLOSED months only — an open month's low count is
+        // just "not finished yet", not a drop.
+        const closedCount = recentRows.filter((r) => !isOpenMonth(r)).length;
+        const marks = recentRows.map(() => false);
+        const notes = [];
+        // Worst month vs the SAME month last year — month-on-month would
+        // just rediscover seasonality (every January drops after the
+        // December peak).
+        let worst = null;
+        recentRows.forEach((r, i) => {
+            if (i >= closedCount) return;
+            const prev = lastYear[i];
+            if (!Number.isFinite(prev) || prev < 100) return;
+            const ch = pctChange(r.newOrders, prev);
+            if (ch !== null && ch <= -25 && (!worst || ch < worst.ch)) worst = { i, ch, prev, cur: r.newOrders };
+        });
+        // The trend across months beats any single month: how many closed
+        // months came in below the same month last year?
+        const compared = recentRows.map((r, i) => (i < closedCount && Number.isFinite(lastYear[i]) ? r.newOrders - lastYear[i] : null)).filter((d) => d !== null);
+        const below = compared.filter((d) => d < 0).length;
+        if (compared.length >= 6 && (below / compared.length >= 0.7 || below / compared.length <= 0.3)) {
+            notes.push({
+                tone: below > compared.length / 2 ? "bad" : "good",
+                text: t(below > compared.length / 2 ? "customers.noteStreakDown" : "customers.noteStreakUp", {
+                    n: below > compared.length / 2 ? below : compared.length - below, total: compared.length
+                })
+            });
+        }
+        if (worst) {
+            marks[worst.i] = true;
+            notes.push({ tone: "bad", text: t("customers.noteDrop", { month: months[worst.i].month, pct: signedPct(worst.ch), prev: fmtNumber(worst.prev), cur: fmtNumber(worst.cur) }) });
+        }
+        const peakIdx = recentRows.reduce((best, r, i) => (i < closedCount && r.newOrders > recentRows[best].newOrders ? i : best), 0);
+        marks[peakIdx] = true;
+        notes.push({ tone: "good", text: t("customers.notePeak", { month: months[peakIdx].month, value: fmtNumber(recentRows[peakIdx].newOrders) }) });
+        const latestI = Math.max(closedCount - 1, 0); // latest CLOSED month
+        if (Number.isFinite(lastYear[latestI]) && (!worst || worst.i !== latestI)) {
+            const ch = pctChange(recentRows[latestI].newOrders, lastYear[latestI]);
+            if (ch !== null && Math.abs(ch) >= 10) {
+                notes.push({ tone: ch >= 0 ? "good" : "bad", text: t("customers.noteYoy", { month: months[latestI].month, pct: signedPct(ch) }) });
+            }
+        }
+
+        // ---- headline figures for the latest month ----
+        const latest = recentRows[latestI];
+        const share = (r) => (r.newOrders + r.repeatOrders ? (r.newOrders / (r.newOrders + r.repeatOrders)) * 100 : 0);
+        const lyRow = full[offset + latestI - 12];
+        const stat = (label, value, compare) => `
+            <div class="custStat">
+                <span class="custStatLabel">${label}</span>
+                <span class="custStatValue">${value}</span>
+                <span class="custStatCompare">${compare}</span>
+            </div>`;
+        const vsLy = (cur, ly) => Number.isFinite(ly) ? t("customers.vsLy", { pct: signedPct(pctChange(cur, ly)), value: fmtNumber(ly) }) : "";
+        if (statsEl) {
+            statsEl.innerHTML =
+                `<div class="custStatMonth">${svgEsc(latest.period)}</div>` +
+                stat(t("customers.statNew"), fmtNumber(latest.newOrders), vsLy(latest.newOrders, lastYear[latestI])) +
+                stat(t("customers.statRepeat"), fmtNumber(latest.repeatOrders), vsLy(latest.repeatOrders, lastYearRepeat[latestI])) +
+                stat(t("customers.statShare"), share(latest).toFixed(1) + "%",
+                    lyRow ? t("customers.vsLyPts", { pts: ((share(latest) - share(lyRow)) >= 0 ? "+" : "−") + Math.abs(share(latest) - share(lyRow)).toFixed(1) }) : "");
+        }
+        if (closedCount < recentRows.length) {
+            notes.push({ tone: "info", text: t("customers.noteOpen", { month: months[recentRows.length - 1].month }) });
+        }
+        if (notesEl) {
+            notesEl.innerHTML = notes.map((n) => `<li class="custNote ${n.tone}">${svgEsc(n.text)}</li>`).join("");
+        }
+
+        newEl.innerHTML = newCustomerSvg(recentRows, lastYear, months, marks);
+        repEl.innerHTML = repeatOrdersSvg(recentRows, months);
+    }
+
     THD.ui = {
+        renderCustomerFlow,
         renderBriefing,
         renderBriefHeader,
         renderVitals,

@@ -517,7 +517,7 @@ body[data-view="overview"] .rangeCompareBar{
 
 }
 
-.vital:first-child{ border-left:none; padding-left:0; }
+.vital:first-child{ border-left:none; }
 
 /* "On the chart" marker. This used to be a top rule that also slid
    in on hover, so the plotted cards looked like a hover animation
@@ -978,7 +978,7 @@ body[data-view="overview"] .rangeCompareBar{
 
     .vitals{ grid-template-columns:repeat(3, minmax(0,1fr)); }
 
-    .vital:nth-child(3n+1){ border-left:none; padding-left:0; }
+    .vital:nth-child(3n+1){ border-left:none; }
 
     .vital:nth-child(n+4){ border-top:1px solid var(--border); }
 
@@ -1028,7 +1028,7 @@ body[data-view="overview"] .rangeCompareBar{
 
     .vitals{ grid-template-columns:repeat(2, minmax(0,1fr)); }
 
-    .vital:nth-child(n){ border-left:none; padding-left:0; border-top:none; }
+    .vital:nth-child(n){ border-left:none; border-top:none; }
 
     .vital:nth-child(2n){ border-left:1px solid var(--border); padding-left:14px; }
 
@@ -1172,5 +1172,239 @@ body[data-view="overview"] .rangeCompareBar{
 @media(max-width:1180px){
 
     .vitalOnChart{ font-size:0; gap:0; }
+
+}
+
+
+
+/* ==========================================================
+   Briefing — chart docked under the vital signs
+   The vitals ARE the chart's legend/toggles now (click a vital
+   to add/remove it), so the chart's own checkbox row is hidden
+   here and the card loses its frame to read as one block.
+========================================================== */
+
+.vitals{ margin-bottom:0; }
+
+.vitals + .trendCard{
+
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--border);
+    border-radius:0;
+    padding:6px 0 18px;
+    margin-bottom:34px;
+
+}
+
+.vitals + .trendCard .chartHeader h3,
+.vitals + .trendCard #metricToggles{
+
+    display:none;
+
+}
+
+.vitals + .trendCard .chartHeader{ margin-bottom:0; }
+
+.vitals + .trendCard .trendOverlayRow{ justify-content:flex-end; margin-bottom:4px; }
+
+
+/* ==========================================================
+   Customer flow (Sales tab)
+   Monochrome ink + hollow rings, on purpose: every other chart
+   uses the metric colors, so this one shouldn't look like them.
+========================================================== */
+
+.customerCard{ padding-bottom:12px; }
+
+.custTop{
+
+    display:grid;
+    grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);
+    gap:18px 28px;
+    align-items:start;
+    padding:6px 0 18px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:12px;
+
+}
+
+.custStats{
+
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:4px 18px;
+
+}
+
+.custStatMonth{
+
+    grid-column:1 / -1;
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--text-light);
+    letter-spacing:.06em;
+
+}
+
+.custStat{ display:flex; flex-direction:column; gap:1px; min-width:0; }
+
+.custStatLabel{ font-size:11.5px; color:var(--text-light); }
+
+.custStatValue{
+
+    font-family:var(--font-display);
+    font-size:28px;
+    font-weight:900;
+    line-height:1.15;
+    color:var(--ink);
+
+}
+
+.custStatCompare{ font-size:11.5px; color:var(--text-light); font-family:var(--font-mono); }
+
+.custNotes{
+
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin:0;
+    padding:0;
+
+}
+
+.custNote{
+
+    font-size:13px;
+    line-height:1.5;
+    padding-left:14px;
+    position:relative;
+    color:var(--text);
+
+}
+
+.custNote::before{
+
+    content:"";
+    position:absolute;
+    left:0;
+    top:.5em;
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    border:1.5px solid var(--text-light);
+
+}
+
+.custNote.bad::before{ background:var(--tone-alert); border-color:var(--tone-alert); }
+.custNote.good::before{ background:var(--tone-good); border-color:var(--tone-good); }
+
+.custPanels{
+
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:8px 28px;
+
+}
+
+.custPanel{ margin:0; min-width:0; }
+
+.custPanel figcaption{
+
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:center;
+    gap:4px 12px;
+    font-size:13px;
+    font-weight:700;
+    margin-bottom:4px;
+
+}
+
+.custLegend{
+
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:11.5px;
+    font-weight:500;
+    color:var(--text-light);
+
+}
+
+.custLegend .lgDot,
+.custLegend .lgRing{
+
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    display:inline-block;
+
+}
+
+.custLegend .lgDot{ background:var(--ink); }
+.custLegend .lgRing{ border:1.5px solid var(--text-faint); margin-left:6px; }
+
+.cfSvg{ display:block; width:100%; height:auto; overflow:visible; }
+
+.cfSvg .cfGrid{ stroke:var(--border); stroke-width:1; }
+.cfSvg .cfTick,
+.cfSvg .cfMonth{ fill:var(--text-light); font-size:11px; font-family:var(--font-mono); }
+.cfSvg .cfYear{ fill:var(--text-faint); font-size:10px; font-family:var(--font-mono); }
+.cfSvg .cfHit{ fill:transparent; }
+.cfSvg .cfMonthGroup:hover .cfHit{ fill:var(--surface-2); }
+
+.cfSvg .cfLink{ stroke-width:2.5; stroke-linecap:round; }
+.cfSvg .cfLink.up{ stroke:var(--tone-good); }
+.cfSvg .cfLink.down{ stroke:var(--tone-alert); }
+
+.cfSvg .cfRing{ fill:var(--surface); stroke:var(--text-faint); stroke-width:1.6; }
+.cfSvg .cfDot{ fill:var(--ink); }
+.cfSvg .cfDot.isMarked{ stroke:var(--surface); stroke-width:2; }
+.cfSvg .cfDot.isOpen{ fill:var(--surface); stroke:var(--ink); stroke-width:1.6; stroke-dasharray:2 2; }
+
+.cfSvg .cfValue{ fill:var(--ink); font-size:11.5px; font-weight:700; font-family:var(--font-mono); }
+
+.cfSvg .cfCol{ fill:var(--ink); opacity:.78; }
+.cfSvg .cfCol.isLow{ opacity:1; fill:var(--tone-alert); }
+.cfSvg .cfCol.isOpen{ opacity:.25; }
+
+.cfSvg .cfMedian{ stroke:var(--text-light); stroke-width:1; stroke-dasharray:4 4; }
+.cfSvg .cfMedianLabel{ fill:var(--text-light); font-size:10.5px; font-family:var(--font-mono); }
+
+@media(max-width:900px){
+
+    .custTop,
+    .custPanels{ grid-template-columns:minmax(0,1fr); }
+
+}
+
+@media(max-width:520px){
+
+    .custStats{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .custStatValue{ font-size:23px; }
+
+}
+
+.trendHint{ display:none; }
+
+.vitals + .trendCard .trendOverlayRow{
+
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px 16px;
+
+}
+
+.vitals + .trendCard .trendHint{
+
+    display:inline;
+    order:-1;
+    font-size:12px;
+    color:var(--text-faint);
 
 }

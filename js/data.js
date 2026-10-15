@@ -249,6 +249,8 @@ window.THD = window.THD || {};
                 .filter((r) => Number.isFinite(r[0]) && Number.isFinite(r[1])) // drops blank/leftover formula rows at the bottom
                 .sort((a, b) => (a[0] * 12 + a[1]) - (b[0] * 12 + b[1]))
                 .map((r) => ({
+                    year: r[0],
+                    month: r[1],
                     period: businessMonthLabel(r[0], r[1] - 1),
                     totalRevenue: parseFormattedNumber(r[2]),
                     totalOrders: parseFormattedNumber(r[5]),

@@ -93,7 +93,8 @@
     }
 
     function renderNewRepeatChartOnly() {
-        THD.charts.renderNewRepeatChart(newRepeatRows);
+        THD.charts.renderNewRepeatChart(newRepeatRows); // no-op now (canvas removed) — kept for the PDF/print path's safety
+        THD.ui.renderCustomerFlow(newRepeatRows, fullNewRepeatRows);
         renderAovChartOnly();
     }
 
