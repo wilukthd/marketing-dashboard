@@ -1422,3 +1422,91 @@ body[data-view="overview"] .rangeCompareBar{
    "By ad platform (Google, Meta, Yahoo, Criteo…)" select was 439px wide
    and pushed the whole page sideways. */
 select{ max-width:100%; text-overflow:ellipsis; }
+
+
+/* ==========================================================
+   Traffic tree table
+========================================================== */
+
+.trafficCompareTable .tcSourceInner{
+
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding-left:calc(var(--depth, 0) * 22px);
+
+}
+
+.tcCaret,
+.tcCaretSpacer{
+
+    width:20px;
+    height:20px;
+    flex:0 0 20px;
+
+}
+
+.tcCaret{
+
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border:none;
+    border-radius:6px;
+    background:transparent;
+    color:var(--text-light);
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    transition:transform .15s, background .15s;
+
+}
+
+.tcCaret:hover{ background:var(--surface-2); color:var(--text); }
+
+.tcCaret.isOpen{ transform:rotate(90deg); }
+
+.tcCount{
+
+    font-size:10.5px;
+    color:var(--text-faint);
+    font-family:var(--font-mono);
+
+}
+
+.trafficCompareTable tr.lvl-channel td{ font-weight:600; }
+
+.trafficCompareTable tr.lvl-group td{ font-style:italic; color:var(--text-light); }
+
+.trafficCompareTable tr.lvl-platform td,
+.trafficCompareTable tr.lvl-source td{ font-size:12.5px; }
+
+.trafficCompareTable tr.lvl-source .tcLabel{
+
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-light);
+
+}
+
+.trafficCompareTable tr.isInternal .tcLabel{ color:var(--text-light); }
+
+.tcMuted{ color:var(--text-faint); cursor:help; }
+
+/* rows are left-aligned labels in a centered table: keep the label column left */
+.trafficCompareTable td.tcSource{ text-align:left; }
+
+.tcMore{
+
+    border:none;
+    background:transparent;
+    color:var(--signal);
+    font:inherit;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    padding:2px 0;
+
+}
+
+.tcMore:hover{ text-decoration:underline; }

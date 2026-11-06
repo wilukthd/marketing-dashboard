@@ -189,7 +189,10 @@ window.THD = window.THD || {};
                     users: Number(r.users) || 0,
                     purchases: Number(r.purchases) || 0,
                     revenue: Number(r.revenue) || 0,
-                    channel: r.channel || null,
+                    // GA4's own channel group, if the report adds the
+                    // sessionDefaultChannelGroup dimension (see the report
+                    // config sheet) — far better than guessing from text.
+                    channel: r.channel || r.sessionDefaultChannelGroup || null,
                     // Optional — only present once a "campaign" column is
                     // added to the published sheet (see Ads Performance,
                     // thd-dashboard-changelog.md item 12). Used to line up
@@ -420,11 +423,93 @@ window.THD = window.THD || {};
        for sheets that don't include an explicit channel column.
     ========================================================== */
 
+    /* ==========================================================
+       Special buckets — checked BEFORE the normal channel/platform
+       rules, in both groupings.
+       • Internal / Payment: the company's own sites and tools, and
+         payment / carrier-billing pages. A customer who goes to the
+         payment page and comes back starts a NEW session credited to
+         that page, which steals the sale from the real source and
+         made "Referral (Other)" look like an 18%-CVR channel. These
+         aren't acquisition channels at all, so they get their own
+         bucket and are kept out of the channel-efficiency stories.
+         (The real fix is GA4's "unwanted referrals" list + cross-
+         domain measurement — this just stops the dashboard repeating
+         the distortion.)
+       • AI Assistants: ChatGPT/Gemini/Perplexity etc. arrive as
+         referral, organic or (not set) depending on the app — one
+         bucket so the trend is visible.
+       • Webmail: mail.nifty.com etc. are email clicks, not referrals.
+       Edit these lists when a new domain shows up in 参照（その他）.
+    ========================================================== */
+
+    const OWN_HOSTS = [
+        /(^|\.)totalhealthdesign\.jp$/,
+        /(^|\.)th-d\.co\.jp$/,
+        /(^|\.)makerepeater\.jp$/,
+        /(^|\.)utage-system\.com$/,
+        /studioiframesandbox\.com$/
+    ];
+    const PAYMENT_HOSTS = [
+        /(^|\.)mul-pay\.jp$/,          // GMO Payment Gateway
+        /(^|\.)gmo-pg\.com$/,
+        /(^|\.)docomo\.ne\.jp$/,       // d払い / carrier billing
+        /(^|\.)auone\.jp$/,             // au PAY / carrier billing
+        /(^|\.)softbank\.jp$/,
+        /(^|\.)paypay\.ne\.jp$/,
+        /(^|\.)paypal\.com$/,
+        /(^|\.)stripe\.com$/,
+        /(^|\.)sbpayment\.jp$/,
+        /(^|\.)veritrans\.co\.jp$/,
+        /(^|\.)paygent\.co\.jp$/,
+        /(^|\.)pay\.amazon\./,
+        /(^|\.)pay\.rakuten\.co\.jp$/
+    ];
+    const AI_SOURCE = /^(chatgpt\.com|chat\.openai\.com|openai|chatgpt|perplexity|perplexity\.ai|gemini|gemini\.google\.com|bard\.google\.com|claude\.ai|copilot\.microsoft\.com|copilot)$/;
+    // Any webmail host (mail.ocn.jp, mail.commufa.jp, wm.zaq.ne.jp, outlook.live.com, …).
+    const WEBMAIL_SOURCE = /^((web)?mail\d*|wm|webmail)\.[a-z0-9.-]+$|^outlook\.(live|office|office365)\.com$/;
+
+    function specialBucket(source) {
+        if (OWN_HOSTS.some((re) => re.test(source)) || PAYMENT_HOSTS.some((re) => re.test(source))) return "Internal / Payment";
+        if (AI_SOURCE.test(source)) return "AI Assistants";
+        if (WEBMAIL_SOURCE.test(source)) return "Email";
+        return null;
+    }
+
+    // Social networks by their short and long source names — "ig"/"fb"
+    // are what Meta's own UTM templates send.
+    const SOCIAL_SOURCE = /^(ig|fb|instagram|facebook|meta|l\.facebook\.com|m\.facebook\.com|lm\.facebook\.com|instagram\.com|facebook\.com|line|line\.me|twitter|x|t\.co|x\.com|twitter\.com|tiktok|tiktok\.com|pinterest|pinterest\.com|youtube|youtube\.com|m\.youtube\.com)$/;
+
+    // GA4 default channel group names -> this dashboard's keys.
+    const GA4_CHANNEL_MAP = {
+        "unassigned": "(not set)",
+        "(not set)": "(not set)",
+        "organic social": "Social",
+        "organic video": "Video",
+        "paid video": "Video",
+        "organic shopping": "Shopping",
+        "paid shopping": "Shopping",
+        "cross-network": "Cross-network",
+        "paid other": "Paid (Other)",
+        "mobile push notifications": "Other",
+        "sms": "Other",
+        "audio": "Other"
+    };
+
+    function normalizeGa4Channel(ch) {
+        if (!ch) return null;
+        const key = String(ch).trim();
+        return GA4_CHANNEL_MAP[key.toLowerCase()] || key;
+    }
+
     function classifySourceChannel(sourceMedium) {
         if (!sourceMedium) return "Other";
         const parts = String(sourceMedium).split("/").map((s) => s.trim().toLowerCase());
         const source = parts[0] || "";
         const medium = parts[1] || "";
+
+        const special = specialBucket(source);
+        if (special) return special;
 
         // Broken/missing attribution (bad UTMs, cross-domain linking
         // gaps, ad blockers stripping referrers, etc.) — kept as its
@@ -433,6 +518,14 @@ window.THD = window.THD || {};
         if (isUnattributed(source, medium)) return "(not set)";
 
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
+        // A social network with a paid medium is paid social, not paid
+        // search ("ig / paid", "fb / paid" used to land in Paid Search);
+        // a social network linking in normally is social, not referral.
+        if (SOCIAL_SOURCE.test(source)) {
+            if (/cpc|ppc|paid|cpm|ads?$/.test(medium)) return "Paid Social";
+            if (medium === "display" || medium === "banner") return "Display";
+            return "Social";
+        }
         if (medium === "organic") return "Organic Search";
         // Paid social has to be checked before plain "paid"/"social" —
         // Meta's own auto-tagging sends "paid_social", which used to
@@ -469,9 +562,10 @@ window.THD = window.THD || {};
     ========================================================== */
 
     const PLATFORM_MATCHERS = [
+        { test: /youtube|youtu\.be/, label: "YouTube" },
         { test: /google|doubleclick|admanager/, label: "Google" },
-        { test: /facebook|instagram|meta/, label: "Meta" },
-        { test: /yahoo/, label: "Yahoo" },
+        { test: /facebook|instagram|meta|^ig$|^fb$/, label: "Meta" },
+        { test: /yahoo|^ydn$|overture/, label: "Yahoo" },
         { test: /criteo/, label: "Criteo" },
         { test: /^line$|\bline\b/, label: "LINE" },
         { test: /bing|microsoft/, label: "Bing" },
@@ -493,6 +587,9 @@ window.THD = window.THD || {};
         const source = parts[0] || "";
         const medium = parts[1] || "";
 
+        const special = specialBucket(source);
+        if (special) return special;
+
         if (isUnattributed(source, medium)) return "(not set)";
 
         if (source === "(direct)" && (medium === "(none)" || medium === "")) return "Direct";
@@ -501,7 +598,11 @@ window.THD = window.THD || {};
         if (match) {
             if (SPLIT_PAID_ORGANIC.includes(match.label)) {
                 const isPaid = /cpc|ppc|paid|cpm|display|banner/.test(medium);
-                return `${match.label} ${isPaid ? "Ads" : "Organic"}`;
+                if (isPaid) return `${match.label} Ads`;
+                // e.g. news.yahoo.co.jp / referral is a link from a Yahoo
+                // site, not Yahoo search — don't call it "Organic".
+                if (medium === "referral") return `${match.label} Referral`;
+                return `${match.label} Organic`;
             }
             return match.label;
         }
@@ -522,11 +623,18 @@ window.THD = window.THD || {};
     // every source row once per channel on every render (≈4s for "This
     // Year"), and a row's sourceMedium never changes after load.
     function classifyForGroupBy(row, groupBy) {
+        if (groupBy === "source") return row.sourceMedium;
         if (groupBy === "platform") {
             if (row._platform === undefined) row._platform = classifyPlatform(row.sourceMedium);
             return row._platform;
         }
-        if (row._channel === undefined) row._channel = row.channel || classifySourceChannel(row.sourceMedium);
+        if (row._channel === undefined) {
+            const source = String(row.sourceMedium || "").split("/")[0].trim().toLowerCase();
+            // Our special buckets win even over GA4's grouping (GA4 calls
+            // the payment gateway "Referral"); otherwise prefer GA4's own
+            // channel when the export has it, else classify from text.
+            row._channel = specialBucket(source) || normalizeGa4Channel(row.channel) || classifySourceChannel(row.sourceMedium);
+        }
         return row._channel;
     }
 
@@ -840,7 +948,9 @@ window.THD = window.THD || {};
 
         if (channels && channels.length) {
             const totalRevenue = channels.reduce((sum, c) => sum + c.revenue, 0);
-            const topByRevenue = channels.reduce((a, b) => (b.revenue > a.revenue ? b : a), channels[0]);
+            const realChannels = channels.filter((c) => !NOT_A_CHANNEL.has(c.label));
+            const pool = realChannels.length ? realChannels : channels;
+            const topByRevenue = pool.reduce((a, b) => (b.revenue > a.revenue ? b : a), pool[0]);
             const share = totalRevenue ? Math.round((topByRevenue.revenue / totalRevenue) * 100) : 0;
             const label = `<strong>${escapeHtml(window.I18N.channelLabel(topByRevenue.label))}</strong>`;
             insights.push(window.I18N.t("insight.topChannelRevenue", { label, figure: highlight(share + "%", "neutral") }));
@@ -1165,7 +1275,12 @@ window.THD = window.THD || {};
        tune here rather than emerging from an opaque formula.
     ========================================================== */
 
-    const BRIEF_MIN_CHANNEL_SESSIONS = 300;   // ignore tiny channels for efficiency stories
+    const BRIEF_MIN_CHANNEL_SESSIONS = 300;
+    // Buckets that aren't acquisition channels — never "the top channel"
+    // and never a "converts well / doesn't convert" story. Internal /
+    // Payment sessions are mid-checkout by definition, so their CVR is
+    // meaningless as a channel metric.
+    const NOT_A_CHANNEL = new Set(["(not set)", "Direct", "Internal / Payment"]);   // ignore tiny channels for efficiency stories
     const BRIEF_LOW_CVR_RATIO = 0.4;          // < 40% of site CVR = "not converting"
     const BRIEF_HIGH_CVR_RATIO = 2;           // >= 2x site CVR = "high-efficiency"
     const BRIEF_AOV_MOVE_PCT = 10;            // AOV change worth mentioning
@@ -1267,7 +1382,7 @@ window.THD = window.THD || {};
 
         // ---- 3. Channel efficiency: traffic that doesn't convert / converts unusually well ----
         if (siteCvr > 0) {
-            const eligible = channels.filter((c) => c.sessions >= BRIEF_MIN_CHANNEL_SESSIONS && c.label !== "(not set)" && c.label !== "Direct");
+            const eligible = channels.filter((c) => c.sessions >= BRIEF_MIN_CHANNEL_SESSIONS && !NOT_A_CHANNEL.has(c.label));
             const weak = eligible
                 .filter((c) => c.cvr < siteCvr * BRIEF_LOW_CVR_RATIO)
                 .sort((a, b) => b.sessions - a.sessions)[0];
@@ -1466,7 +1581,7 @@ window.THD = window.THD || {};
 
         const parts = [];
         const totalRevenue = channels.reduce((s, c) => s + c.revenue, 0);
-        const top = channels.filter((c) => c.label !== "(not set)").sort((a, b) => b.revenue - a.revenue)[0];
+        const top = channels.filter((c) => !NOT_A_CHANNEL.has(c.label)).sort((a, b) => b.revenue - a.revenue)[0];
         if (top && totalRevenue) {
             parts.push(t("brief.dek.topChannel", {
                 label: window.I18N.channelLabel(top.label),
@@ -1483,6 +1598,104 @@ window.THD = window.THD || {};
         if (firstWarning) parts.push(t("brief.dek.watch", { title: firstWarning.title }));
 
         return { main, dek: parts.join(t("brief.dek.sep")) };
+    }
+
+    /* ==========================================================
+       Traffic tree — one table instead of the old "by platform" /
+       "by channel" dropdown, which showed the same traffic sliced
+       two ways with neither complete:
+         channel  (GA4-style: Paid Search, Direct, …)
+           └ platform (Google Ads, Yahoo Ads, …) — skipped when a
+             channel has only one platform, since that row would just
+             repeat its parent
+               └ source / medium (the raw GA4 value)
+       Channels too small to read (< 0.5% of sessions in both
+       periods) are folded into one "small sources" group, so a
+       single 1-session email doesn't get a "100% CVR" row of its own.
+       Every node carries {groupBy, label} so a click can filter the
+       Session Source table / channel trend to exactly that slice.
+    ========================================================== */
+
+    const TREE_SMALL_SHARE = 0.005;
+
+    function buildTrafficTree(currentRows, previousRows) {
+        const emptyTotals = () => ({ sessions: 0, users: 0, purchases: 0, revenue: 0 });
+        const nodes = new Map(); // id -> node
+        const roots = [];
+
+        const node = (id, level, groupBy, label, parent) => {
+            let n = nodes.get(id);
+            if (!n) {
+                n = { id, level, groupBy, label, cur: emptyTotals(), prev: emptyTotals(), children: [] };
+                nodes.set(id, n);
+                (parent ? parent.children : roots).push(n);
+            }
+            return n;
+        };
+        const add = (rows, period) => {
+            (rows || []).forEach((r) => {
+                const ch = classifyForGroupBy(r, "channel");
+                const pl = classifyForGroupBy(r, "platform");
+                const cN = node("c:" + ch, "channel", "channel", ch, null);
+                const pN = node("p:" + ch + "|" + pl, "platform", "platform", pl, cN);
+                const sN = node("s:" + r.sourceMedium, "source", "source", r.sourceMedium, pN);
+                [cN, pN, sN].forEach((n) => {
+                    n[period].sessions += r.sessions;
+                    n[period].users += r.users;
+                    n[period].purchases += r.purchases;
+                    n[period].revenue += r.revenue;
+                });
+            });
+        };
+        add(currentRows, "cur");
+        add(previousRows, "prev");
+
+        const finish = (n) => {
+            ["cur", "prev"].forEach((p) => {
+                n[p].cvr = n[p].sessions ? (n[p].purchases / n[p].sessions) * 100 : 0;
+            });
+            n.children.sort((a, b) => b.cur.sessions - a.cur.sessions || b.prev.sessions - a.prev.sessions);
+            n.children.forEach(finish);
+            // A channel with a single platform: lift the sources up a level.
+            if (n.level === "channel" && n.children.length === 1) {
+                n.alsoPlatform = n.children[0].label; // so a platform-level filter (e.g. from the briefing) still finds this row
+                n.children = n.children[0].children;
+            }
+            // A platform with a single source that IS the platform's only
+            // traffic still keeps its source row — the raw value is useful.
+        };
+        roots.forEach(finish);
+        roots.sort((a, b) => b.cur.sessions - a.cur.sessions || b.prev.sessions - a.prev.sessions);
+
+        const totalCur = roots.reduce((s, n) => s + n.cur.sessions, 0) || 1;
+        const totalPrev = roots.reduce((s, n) => s + n.prev.sessions, 0) || 1;
+        const big = [];
+        const small = [];
+        roots.forEach((n) => {
+            // AI assistants stay visible however small — it's a trend to watch.
+            const tiny = n.label !== "AI Assistants" &&
+                n.cur.sessions / totalCur < TREE_SMALL_SHARE && n.prev.sessions / totalPrev < TREE_SMALL_SHARE;
+            (tiny ? small : big).push(n);
+        });
+        if (small.length >= 2) {
+            const g = { id: "g:small", level: "group", groupBy: null, label: "__small__", cur: emptyTotals(), prev: emptyTotals(), children: small };
+            small.forEach((n) => ["cur", "prev"].forEach((p) => {
+                ["sessions", "users", "purchases", "revenue"].forEach((k) => { g[p][k] += n[p][k]; });
+            }));
+            ["cur", "prev"].forEach((p) => { g[p].cvr = g[p].sessions ? (g[p].purchases / g[p].sessions) * 100 : 0; });
+            big.push(g);
+        } else {
+            big.push(...small);
+        }
+        return big;
+    }
+
+    // Depth-first list of every node, for CSV export.
+    function flattenTrafficTree(tree) {
+        const out = [];
+        const walk = (n, depth) => { out.push({ ...n, depth }); n.children.forEach((c) => walk(c, depth + 1)); };
+        (tree || []).forEach((n) => walk(n, 0));
+        return out;
     }
 
     /* ==========================================================
@@ -2443,6 +2656,8 @@ window.THD = window.THD || {};
         buildTodayYesterdaySpikeInsights,
         buildLandingPageDetail,
         buildTrafficComparison,
+        buildTrafficTree,
+        flattenTrafficTree,
         buildChannelTrend,
         computeMovingAverage,
         buildBusinessMonths,

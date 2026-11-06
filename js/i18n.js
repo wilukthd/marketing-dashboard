@@ -98,7 +98,12 @@ window.I18N = (function () {
             "trend.movingAvgSuffix": " (7-day avg)",
 
             "traffic.title": "Traffic Sources",
-            "traffic.subtitle": "Selected period vs. the period before it, by ad platform",
+            "traffic.subtitle": "Channel → platform → source. ▸ opens a row; click a row to see its trend and sources",
+            "traffic.smallSources": "Small sources ({n})",
+            "traffic.showMore": "Show {n} more",
+            "traffic.expand": "Show breakdown",
+            "traffic.collapse": "Hide breakdown",
+            "traffic.internalCvrHint": "Own sites and payment pages: these sessions are mid-checkout, so their CVR isn't a channel metric",
             "traffic.byPlatform": "By Ad Platform (Google, Meta, Yahoo, Criteo…)",
             "traffic.byChannel": "By Channel (GA4 default grouping)",
             "traffic.selectedPeriod": "Selected period:",
@@ -448,7 +453,12 @@ window.I18N = (function () {
             "trend.movingAvgSuffix": "（7日移動平均）",
 
             "traffic.title": "トラフィック獲得経路",
-            "traffic.subtitle": "選択期間と前期間の比較（広告プラットフォーム別）",
+            "traffic.subtitle": "チャネル → プラットフォーム → 参照元。▸で内訳を開き、行をクリックで推移と参照元を表示",
+            "traffic.smallSources": "少数の流入元（{n}）",
+            "traffic.showMore": "さらに{n}件を表示",
+            "traffic.expand": "内訳を表示",
+            "traffic.collapse": "内訳を閉じる",
+            "traffic.internalCvrHint": "自社サイト・決済ページ：購入手続きの途中のセッションのため、CVRはチャネルの指標になりません",
             "traffic.byPlatform": "広告プラットフォーム別（Google、Meta、Yahoo、Criteoなど）",
             "traffic.byChannel": "チャネル別（GA4デフォルトのグループ化）",
             "traffic.selectedPeriod": "選択期間：",
@@ -762,10 +772,20 @@ window.I18N = (function () {
             "Bing Ads": "Bing 広告",
             "Bing Organic": "Bing オーガニック",
             "Rakuten": "楽天",
-            "Referral (Other)": "参照（その他）",
+            "Referral (Other)": "その他のサイト",
+            "Google Referral": "Google（参照）",
+            "Yahoo Referral": "Yahoo（参照）",
+            "Meta Referral": "Meta（参照）",
+            "Bing Referral": "Bing（参照）",
             "Organic Search (Other)": "オーガニック検索（その他）",
             "Social (Other)": "ソーシャル（その他）",
-            "Paid (Other)": "有料（その他）"
+            "Paid (Other)": "有料（その他）",
+            "Internal / Payment": "自社サイト・決済",
+            "AI Assistants": "AIアシスタント",
+            "YouTube": "YouTube",
+            "Video": "動画",
+            "Shopping": "ショッピング",
+            "Cross-network": "クロスネットワーク"
         }
     };
 

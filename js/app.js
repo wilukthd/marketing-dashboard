@@ -64,16 +64,26 @@
     let currentRangeObj = null;
     let lastFiltered = null; // last filterDailyRange result — reused by metric toggles so the chart keeps the source filter
     let currentEffectiveSourceRows = [];
-    let currentGroupBy = "platform";
+    let lastTrafficTree = [];
+
+    // activeSourceFilter is { groupBy: "channel"|"platform"|"source", label } or null.
+    const sameFilter = (a, b) => !!a && !!b && a.groupBy === b.groupBy && a.label === b.label;
+
+    function refreshTrafficSelection() {
+        THD.ui.renderTrafficTree(null, activeSourceFilter, null);
+        renderFilteredSourceTable();
+        renderChannelTrendOrDoughnuts();
+    }
 
     function renderChannelTrendOrDoughnuts() {
         if (!activeSourceFilter) {
             THD.ui.hideChannelTrendMode();
             return;
         }
-        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, activeSourceFilter, currentGroupBy, currentRangeObj);
-        THD.ui.showChannelTrendMode(activeSourceFilter);
-        THD.charts.renderChannelTrendChart("trafficChannelTrendChart", activeSourceFilter, trendData, THD.ui.getChannelTrendMetric());
+        const { groupBy, label } = activeSourceFilter;
+        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, label, groupBy, currentRangeObj);
+        THD.ui.showChannelTrendMode(label);
+        THD.charts.renderChannelTrendChart("trafficChannelTrendChart", label, trendData, THD.ui.getChannelTrendMetric());
     }
     let dataSourceStatus = { daily: true, sources: true, landingPages: true, newRepeat: true }; // true = live data loaded successfully; false = fell back to demo data
 
@@ -85,8 +95,9 @@
     }
 
     function renderFilteredSourceTable() {
-        const rows = activeSourceFilter
-            ? sourcesCurrentForFilter.filter((r) => THD.data.classifyForGroupBy(r, THD.ui.getTrafficGroupBy()) === activeSourceFilter)
+        const f = activeSourceFilter;
+        const rows = f
+            ? sourcesCurrentForFilter.filter((r) => THD.data.classifyForGroupBy(r, f.groupBy) === f.label)
             : sourcesCurrentForFilter;
         THD.ui.renderSourceTable(rows);
         THD.ui.renderSourceFilterStatus(activeSourceFilter);
@@ -164,10 +175,9 @@
         if (!anomaly || !anomaly.channel) return;
         THD.ui.switchToView("traffic", () => {
             THD.charts.resizeCharts();
-            activeSourceFilter = anomaly.channel;
-            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
-            renderFilteredSourceTable();
-            renderChannelTrendOrDoughnuts();
+            // Briefing/anomaly channels are platform-level labels.
+            activeSourceFilter = { groupBy: "platform", label: anomaly.channel };
+            refreshTrafficSelection();
             const wrap = document.getElementById("trafficChannelTrendWrap");
             if (wrap) wrap.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -597,19 +607,27 @@
         // Traffic Sources doughnuts: same current window, plus the
         // matching previous window, both grouped the same way.
         const sourcesPrevious = THD.data.filterSourcesByDates(effectiveSourceRows, range.prevStart, range.prevEnd);
-        const groupBy = THD.ui.getTrafficGroupBy();
         currentRangeObj = range;
         currentEffectiveSourceRows = effectiveSourceRows;
-        currentGroupBy = groupBy;
+
+        // Doughnuts + the tree's top level: channels (≈10 slices, readable).
+        const channelCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, "channel");
+        const channelPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, "channel");
+        const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", channelCurrent.channels, channelCurrent.totalSessions);
+        const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", channelPrevious.channels, channelPrevious.totalSessions);
+        const channelColors = {};
+        previousChannels.concat(currentChannels).forEach((c) => { channelColors[c.label] = c.color; });
+
+        lastTrafficTree = THD.data.buildTrafficTree(sourcesCurrent, sourcesPrevious);
+        THD.ui.renderTrafficTree(lastTrafficTree, activeSourceFilter, channelColors);
+        renderChannelTrendOrDoughnuts();
+
+        // Briefing, insights and anomalies stay platform-level ("Meta Ads"
+        // is something you can act on; "Paid Social" isn't).
+        const groupBy = "platform";
         const trafficCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, groupBy);
         const trafficPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, groupBy);
-
-        const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", trafficCurrent.channels, trafficCurrent.totalSessions);
-        const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", trafficPrevious.channels, trafficPrevious.totalSessions);
-
-        lastTrafficComparisonRows = THD.data.buildTrafficComparison(currentChannels, previousChannels);
-        THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
-        renderChannelTrendOrDoughnuts();
+        lastTrafficComparisonRows = THD.data.buildTrafficComparison(trafficCurrent.channels, trafficPrevious.channels);
 
         const channelAnomalies = THD.data.buildChannelAnomalyInsights(effectiveSourceRows, trafficCurrent.channels, groupBy, range);
 
@@ -821,28 +839,18 @@
             activeSourceFilter = null;
             renderForRange(currentRange, currentCustomRange);
         });
-        THD.ui.wireTrafficGroupToggle(() => {
-            activeSourceFilter = null;
-            renderForRange(currentRange, currentCustomRange);
-        });
-        THD.ui.wireTrafficComparisonFilter((label) => {
-            activeSourceFilter = (activeSourceFilter === label) ? null : label;
-            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
-            renderFilteredSourceTable();
-            renderChannelTrendOrDoughnuts();
-        });
+        THD.ui.wireTrafficTree((filter) => {
+            activeSourceFilter = sameFilter(activeSourceFilter, filter) ? null : filter;
+            refreshTrafficSelection();
+        }, () => activeSourceFilter);
         THD.ui.wireClearSourceFilter(() => {
             activeSourceFilter = null;
-            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
-            renderFilteredSourceTable();
-            renderChannelTrendOrDoughnuts();
+            refreshTrafficSelection();
         });
         THD.ui.wireChannelTrendMetricToggle(renderChannelTrendOrDoughnuts);
         THD.ui.wireChannelTrendCloseButton(() => {
             activeSourceFilter = null;
-            THD.ui.renderTrafficComparison(lastTrafficComparisonRows, activeSourceFilter);
-            renderFilteredSourceTable();
-            renderChannelTrendOrDoughnuts();
+            refreshTrafficSelection();
         });
         THD.ui.wireLandingDeviceToggle(renderLandingPagesForDevice);
         THD.ui.wireHideSystemToggle(renderLandingPagesForDevice);
@@ -903,21 +911,16 @@
                 ], sourcesCurrentForFilter);
             },
             exportTrafficCsvBtn: () => {
+                // Every level of the traffic tree, in display order.
                 THD.exportUtil.downloadCsv("thd-traffic-comparison.csv", [
-                    { key: "label", header: "Source" },
-                    { header: "Sessions (Current)", value: (r) => r.current ? r.current.sessions : 0 },
-                    { header: "Sessions (Previous)", value: (r) => r.previous ? r.previous.sessions : 0 },
-                    {
-                        header: "Delta vs Previous (%)",
-                        value: (r) => {
-                            const cur = r.current ? r.current.sessions : 0;
-                            const prev = r.previous ? r.previous.sessions : 0;
-                            return prev ? ((cur - prev) / prev * 100).toFixed(2) : "";
-                        }
-                    },
-                    { header: "Revenue (Current)", value: (r) => r.current ? r.current.revenue : 0 },
-                    { header: "CVR (Current, %)", value: (r) => r.current ? r.current.cvr.toFixed(2) : "" }
-                ], lastTrafficComparisonRows);
+                    { key: "level", header: "Level" },
+                    { header: "Source", value: (r) => (r.level === "group" ? "Small sources" : r.label) },
+                    { header: "Sessions (Current)", value: (r) => r.cur.sessions },
+                    { header: "Sessions (Previous)", value: (r) => r.prev.sessions },
+                    { header: "Delta vs Previous (%)", value: (r) => (r.prev.sessions ? ((r.cur.sessions - r.prev.sessions) / r.prev.sessions * 100).toFixed(2) : "") },
+                    { header: "Revenue (Current)", value: (r) => r.cur.revenue },
+                    { header: "CVR (Current, %)", value: (r) => (r.cur.sessions ? r.cur.cvr.toFixed(2) : "") }
+                ], THD.data.flattenTrafficTree(lastTrafficTree));
             },
             exportMonthlyCsvBtn: () => {
                 THD.exportUtil.downloadCsv("thd-monthly-performance.csv", [

@@ -1050,9 +1050,12 @@ window.THD = window.THD || {};
        Traffic Grouping Toggle (Ad Platform vs GA4 Channel)
     ========================================================== */
 
+    // The platform/channel dropdown is gone (the traffic tree shows
+    // both levels at once). Platform stays the grouping for the
+    // landing-page source breakdown and the briefing — it's the more
+    // actionable cut ("Meta Ads", not "Paid Social").
     function getTrafficGroupBy() {
-        const select = document.getElementById("trafficGroupSelect");
-        return select ? select.value : "platform";
+        return "platform";
     }
 
     function wireTrafficGroupToggle(onChange) {
@@ -1108,10 +1111,11 @@ window.THD = window.THD || {};
 
     // Small "Filtered by: <label> [Clear]" indicator shown above the
     // Session Source table once a Traffic Comparison row is clicked.
-    function renderSourceFilterStatus(label) {
+    function renderSourceFilterStatus(filter) {
         const status = document.getElementById("sourceFilterStatus");
         const labelEl = document.getElementById("sourceFilterLabel");
         if (!status || !labelEl) return;
+        const label = filter && typeof filter === "object" ? filter.label : filter;
         if (label) {
             labelEl.textContent = window.I18N.channelLabel(label);
             status.style.display = "flex";
@@ -1908,7 +1912,150 @@ window.THD = window.THD || {};
         repEl.innerHTML = repeatOrdersSvg(recentRows, months);
     }
 
+    /* ==========================================================
+       Traffic tree table (replaces the flat comparison table and
+       its platform/channel dropdown — see buildTrafficTree in
+       data.js). The caret opens a row; clicking the row itself
+       filters the Session Source table and channel trend to that
+       slice. Expansion state survives re-renders (range changes),
+       and the path to the active filter is always opened.
+    ========================================================== */
+
+    const treeExpanded = new Set();
+    const treeShowAll = new Set(); // parent ids whose full child list is open
+    const TREE_CHILD_LIMIT = 12;
+    let lastTree = [];
+    let lastTreeColors = {};
+
+    const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    function treeNodeMatches(n, filter) {
+        if (!filter) return false;
+        if (n.groupBy === filter.groupBy && n.label === filter.label) return true;
+        return filter.groupBy === "platform" && n.alsoPlatform === filter.label;
+    }
+
+    // Opens every ancestor of the node the filter points at, so a
+    // click-through from the briefing lands on a visible row.
+    function expandPathTo(filter) {
+        const walk = (nodes, path) => {
+            for (const n of nodes) {
+                if (treeNodeMatches(n, filter)) { path.forEach((id) => treeExpanded.add(id)); return true; }
+                if (walk(n.children, path.concat(n.id))) return true;
+            }
+            return false;
+        };
+        walk(lastTree, []);
+    }
+
+    function treeLabel(n) {
+        if (n.level === "group") return escAttr(window.I18N.t("traffic.smallSources", { n: n.children.length }));
+        if (n.level === "source") return escAttr(n.label); // raw GA4 source / medium — untrusted text
+        return escAttr(window.I18N.channelLabel(n.label));
+    }
+
+    function treeDeltaHtml(n) {
+        const cur = n.cur.sessions;
+        const prev = n.prev.sessions;
+        if (prev > 0) {
+            const delta = ((cur - prev) / prev) * 100;
+            // More unattributed traffic is a tracking problem, not growth.
+            const upIsBad = n.label === "(not set)";
+            const good = upIsBad ? delta <= 0 : delta >= 0;
+            return `<span class="deltaBadge ${good ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
+        }
+        return cur > 0 ? `<span class="deltaBadge positive">${window.I18N.t("traffic.new")}</span>` : "—";
+    }
+
+    function treeRowsHtml(nodes, depth, filter) {
+        return nodes.map((n) => {
+            const hasKids = n.children.length > 0;
+            const open = hasKids && treeExpanded.has(n.id);
+            const active = treeNodeMatches(n, filter);
+            const color = n.level === "channel" ? (lastTreeColors[n.label] || "var(--text-faint)") : null;
+            // Internal / Payment sessions are mid-checkout — their CVR
+            // isn't a channel metric, so don't invite comparing it.
+            const notChannel = n.label === "Internal / Payment";
+            const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
+            const row = `
+                <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
+                    data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}">
+                    <td class="tcSource">
+                        <span class="tcSourceInner" style="--depth:${depth}">
+                            ${hasKids
+                                ? `<button type="button" class="tcCaret${open ? " isOpen" : ""}" aria-expanded="${open}" aria-label="${escAttr(window.I18N.t(open ? "traffic.collapse" : "traffic.expand"))}">›</button>`
+                                : `<span class="tcCaretSpacer"></span>`}
+                            ${color ? `<span class="legendColor" style="background:${color}"></span>` : ""}
+                            <span class="tcLabel">${treeLabel(n)}</span>
+                            ${hasKids ? `<small class="tcCount">${n.children.length}</small>` : ""}
+                        </span>
+                    </td>
+                    <td class="number">${n.cur.sessions ? fmtNumber(n.cur.sessions) : "—"}</td>
+                    <td class="number">${n.prev.sessions ? fmtNumber(n.prev.sessions) : "—"}</td>
+                    <td class="number">${treeDeltaHtml(n)}</td>
+                    <td class="number">${n.cur.sessions ? fmtYen(n.cur.revenue) : "—"}</td>
+                    <td class="number">${cvr}</td>
+                </tr>`;
+            if (!open) return row;
+            const all = treeShowAll.has(n.id) || n.children.length <= TREE_CHILD_LIMIT + 2;
+            const shown = all ? n.children : n.children.slice(0, TREE_CHILD_LIMIT);
+            let html = row + treeRowsHtml(shown, depth + 1, filter);
+            if (!all) {
+                const rest = n.children.length - shown.length;
+                html += `
+                <tr class="tcRow lvl-more" data-id="${escAttr(n.id)}" data-level="more">
+                    <td class="tcSource" colspan="6">
+                        <span class="tcSourceInner" style="--depth:${depth + 1}">
+                            <span class="tcCaretSpacer"></span>
+                            <button type="button" class="tcMore">${escAttr(window.I18N.t("traffic.showMore", { n: rest }))}</button>
+                        </span>
+                    </td>
+                </tr>`;
+            }
+            return html;
+        }).join("");
+    }
+
+    // colors: channel label -> doughnut color (from renderTrafficChart)
+    function renderTrafficTree(tree, filter, colors) {
+        if (tree) lastTree = tree;
+        if (colors) lastTreeColors = colors;
+        const tbody = document.getElementById("trafficCompareTable");
+        if (!tbody) return;
+        if (!lastTree.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("traffic.empty")}</td></tr>`;
+            return;
+        }
+        if (filter) expandPathTo(filter);
+        tbody.innerHTML = treeRowsHtml(lastTree, 0, filter);
+    }
+
+    // onFilter({groupBy, label}) for a row click; the caret (and the
+    // "small sources" group row) only open/close.
+    function wireTrafficTree(onFilter, getFilter) {
+        const tbody = document.getElementById("trafficCompareTable");
+        if (!tbody) return;
+        tbody.addEventListener("click", (e) => {
+            const row = e.target.closest("tr.tcRow");
+            if (!row) return;
+            const toggle = () => {
+                const id = row.dataset.id;
+                if (treeExpanded.has(id)) treeExpanded.delete(id); else treeExpanded.add(id);
+                renderTrafficTree(null, getFilter(), null);
+            };
+            if (row.dataset.level === "more") {
+                treeShowAll.add(row.dataset.id);
+                renderTrafficTree(null, getFilter(), null);
+                return;
+            }
+            if (e.target.closest(".tcCaret") || row.dataset.level === "group") { toggle(); return; }
+            onFilter({ groupBy: row.dataset.groupBy, label: row.dataset.label });
+        });
+    }
+
     THD.ui = {
+        renderTrafficTree,
+        wireTrafficTree,
         renderCustomerFlow,
         renderBriefing,
         renderBriefHeader,
