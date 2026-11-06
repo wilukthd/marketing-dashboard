@@ -110,7 +110,13 @@ window.THD = window.THD || {};
                 header: true,
                 dynamicTyping: true,
                 skipEmptyLines: true,
-                complete: (results) => resolve(results.data),
+                complete: (results) => {
+                    if ((!results.data || !results.data.length) && results.errors && results.errors.length) {
+                        reject(new Error(results.errors[0].message || "CSV parse error"));
+                    } else {
+                        resolve(results.data);
+                    }
+                },
                 error: (err) => reject(err)
             });
         });
@@ -672,7 +678,7 @@ window.THD = window.THD || {};
     // they already work, just fed a source-scoped daily series instead
     // of the full-property one.
     function buildDailyRowsFromSources(sourceRows) {
-        const byDate = {};
+        const byDate = Object.create(null);
         (sourceRows || []).forEach((r) => {
             if (!byDate[r.date]) byDate[r.date] = { date: r.date, users: 0, sessions: 0, purchases: 0, revenue: 0 };
             const d = byDate[r.date];
@@ -685,7 +691,7 @@ window.THD = window.THD || {};
     }
 
     function deriveTrafficBreakdown(sourceRows, groupBy) {
-        const totals = {};
+        const totals = Object.create(null);
         let totalSessions = 0;
 
         sourceRows.forEach((r) => {
@@ -862,8 +868,17 @@ window.THD = window.THD || {};
     // same-period-last-year comparison reaching further back than
     // the data actually goes), so the latter can show a warning
     // instead of a silently misleading "0.0% change".
+    // "Has data" means near-complete coverage (>= 90% of the window's
+    // days), not "at least one row": a 31-day comparison containing only
+    // Jan 31 used to pass and produced a meaningless delta.
+    const MIN_COMPARE_COVERAGE = 0.9;
+
     function hasDataInRange(dailyRows, start, end) {
-        return (dailyRows || []).some((r) => inRange(r.date, start, end));
+        const days = Math.round((end - start) / 86400000) + 1;
+        if (days <= 0) return false;
+        const seen = new Set();
+        (dailyRows || []).forEach((r) => { if (inRange(r.date, start, end)) seen.add(r.date); });
+        return seen.size >= Math.ceil(days * MIN_COMPARE_COVERAGE);
     }
 
     /* ==========================================================
@@ -1023,9 +1038,19 @@ window.THD = window.THD || {};
        window.
     ========================================================== */
 
-    function buildNewRepeatInsights(rows) {
+    function isOpenBusinessMonth(r) {
+        return Number.isFinite(r.year) && Number.isFinite(r.month) &&
+            new Date() <= new Date(r.year, r.month - 1, 20, 23, 59, 59);
+    }
+
+    function buildNewRepeatInsights(allRows) {
         const insights = [];
-        if (!rows || rows.length < 2) return insights;
+        // An open business month (closes on the 20th) isn't comparable
+        // with complete ones — leave it out of every comparison here.
+        const rows = (allRows || []).filter((r) => !isOpenBusinessMonth(r));
+        if (rows.length < 2) return insights;
+        const byYm = new Map();
+        rows.forEach((r) => { if (Number.isFinite(r.year)) byYm.set(r.year * 12 + r.month, r); });
 
         const latest = rows[rows.length - 1];
         const orderShare = (r) => (r.newOrders + r.repeatOrders)
@@ -1037,8 +1062,8 @@ window.THD = window.THD || {};
 
         // New customer share of orders, with YoY comparison once a
         // full year of history is available.
-        if (rows.length > 12) {
-            const yearAgo = rows[rows.length - 13];
+        const yearAgo = Number.isFinite(latest.year) ? byYm.get((latest.year - 1) * 12 + latest.month) : (rows.length > 12 ? rows[rows.length - 13] : null);
+        if (yearAgo) {
             const diff = latestShare - orderShare(yearAgo);
             const figure = highlight(`${Math.abs(diff).toFixed(1)} ${window.I18N.t("unit.pts")}`, diff >= 0 ? "pos" : "neg");
             const direction = window.I18N.t(diff >= 0 ? "newRepeatInsight.up" : "newRepeatInsight.down");
@@ -1078,7 +1103,12 @@ window.THD = window.THD || {};
         // Recent direction: average new-customer share over the last
         // 3 months vs the 3 months before that.
         if (rows.length >= 6) {
-            const avgShare = (arr) => arr.reduce((sum, r) => sum + orderShare(r), 0) / arr.length;
+            // Volume-weighted (Σnew / Σtotal), not an average of monthly shares.
+            const avgShare = (arr) => {
+                const n = arr.reduce((s, r) => s + r.newOrders, 0);
+                const tot = arr.reduce((s, r) => s + r.newOrders + r.repeatOrders, 0);
+                return tot ? (n / tot) * 100 : 0;
+            };
             const trendDiff = avgShare(rows.slice(-3)) - avgShare(rows.slice(-6, -3));
             if (Math.abs(trendDiff) >= 1) {
                 const figure = highlight(`${Math.abs(trendDiff).toFixed(1)} ${window.I18N.t("unit.pts")}`, trendDiff >= 0 ? "pos" : "neg");
@@ -1123,9 +1153,11 @@ window.THD = window.THD || {};
     // anomaly. Strip it before anomaly detection only; KPI totals
     // still include today, since "This Month" etc. should naturally
     // include today-so-far like any other dashboard.
-    function excludeToday(labels, series) {
-        const todayLabel = window.I18N.formatDayLabel(new Date());
-        if (!labels.length || labels[labels.length - 1] !== todayLabel) {
+    function excludeToday(labels, series, dates) {
+        const isToday = dates && dates.length
+            ? dates[dates.length - 1] === toLocalDateKey(startOfDay(new Date()))
+            : labels.length && labels[labels.length - 1] === window.I18N.formatDayLabel(new Date());
+        if (!labels.length || !isToday) {
             return { labels, series };
         }
         const trimmedSeries = {};
@@ -1135,19 +1167,32 @@ window.THD = window.THD || {};
         return { labels: labels.slice(0, -1), series: trimmedSeries };
     }
 
-    // opts.dates (YYYY-MM-DD per value) + opts.weekdayIndex (from
-    // buildWeekdayIndex): when both are there, each day is judged against
-    // the typical level FOR ITS WEEKDAY, using a robust z-score (median /
-    // MAD) so the outlier itself can't inflate the yardstick it's measured
-    // with. Without them (short windows, CVR) it falls back to the plain
-    // mean / standard-deviation z-score.
+    // Out-of-sample baseline: each day is compared with the same weekday
+    // over the previous 8 weeks (from the full history, so the day being
+    // tested never sits in its own yardstick). Robust z = (actual −
+    // median) / (1.4826 × MAD), with a floor on the scale (10% of the
+    // median) so a perfectly steady baseline can't make every wobble an
+    // "anomaly" or — the opposite bug — silently skip the metric.
     const ROBUST_Z_THRESHOLD = 3.5;
-    const ROBUST_MIN_DAYS = 10;
+    const ROBUST_MIN_BASELINE = 6;     // of the 8 prior same-weekday days
+    const ROBUST_MIN_REL_CHANGE = 0.3; // and at least ±30% vs that baseline
+
+    function sameWeekdayBaseline(history, dateStr, key) {
+        const d = parseLocalDate(dateStr);
+        const base = [];
+        for (let w = 1; w <= 8; w++) {
+            const p = new Date(d);
+            p.setDate(p.getDate() - 7 * w);
+            const row = history.get(toLocalDateKey(p));
+            if (row && Number.isFinite(row[key])) base.push(row[key]);
+        }
+        return base;
+    }
 
     function detectAnomalies(labels, series, opts) {
         const anomalies = [];
         const dates = opts && opts.dates;
-        const wIdx = opts && opts.weekdayIndex;
+        const history = opts && opts.history;
 
         Object.keys(series || {}).forEach((key) => {
             const values = series[key] || [];
@@ -1155,30 +1200,29 @@ window.THD = window.THD || {};
             if (n < ANOMALY_MIN_DAYS) return;
             const format = ANOMALY_FORMATTERS[key] || ((v) => v);
 
-            const idx = wIdx && wIdx[key];
-            if (idx && dates && dates.length >= n && n >= ROBUST_MIN_DAYS) {
-                const dow = values.map((_, i) => parseLocalDate(dates[i]).getDay());
-                const adjusted = values.map((v, i) => v / (idx[dow[i]] || 1));
-                const med = median(adjusted);
-                const mad = median(adjusted.map((v) => Math.abs(v - med)));
-                const scale = 1.4826 * mad;
-                if (!scale) return;
-                adjusted.forEach((a, i) => {
-                    const z = (a - med) / scale;
-                    if (Math.abs(z) < ROBUST_Z_THRESHOLD) return;
-                    const expected = med * (idx[dow[i]] || 1);
+            if (history && dates && dates.length >= n && key !== "cvr") {
+                values.forEach((v, i) => {
+                    const base = sameWeekdayBaseline(history, dates[i], key);
+                    if (base.length < ROBUST_MIN_BASELINE) return;
+                    const med = median(base);
+                    const mad = median(base.map((b) => Math.abs(b - med)));
+                    const scale = Math.max(1.4826 * mad, 0.1 * Math.abs(med), 1);
+                    const z = (v - med) / scale;
+                    const rel = med ? Math.abs(v - med) / Math.abs(med) : Infinity;
+                    if (Math.abs(z) < ROBUST_Z_THRESHOLD || rel < ROBUST_MIN_REL_CHANGE) return;
                     anomalies.push({
                         key,
                         index: i,
-                        value: values[i],
-                        mean: expected,
+                        value: v,
+                        mean: med,
                         weekdayAdjusted: true,
                         metric: window.I18N.t(ANOMALY_METRIC_I18N_KEYS[key] || key),
                         date: labels[i],
-                        valueText: format(values[i]),
-                        meanText: format(expected),
-                        // scaled to the plain-z range so story scoring stays comparable
-                        z: z * (ANOMALY_Z_THRESHOLD / ROBUST_Z_THRESHOLD),
+                        valueText: format(v),
+                        meanText: format(med),
+                        robustZ: z,
+                        // editorial ranking uses a bounded strength, kept separate from the statistic
+                        z: Math.sign(z) * Math.min(Math.abs(z) / 1.75, 6),
                         direction: z > 0 ? "spike" : "drop"
                     });
                 });
@@ -1214,9 +1258,9 @@ window.THD = window.THD || {};
     }
 
     function buildAnomalyInsights(labels, series, opts) {
-        const trimmed = excludeToday(labels, series);
+        const trimmed = excludeToday(labels, series, opts && opts.dates);
         const dates = opts && opts.dates ? opts.dates.slice(0, trimmed.labels.length) : null;
-        return detectAnomalies(trimmed.labels, trimmed.series, { dates, weekdayIndex: opts && opts.weekdayIndex })
+        return detectAnomalies(trimmed.labels, trimmed.series, { dates, history: opts && opts.history })
             .slice(0, 2)
             .map((a) => {
                 const verb = window.I18N.t(a.direction === "spike" ? "anomaly.spike" : "anomaly.drop");
@@ -1446,9 +1490,14 @@ window.THD = window.THD || {};
         if (siteCvr > 0 && !(range && range.partial)) {
             const eligible = channels.filter((c) => c.sessions >= BRIEF_MIN_CHANNEL_SESSIONS && !NOT_A_CHANNEL.has(c.label));
             // vs the REST of the site, so a big channel isn't compared with itself
-            const sitePurchases = kpi.purchases.value;
-            const siteSessions = kpi.sessions.value;
+            // Rest-of-site from the SAME source feed (not the daily feed,
+            // whose totals and coverage can differ), and only when the
+            // channel would expect enough purchases for a rate to mean much.
+            const sitePurchases = channels.reduce((s, c) => s + (c.cvr / 100) * c.sessions, 0);
+            const siteSessions = totalSessions;
+            const sourceCvr = siteSessions ? sitePurchases / siteSessions : 0;
             const zVsRest = (c) => {
+                if (c.sessions * sourceCvr < 20) return 0;
                 const p = (c.cvr / 100) * c.sessions;
                 return twoProportionZ(p, c.sessions, sitePurchases - p, siteSessions - c.sessions);
             };
@@ -1503,11 +1552,11 @@ window.THD = window.THD || {};
             sessions: (input.series || {}).sessions || [],
             revenue: (input.series || {}).revenue || [],
             purchases: (input.series || {}).purchases || []
-        });
+        }, input.dates);
         const seenDays = new Set();
         const dayStories = {}; // date label -> story, so channel spikes on the same day can explain it
         const anomalyDates = input.dates ? input.dates.slice(0, trimmed.labels.length) : null;
-        detectAnomalies(trimmed.labels, trimmed.series, { dates: anomalyDates, weekdayIndex: input.weekdayIndex }).forEach((a) => {
+        detectAnomalies(trimmed.labels, trimmed.series, { dates: anomalyDates, history: input.history }).forEach((a) => {
             // One story per day — a revenue spike usually comes with a
             // purchases spike on the same day; that's one event.
             if (seenDays.has(a.date) || seenDays.size >= 2) return;
@@ -1535,7 +1584,7 @@ window.THD = window.THD || {};
         const covered = new Set(stories.filter((s) => s.action && s.action.channel).map((s) => s.action.channel));
         const drivers = {};
         (input.channelAnomalies || []).forEach((a) => {
-            if (a.direction === "spike" && dayStories[a.date]) {
+            if (a.direction === "spike" && dayStories[a.date] && dayStories[a.date].tone === "good") {
                 (drivers[a.date] = drivers[a.date] || []).push(a);
                 return;
             }
@@ -1646,38 +1695,6 @@ window.THD = window.THD || {};
         const p = (x1 + x2) / (n1 + n2);
         const se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
         return se ? (x1 / n1 - x2 / n2) / se : 0;
-    }
-
-    // Day-of-week index per metric (Sun=0 … Sat=6): how a weekday runs
-    // relative to the average day, from the last 52 complete weeks
-    // (whole weeks, so every weekday is counted equally). On this shop
-    // Sunday revenue runs ~26% below average and Monday ~11% above — so
-    // without this, every quiet Sunday looked like a "drop".
-    const WEEKDAY_METRICS = ["users", "sessions", "purchases", "revenue"];
-
-    function buildWeekdayIndex(dailyRows) {
-        const rows = (dailyRows || []).slice();
-        if (rows.length < 56) return null; // need 8+ weeks for a stable pattern
-        // Drop a still-filling today, then keep a whole number of weeks.
-        const todayKey = toLocalDateKey(startOfDay(new Date()));
-        if (rows.length && rows[rows.length - 1].date === todayKey) rows.pop();
-        const weeks = Math.min(52, Math.floor(rows.length / 7));
-        const span = rows.slice(-weeks * 7);
-        const index = {};
-        WEEKDAY_METRICS.forEach((metric) => {
-            const sums = [0, 0, 0, 0, 0, 0, 0];
-            const counts = [0, 0, 0, 0, 0, 0, 0];
-            span.forEach((r) => {
-                const d = parseLocalDate(r.date).getDay();
-                sums[d] += r[metric] || 0;
-                counts[d] += 1;
-            });
-            const overall = sums.reduce((a, b) => a + b, 0) / Math.max(counts.reduce((a, b) => a + b, 0), 1);
-            index[metric] = overall
-                ? sums.map((s, d) => (counts[d] ? s / counts[d] / overall : 1) || 1)
-                : null;
-        });
-        return index;
     }
 
     // Revenue = sessions × CVR × order value, so a revenue change splits
@@ -1805,7 +1822,7 @@ window.THD = window.THD || {};
             // ---- B. Traffic added without revenue ----
             const sitePerSession = kpi.sessions.value ? kpi.revenue.value / kpi.sessions.value : 0;
             const lowYield = rows
-                .filter((r) => r.ps > 0 && r.cs - r.ps >= BRIEF_LOWYIELD_MIN_ADDED && (r.cs - r.ps) / r.ps >= 0.2)
+                .filter((r) => r.ps > 0 && r.pp >= 20 && r.cp >= 20 && r.cs - r.ps >= BRIEF_LOWYIELD_MIN_ADDED && (r.cs - r.ps) / r.ps >= 0.2)
                 .map((r) => ({ ...r, addedS: r.cs - r.ps, addedR: r.cr - r.pr, z: twoProportionZ(r.cp, r.cs, r.pp, r.ps) }))
                 .filter((r) => sitePerSession && r.addedR / r.addedS < sitePerSession * BRIEF_LOWYIELD_RATIO && r.z <= -2)
                 .sort((a, b) => b.addedS - a.addedS)[0];
@@ -1858,26 +1875,46 @@ window.THD = window.THD || {};
             }
         }
 
-        // ---- D. Revenue concentration ----
+        // ---- D. Revenue concentration (by vendor: Google Ads + Google
+        // Organic + Google Referral count together — three Google buckets
+        // can dominate without any one crossing the line) ----
         const revRows = comparisonRows.filter((r) => r.current && !["Internal / Payment", "(not set)", "Direct"].includes(r.label));
         // Share of ALL revenue, so it matches the headline's "X% of revenue".
         const revTotal = comparisonRows.reduce((s, r) => s + (r.current ? r.current.revenue : 0), 0);
-        const ranked = revRows.slice().sort((a, b) => b.current.revenue - a.current.revenue);
-        if (revTotal && ranked[0] && !existing.has(ranked[0].label)) {
-            const share = ranked[0].current.revenue / revTotal * 100;
-            if (share >= BRIEF_CONCENTRATION_SHARE) {
+        const vendorOf = (label) => {
+            const m = /^(Google|Meta|Yahoo|Bing) (Ads|Organic|Referral)$/.exec(label);
+            return m ? m[1] : label;
+        };
+        const vendors = new Map();
+        revRows.forEach((r) => {
+            const v = vendorOf(r.label);
+            const e = vendors.get(v) || { vendor: v, revenue: 0, labels: [] };
+            e.revenue += r.current.revenue;
+            e.labels.push(r.label);
+            vendors.set(v, e);
+        });
+        const ranked = Array.from(vendors.values()).sort((a, b) => b.revenue - a.revenue);
+        if (revTotal && ranked[0]) {
+            const top = ranked[0];
+            const share = top.revenue / revTotal * 100;
+            const topLabel = top.labels.length === 1 ? chLabel(top.labels[0]) : escapeHtml(top.vendor);
+            const related = stories.find((s) => s.action && top.labels.includes(s.action.channel));
+            if (share >= BRIEF_CONCENTRATION_SHARE && related) {
+                // Same platform already has a story — add the dependence fact to it.
+                related.body += " " + t("brief.concentration.note", { share: share.toFixed(0), label: topLabel });
+            } else if (share >= BRIEF_CONCENTRATION_SHARE) {
                 stories.push({
                     id: "concentration",
                     tone: "info",
                     kicker: t("brief.kicker.risk"),
-                    title: t("brief.concentration.title", { share: share.toFixed(0), label: chLabel(ranked[0].label) }),
+                    title: t("brief.concentration.title", { share: share.toFixed(0), label: topLabel }),
                     body: t("brief.concentration.body", {
-                        next: ranked[1] ? chLabel(ranked[1].label) : "—",
-                        nextShare: ranked[1] ? (ranked[1].current.revenue / revTotal * 100).toFixed(0) : "0"
+                        next: ranked[1] ? (ranked[1].labels.length === 1 ? chLabel(ranked[1].labels[0]) : escapeHtml(ranked[1].vendor)) : "—",
+                        nextShare: ranked[1] ? (ranked[1].revenue / revTotal * 100).toFixed(0) : "0"
                     }),
                     stat: share.toFixed(0) + "%",
                     spark: null,
-                    action: { type: "channel", channel: ranked[0].label },
+                    action: { type: "channel", channel: top.labels[0] },
                     score: 38
                 });
             }
@@ -2080,7 +2117,7 @@ window.THD = window.THD || {};
     function filterSourcesByDates(sourceRows, start, end, splitByChannel) {
         const inWindow = sourceRows.filter((r) => inRange(r.date, start, end));
 
-        const totals = {};
+        const totals = Object.create(null);
         inWindow.forEach((r) => {
             const key = splitByChannel ? r.sourceMedium + "\u0000" + (r.channel || "") : r.sourceMedium;
             if (!totals[key]) {
@@ -2147,7 +2184,7 @@ window.THD = window.THD || {};
         const firstHalfDates = new Set(allDates.slice(0, midIdx));
         const secondHalfDates = new Set(allDates.slice(midIdx));
 
-        const totals = {};
+        const totals = Object.create(null);
         inWindow.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             if (!totals[key]) {
@@ -2191,7 +2228,7 @@ window.THD = window.THD || {};
 
         const contentRows = inWindow.filter((r) => r.pageType !== "system");
 
-        const byTitle = {};
+        const byTitle = Object.create(null);
         contentRows.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             if (!byTitle[key]) byTitle[key] = { pageTitle: key, sessions: 0, pc: 0, sp: 0 };
@@ -2260,11 +2297,14 @@ window.THD = window.THD || {};
             const deviceLabel = biggestMismatch.spShare > overallSpShare
                 ? window.I18N.t("landing.smartphone")
                 : window.I18N.t("landing.pc");
-            const figure = Math.max(biggestMismatch.spShare, 100 - biggestMismatch.spShare);
+            const spHeavy = biggestMismatch.spShare > overallSpShare;
+            const figure = spHeavy ? biggestMismatch.spShare : 100 - biggestMismatch.spShare;
+            const siteFigure = spHeavy ? overallSpShare : 100 - overallSpShare;
             insights.push(window.I18N.t("landingInsight.deviceMismatch", {
                 title: `<strong>${escapeHtml(biggestMismatch.pageTitle)}</strong>`,
                 device: deviceLabel,
-                figure: highlight(figure.toFixed(0) + "%", "neutral")
+                figure: highlight(figure.toFixed(0) + "%", "neutral"),
+                site: siteFigure.toFixed(0) + "%"
             }));
         }
 
@@ -2280,7 +2320,7 @@ window.THD = window.THD || {};
         // could easily wash out or miss entirely.
         let biggestSpike = null;
         candidates.forEach((p) => {
-            const byDate = {};
+            const byDate = Object.create(null);
             contentRows
                 .filter((r) => (r.pageTitle || "(not set)") === p.pageTitle)
                 .forEach((r) => { byDate[r.date] = (byDate[r.date] || 0) + r.sessions; });
@@ -2326,7 +2366,7 @@ window.THD = window.THD || {};
     ========================================================== */
 
     function sumSessionsByTitle(rows) {
-        const map = {};
+        const map = Object.create(null);
         rows.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             map[key] = (map[key] || 0) + r.sessions;
@@ -2363,7 +2403,7 @@ window.THD = window.THD || {};
         for (let d = new Date(win.start); d <= win.end; d.setDate(d.getDate() + 1)) {
             allDates.push(d.toISOString().slice(0, 10));
         }
-        const byDate = {};
+        const byDate = Object.create(null);
         rows
             .filter((r) => (r.pageTitle || "(not set)") === pageTitle)
             .forEach((r) => { byDate[r.date] = (byDate[r.date] || 0) + r.sessions; });
@@ -2407,8 +2447,12 @@ window.THD = window.THD || {};
        or login page isn't the kind of anomaly this is hunting for.
     ========================================================== */
 
-    const RISING_PAGE_MIN_PREV_SESSIONS = 10;
-    const RISING_PAGE_THRESHOLD_PCT = 100;
+    // Editorial gates (from review): a riser needs a real base, a real
+    // absolute gain, and is ranked by sessions added — not by % alone,
+    // which rewarded 14 -> 94 over 300 -> 900.
+    const RISING_PAGE_MIN_PREV_SESSIONS = 30;
+    const RISING_PAGE_MIN_ADDED = 50;
+    const RISING_PAGE_THRESHOLD_PCT = 50;
 
     /* ==========================================================
        Overview "Today/Yesterday Spike" Insights
@@ -2435,6 +2479,15 @@ window.THD = window.THD || {};
     const TODAY_YESTERDAY_SPIKE_MIN_SESSIONS = 30;
     const TODAY_YESTERDAY_SPIKE_MIN_RATIO = 2; // at least 2x the page's usual day
 
+    function spikeKeyFor(f) {
+        const today = toLocalDateKey(startOfDay(new Date()));
+        const y = startOfDay(new Date());
+        y.setDate(y.getDate() - 1);
+        if (f.date === today) return "landingInsight.spikeToday";
+        if (f.date === toLocalDateKey(y)) return "landingInsight.spikeYesterday";
+        return "landingInsight.spikeOn";
+    }
+
     function buildTodayYesterdaySpikeInsights(landingRows) {
         const win = resolveLast30DayWindow(landingRows);
         if (!win) return [];
@@ -2452,7 +2505,7 @@ window.THD = window.THD || {};
             allDates.push(d.toISOString().slice(0, 10));
         }
 
-        const byTitle = {};
+        const byTitle = Object.create(null);
         contentRows.forEach((r) => {
             const key = r.pageTitle || "(not set)";
             if (!byTitle[key]) byTitle[key] = {};
@@ -2488,7 +2541,7 @@ window.THD = window.THD || {};
 
         // One entry per page: a page that spiked both days used to be
         // listed twice. Keep whichever day was the bigger jump.
-        const bestByPage = {};
+        const bestByPage = Object.create(null);
         found.forEach((f) => {
             const prev = bestByPage[f.pageTitle];
             if (!prev || f.value / f.mean > prev.value / prev.mean) bestByPage[f.pageTitle] = f;
@@ -2520,7 +2573,10 @@ window.THD = window.THD || {};
             current: f.value,
             baseline: f.mean,
             spikeSummary: true,
-            sentence: window.I18N.t(f.dayLabel === "today" ? "landingInsight.spikeToday" : "landingInsight.spikeYesterday", {
+            // "today"/"yesterday" only if the feed's latest date really is
+            // today/yesterday — a stale export gets the actual date instead.
+            sentence: window.I18N.t(spikeKeyFor(f), {
+                date: window.I18N.formatDayLabel(parseLocalDate(f.date)),
                 title: `<strong>${escapeHtml(f.pageTitle)}</strong>`,
                 figure: highlight(Math.round(f.value).toLocaleString("en-US"), "pos"),
                 mean: Math.round(f.mean).toLocaleString("en-US")
@@ -2550,9 +2606,10 @@ window.THD = window.THD || {};
             const current = curMap[title];
             const previous = prevMap[title] || 0;
             if (previous < RISING_PAGE_MIN_PREV_SESSIONS) return;
+            if (current - previous < RISING_PAGE_MIN_ADDED) return;
             const changePct = ((current - previous) / previous) * 100;
             if (changePct < RISING_PAGE_THRESHOLD_PCT) return;
-            if (!best || changePct > best.changePct) {
+            if (!best || current - previous > best.current - best.previous) {
                 best = { pageTitle: title, current, previous, changePct };
             }
         });
@@ -2637,7 +2694,7 @@ window.THD = window.THD || {};
         const dayRows = landingRows.filter((r) => r.date === date && r.pageTitle === pageTitle);
         if (!dayRows.length) return null;
 
-        const totals = {};
+        const totals = Object.create(null);
         let total = 0;
         dayRows.forEach((r) => {
             const label = classifyForGroupBy(r, groupBy);
@@ -2668,7 +2725,7 @@ window.THD = window.THD || {};
         );
         if (!rows.length) return null;
 
-        const totals = {};
+        const totals = Object.create(null);
         rows.forEach((r) => {
             const key = r.sourceMedium || "(not set)";
             if (!totals[key]) totals[key] = { sourceMedium: key, sessions: 0, purchases: 0, revenue: 0 };
@@ -2690,7 +2747,7 @@ window.THD = window.THD || {};
     ========================================================== */
 
     function buildTrafficComparison(currentChannels, previousChannels) {
-        const map = {};
+        const map = Object.create(null);
 
         (currentChannels || []).forEach((c) => {
             map[c.label] = { label: c.label, current: c, previous: null };
@@ -2736,7 +2793,7 @@ window.THD = window.THD || {};
         const filtered = sourceRows.filter((r) => classifyForGroupBy(r, groupBy) === channelKey &&
             (!channelScope || classifyForGroupBy(r, "channel") === channelScope));
 
-        const byDate = {};
+        const byDate = Object.create(null);
         filtered.forEach((r) => {
             if (!byDate[r.date]) byDate[r.date] = { users: 0, sessions: 0, purchases: 0, revenue: 0 };
             const d = byDate[r.date];
@@ -2838,13 +2895,17 @@ window.THD = window.THD || {};
         const rows = sortedKeys.map((key, i) => {
             const b = buckets[key];
             const prev = i > 0 ? buckets[sortedKeys[i - 1]] : null;
+            // The latest bucket is still open until the 20th (business month
+            // = 21st..20th); its trend vs a complete month isn't meaningful.
+            const open = new Date() <= new Date(b.year, b.month, 20, 23, 59, 59);
             return {
+                isOpen: open,
                 month: businessMonthLabel(b.year, b.month),
                 revenue: b.revenue,
                 orders: b.orders,
                 users: b.users,
                 cvr: b.sessions ? (b.orders / b.sessions) * 100 : 0,
-                trend: prev && prev.revenue ? ((b.revenue - prev.revenue) / prev.revenue) * 100 : 0
+                trend: open ? null : (prev && prev.revenue ? ((b.revenue - prev.revenue) / prev.revenue) * 100 : 0)
             };
         });
 
@@ -2943,7 +3004,7 @@ window.THD = window.THD || {};
             };
         }).sort((a, b) => b.spend - a.spend);
 
-        const byDate = {};
+        const byDate = Object.create(null);
         spendInRange.forEach((r) => {
             if (!byDate[r.date]) byDate[r.date] = { spend: 0, revenue: 0 };
             byDate[r.date].spend += r.spend;
@@ -3018,7 +3079,6 @@ window.THD = window.THD || {};
         buildAnomalyInsights,
         buildChannelAnomalyInsights,
         buildBriefing,
-        buildWeekdayIndex,
         newCustomerYoY,
         decomposeRevenue,
         setLatestDataDate,

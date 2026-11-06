@@ -109,7 +109,6 @@
     }
 
     function renderNewRepeatChartOnly() {
-        THD.charts.renderNewRepeatChart(newRepeatRows); // no-op now (canvas removed) — kept for the PDF/print path's safety
         THD.ui.renderCustomerFlow(newRepeatRows, fullNewRepeatRows);
         renderAovChartOnly();
     }
@@ -139,6 +138,7 @@
         if (risingPanelActiveInsight && risingPanelActiveGeneric) {
             const refreshed = THD.data.buildLandingPageDetail(landingRows, risingPanelActiveInsight.pageTitle, device);
             if (refreshed) {
+                breakdownDevice = device;
                 risingPanelActiveInsight = refreshed;
                 THD.ui.renderLandingRisingPanel(refreshed, { generic: true });
                 THD.ui.resetSourceBreakdown();
@@ -162,10 +162,18 @@
     // to drill into without needing that context passed back to it.
     let breakdownContext = null;
 
+    // Device the open landing panel is scoped to ("all" for the overview
+    // riser/spikes, the list's device filter for a clicked row) — the
+    // day breakdown must use the same rows the panel's chart used.
+    let breakdownDevice = "all";
+    const landingRowsForDevice = () => (breakdownDevice && breakdownDevice !== "all"
+        ? landingRows.filter((r) => r.device === breakdownDevice)
+        : landingRows);
+
     function showBreakdownForDate(date, pageTitle) {
         const groupBy = THD.ui.getTrafficGroupBy();
         breakdownContext = { date, pageTitle, groupBy };
-        const result = THD.data.buildDayPageSourceBreakdown(landingRows, pageTitle, date, groupBy);
+        const result = THD.data.buildDayPageSourceBreakdown(landingRowsForDevice(), pageTitle, date, groupBy);
         THD.ui.renderSourceBreakdown(result, window.I18N.formatDayLabel(date));
     }
 
@@ -199,6 +207,7 @@
         if (!insight) return;
         risingPanelActiveInsight = insight;
         risingPanelActiveGeneric = false;
+        breakdownDevice = "all";
         THD.ui.renderLandingRisingPanel(insight);
         THD.ui.resetSourceBreakdown();
         THD.ui.switchToView("traffic", () => {
@@ -221,6 +230,7 @@
         const device = THD.ui.getLandingDevice();
         const detail = THD.data.buildLandingPageDetail(landingRows, page.pageTitle, device);
         if (!detail) return;
+        breakdownDevice = device;
         risingPanelActiveInsight = detail;
         risingPanelActiveGeneric = true;
         THD.ui.renderLandingRisingPanel(detail, { generic: true });
@@ -594,7 +604,6 @@
 
         const filtered = THD.data.filterDailyRange(effectiveDailyRows, rangeKey, currentCustomRange, compareMode);
         lastFiltered = filtered;
-        THD.ui.renderKpis(filtered.kpi, hasCompareData);
         THD.ui.renderBriefHeader(range, hasCompareData, latestDataDate(effectiveDailyRows));
         THD.ui.renderVitals(filtered.kpi, filtered.series, hasCompareData, onVitalPick, range.partial);
         THD.ui.renderRangeCompare(range, hasCompareData);
@@ -652,30 +661,35 @@
                 yoyRevenueDelta = THD.data.filterDailyRange(effectiveDailyRows, rangeKey, currentCustomRange, "yoy").kpi.revenue.delta;
             }
         }
-        const weekdayIndex = THD.data.buildWeekdayIndex(effectiveDailyRows);
+        // Full daily history by date, for out-of-sample same-weekday baselines.
+        const dailyHistory = new Map(effectiveDailyRows.map((r) => [r.date, r]));
+        // Don't let demo data stand in for a failed live feed in analytical
+        // claims: channel/landing stories need their own feed to be live.
+        const sourcesLive = dataSourceStatus.sources !== false;
+        const landingLive = dataSourceStatus.landingPages !== false;
 
         THD.ui.renderBriefing(THD.data.buildBriefing({
             kpi: filtered.kpi,
             hasCompareData,
             labels: filtered.labels,
             dates: filtered.dates,
-            weekdayIndex,
+            history: dailyHistory,
             yoyRevenueDelta,
             customerTrend: THD.data.newCustomerYoY(fullNewRepeatRows),
             series: filtered.series,
-            channels: trafficCurrent.channels,
-            comparisonRows: lastTrafficComparisonRows,
-            channelAnomalies,
-            risingPage: risingPageInsight,
-            pageSpikes,
+            channels: sourcesLive ? trafficCurrent.channels : [],
+            comparisonRows: sourcesLive ? lastTrafficComparisonRows : [],
+            channelAnomalies: sourcesLive ? channelAnomalies : [],
+            risingPage: landingLive ? risingPageInsight : null,
+            pageSpikes: landingLive ? pageSpikes : [],
             sourceRows: effectiveSourceRows,
             groupBy,
             range
         }), onBriefAction);
 
         const insightSentences = [
-            ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels, hasCompareData),
-            ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series, { dates: filtered.dates, weekdayIndex })
+            ...THD.data.buildInsights(filtered.kpi, sourcesLive ? trafficCurrent.channels : [], hasCompareData && !range.partial),
+            ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series, { dates: filtered.dates, history: dailyHistory })
         ];
 
         THD.ui.renderInsights(insightSentences, {
@@ -737,7 +751,13 @@
     // than called directly. Remove the checks once those functions
     // exist; until then this just computes the numbers without
     // anywhere to show them, and does nothing else.
+    // Ads Performance has a data layer but no screen yet; computing it on
+    // every render (and loading/generating its feeds) was pure overhead.
+    // Flip on together with the UI.
+    const ADS_ENABLED = false;
+
     function renderAdsTab(range) {
+        if (!ADS_ENABLED) return;
         const perf = THD.data.buildAdPerformance(adSpendRows, sourceRows, range);
         if (THD.ui.renderAdsKpis) THD.ui.renderAdsKpis(perf);
         if (THD.charts.renderAdSpendChart) THD.charts.renderAdSpendChart(perf.trend.labels, perf.trend.spend, perf.trend.revenue);
@@ -835,12 +855,18 @@
         // part of its own re-render (by the time it runs, I18N's
         // internal language state has already switched, so its strings
         // come out translated).
-        if (risingPanelActiveInsight && !risingPanelActiveGeneric && risingPageInsight) {
-            risingPanelActiveInsight = risingPageInsight;
-            THD.ui.renderLandingRisingPanel(risingPageInsight);
-            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", risingPageInsight.dailySessions, risingPageInsight.spikeDate,
-                (date) => showBreakdownForDate(date, risingPageInsight.pageTitle));
-            if (risingPageInsight.spikeDate) showBreakdownForDate(risingPageInsight.spikeDate, risingPageInsight.pageTitle);
+        if (risingPanelActiveInsight && !risingPanelActiveGeneric) {
+            // Re-render the page that was actually open (a spike panel must
+            // not turn into the weekly riser), using its rebuilt insight when
+            // there is one so the sentence is in the new language.
+            const open = risingPanelActiveInsight;
+            const rebuilt = [risingPageInsight].concat(pageSpikes || [])
+                .find((i) => i && i.pageTitle === open.pageTitle && !!i.spikeSummary === !!open.spikeSummary) || open;
+            risingPanelActiveInsight = rebuilt;
+            THD.ui.renderLandingRisingPanel(rebuilt);
+            THD.charts.renderLandingPageMiniChart("landingRisingPanelChart", rebuilt.dailySessions, rebuilt.spikeDate,
+                (date) => showBreakdownForDate(date, rebuilt.pageTitle));
+            if (rebuilt.spikeDate) showBreakdownForDate(rebuilt.spikeDate, rebuilt.pageTitle);
         }
     }
 
@@ -889,7 +915,7 @@
         });
         THD.ui.wireSourceBreakdownRowClicks((label) => {
             if (!breakdownContext) return;
-            const detail = THD.data.buildDayPageSourceDetail(landingRows, breakdownContext.pageTitle, breakdownContext.date, breakdownContext.groupBy, label);
+            const detail = THD.data.buildDayPageSourceDetail(landingRowsForDevice(), breakdownContext.pageTitle, breakdownContext.date, breakdownContext.groupBy, label);
             THD.ui.renderSourceBreakdownDetail(label, detail);
         });
         THD.ui.wireSidebarNav(THD.charts.resizeCharts);
@@ -1025,16 +1051,16 @@
             THD.data.loadSources(),
             THD.data.loadNewRepeat(),
             THD.data.loadLandingPages(),
-            THD.data.loadAdSpend(),
-            THD.data.loadTransactions()
+            ADS_ENABLED ? THD.data.loadAdSpend() : Promise.resolve(null),
+            ADS_ENABLED ? THD.data.loadTransactions() : Promise.resolve(null)
         ]);
 
         dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows();
         THD.data.setLatestDataDate(latestDataDate(dailyRows));
         sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
         landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
-        adSpendRows = liveAdSpend && liveAdSpend.length ? liveAdSpend : buildDummyAdSpend();
-        transactionRows = liveTransactions && liveTransactions.length ? liveTransactions : buildDummyTransactions();
+        adSpendRows = !ADS_ENABLED ? [] : (liveAdSpend && liveAdSpend.length ? liveAdSpend : buildDummyAdSpend());
+        transactionRows = !ADS_ENABLED ? [] : (liveTransactions && liveTransactions.length ? liveTransactions : buildDummyTransactions());
         const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
 
         dataSourceStatus = {
@@ -1048,6 +1074,9 @@
         THD.ui.renderDataSourceWarning(dataSourceStatus);
 
         availableChannels = THD.data.listAvailableChannels(sourceRows, "channel");
+        if (sourceFilterChannel !== "all" && !availableChannels.includes(sourceFilterChannel)) {
+            sourceFilterChannel = "all";
+        }
         THD.ui.populateSourceFilterOptions(availableChannels);
 
         // Fixed 7-day-vs-prior-7-day window (independent of the main

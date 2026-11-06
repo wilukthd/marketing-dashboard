@@ -136,86 +136,12 @@ window.THD = window.THD || {};
     ========================================================== */
 
     const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const kpiPreviousValues = {}; // kpi key -> last raw numeric value shown, so re-renders animate FROM there rather than from 0
-
-    function animateNumber(el, from, to, formatFn, duration) {
-        if (prefersReducedMotion || from === to || !window.requestAnimationFrame) {
-            el.textContent = formatFn(to);
-            return;
-        }
-        const start = performance.now();
-        const ease = (t) => 1 - Math.pow(1 - t, 3); // easeOutCubic
-        function tick(now) {
-            const progress = Math.min(1, (now - start) / duration);
-            const current = from + (to - from) * ease(progress);
-            el.textContent = formatFn(current);
-            if (progress < 1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-    }
 
     /* ==========================================================
        KPI Cards
        Each card is <article data-kpi="key"> with children
        marked data-field="value|delta|daily"
     ========================================================== */
-
-    const KPI_FORMATS = {
-        users: { value: fmtNumber, daily: fmtNumber },
-        sessions: { value: fmtNumber, daily: fmtNumber },
-        purchases: { value: fmtNumber, daily: fmtNumber },
-        revenue: { value: fmtYen, daily: fmtYenCompact },
-        cvr: { value: fmtPercent, daily: fmtPercent }
-    };
-
-    function renderKpis(kpi, hasCompareData = true) {
-        Object.entries(kpi).forEach(([key, data]) => {
-            const card = document.querySelector(`[data-kpi="${key}"]`);
-            const format = KPI_FORMATS[key];
-            if (!card || !format) return;
-
-            card.classList.remove("isSkeleton");
-
-            const valueEl = card.querySelector('[data-field="value"]');
-            const deltaEl = card.querySelector('[data-field="delta"]');
-            const dailyEl = card.querySelector('[data-field="daily"]');
-
-            if (valueEl) {
-                const isFirstRender = kpiPreviousValues[key] === undefined;
-                const from = isFirstRender ? 0 : kpiPreviousValues[key];
-                animateNumber(valueEl, from, data.value, format.value, 700);
-                kpiPreviousValues[key] = data.value;
-
-                if (!isFirstRender && !prefersReducedMotion) {
-                    card.classList.remove("kpiFlash");
-                    // Force reflow so the animation restarts even if
-                    // the class never left (two updates in quick
-                    // succession, e.g. rapid range changes).
-                    void card.offsetWidth;
-                    card.classList.add("kpiFlash");
-                }
-            }
-
-            if (deltaEl) {
-                deltaEl.classList.remove("positive", "negative", "neutral");
-                if (hasCompareData && data.delta !== null) {
-                    // CVR reads in points (6.07% -> 6.79% = +0.72pt).
-                    const usePts = key === "cvr" && data.deltaPts !== null && data.deltaPts !== undefined;
-                    deltaEl.textContent = usePts ? fmtPts(data.deltaPts) : fmtDelta(data.delta);
-                    deltaEl.classList.add(data.delta >= 0 ? "positive" : "negative");
-                } else {
-                    // Comparison window has no underlying data at all
-                    // (see hasDataInRange in data.js) — showing "0.0%"
-                    // here would read as "no change" rather than "no
-                    // data to compare against".
-                    deltaEl.textContent = window.I18N.t("kpi.noCompareData");
-                    deltaEl.classList.add("neutral");
-                }
-            }
-
-            if (dailyEl) dailyEl.textContent = format.daily(data.daily);
-        });
-    }
 
     /* ==========================================================
        Skeleton Loading
@@ -226,10 +152,6 @@ window.THD = window.THD || {};
        their column count from the table's own <thead>, so they
        stay correct if a column is ever added or removed.
     ========================================================== */
-
-    function showKpiSkeletons() {
-        document.querySelectorAll(".kpiCard").forEach((card) => card.classList.add("isSkeleton"));
-    }
 
     function skeletonTableRows(cols, rows) {
         const cell = `<td><span class="skeletonBlock" style="width:${60 + Math.random() * 30}%"></span></td>`;
@@ -256,7 +178,6 @@ window.THD = window.THD || {};
 
     // Called once, right at init — see THD.ui.showInitialSkeletons in app.js.
     function showInitialSkeletons() {
-        showKpiSkeletons();
         showTableSkeleton("sourceTable", 6);
         showTableSkeleton("monthlyTable", 6);
         showTableSkeleton("newRepeatTable", 6);
@@ -288,7 +209,7 @@ window.THD = window.THD || {};
         return `
             <div class="landingItem" data-page-index="${index}" role="button" tabindex="0">
                 <div class="landingItemTop">
-                    <span>${label}</span>
+                    <span>${escAttr(label)}</span>
                     ${stats}
                 </div>
             </div>
@@ -333,11 +254,16 @@ window.THD = window.THD || {};
     function wireLandingPageItemClick(onClick) {
         const container = document.getElementById("landingPages");
         if (!container || !onClick) return;
-        container.addEventListener("click", (e) => {
+        const open = (e) => {
             const item = e.target.closest(".landingItem[data-page-index]");
             if (!item || !container.contains(item)) return;
             const page = visibleLandingPages[Number(item.dataset.pageIndex)];
             if (page) onClick(page);
+        };
+        container.addEventListener("click", open);
+        // role="button" items need the keyboard too
+        container.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
         });
     }
 
@@ -565,7 +491,7 @@ window.THD = window.THD || {};
 
         const rowsHtml = detail.map((d) => `
             <tr>
-                <td>${d.sourceMedium}</td>
+                <td>${escAttr(d.sourceMedium)}</td>
                 <td class="number">${Math.round(d.sessions).toLocaleString("en-US")}</td>
                 <td class="number">${Math.round(d.purchases).toLocaleString("en-US")}</td>
                 <td class="number">¥${Math.round(d.revenue).toLocaleString("en-US")}</td>
@@ -755,6 +681,9 @@ window.THD = window.THD || {};
     let notesArchivedView = false; // false = showing active notes, true = showing the archived list
 
     function noteItemHtml(n, archivedView) {
+        // Notes come from a shared database anyone with the link can write
+        // to: escape the id and allowlist the category before they reach markup.
+        n = { ...n, id: escAttr(n.id), category: NOTE_CATEGORY_KEYS[n.category] ? n.category : "general" };
         const actionBtn = archivedView
             ? `
                 <button class="noteRestoreBtn" data-id="${n.id}" title="${window.I18N.t("notes.restoreTitle")}">
@@ -864,10 +793,16 @@ window.THD = window.THD || {};
             const author = authorInput ? authorInput.value.trim() : "";
             const category = categorySelect ? categorySelect.value : "general";
             if (authorInput) window.THD.notes.setAuthorName(author);
-            window.THD.notes.add({ text, author, category }).catch((e) => {
+            // Keep the draft until the save actually succeeds.
+            addBtn.disabled = true;
+            window.THD.notes.add({ text, author, category }).then(() => {
+                input.value = "";
+            }).catch((e) => {
                 console.warn("[THD.ui] Failed to add note:", e.message);
+                input.setAttribute("aria-invalid", "true");
+            }).finally(() => {
+                addBtn.disabled = false;
             });
-            input.value = "";
         });
 
         if (archiveToggleBtn) {
@@ -916,71 +851,11 @@ window.THD = window.THD || {};
        cross-referencing two lists by eye.
     ========================================================== */
 
-    function trafficCompareRowHtml(row, activeLabel) {
-        const cur = row.current;
-        const prev = row.previous;
-        const curSessions = cur ? cur.sessions : 0;
-        const prevSessions = prev ? prev.sessions : 0;
-        const color = (cur && cur.color) || (prev && prev.color) || "#9498A6";
-        const isActive = !!activeLabel && activeLabel === row.label;
-        const displayLabel = window.I18N.channelLabel(row.label);
-
-        // More unattributed traffic is a tracking problem, not growth —
-        // flip its colors so a jump reads as the warning it is.
-        const upIsBad = row.label === "(not set)";
-        let deltaHtml = "—";
-        if (prevSessions > 0) {
-            const delta = ((curSessions - prevSessions) / prevSessions) * 100;
-            const good = upIsBad ? delta <= 0 : delta >= 0;
-            deltaHtml = `<span class="deltaBadge ${good ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
-        } else if (curSessions > 0) {
-            deltaHtml = `<span class="deltaBadge positive">${window.I18N.t("traffic.new")}</span>`;
-        }
-
-        return `
-            <tr class="tcRow${isActive ? " active" : ""}" data-label="${row.label}" title="${window.I18N.t("traffic.clickHint", { label: displayLabel })}">
-                <td class="tcSource">
-                    <span class="tcSourceInner">
-                        <span class="legendColor" style="background:${color}"></span>
-                        ${displayLabel}
-                    </span>
-                </td>
-                <td class="number">${cur ? fmtNumber(cur.sessions) : "—"}</td>
-                <td class="number">${prev ? fmtNumber(prev.sessions) : "—"}</td>
-                <td class="number">${deltaHtml}</td>
-                <td class="number">${cur ? fmtYen(cur.revenue) : "—"}</td>
-                <td class="number">${cur ? fmtPercent(cur.cvr) : "—"}</td>
-            </tr>
-        `;
-    }
-
-    function renderTrafficComparison(rows, activeLabel) {
-        const tbody = document.getElementById("trafficCompareTable");
-        if (!tbody) return;
-
-        if (!rows || !rows.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("traffic.empty")}</td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = rows.map((r) => trafficCompareRowHtml(r, activeLabel)).join("");
-    }
-
     // Clicking a row asks app.js (which holds the raw source rows and
     // current groupBy) to filter the Session Source table down to just
     // that bucket — e.g. click "Referral (Other)" to see which actual
     // sites make it up. Clicking the same row again clears it; app.js
     // owns that toggle logic, this just reports which label was clicked.
-    function wireTrafficComparisonFilter(onRowClick) {
-        const tbody = document.getElementById("trafficCompareTable");
-        if (!tbody) return;
-        tbody.addEventListener("click", (e) => {
-            const row = e.target.closest("tr.tcRow");
-            if (!row) return;
-            onRowClick(row.dataset.label);
-        });
-    }
-
     /* ==========================================================
        Channel Trend View (doughnut click drill-down)
        Swaps the current/previous doughnut pair for one merged
@@ -1056,12 +931,6 @@ window.THD = window.THD || {};
     // actionable cut ("Meta Ads", not "Paid Social").
     function getTrafficGroupBy() {
         return "platform";
-    }
-
-    function wireTrafficGroupToggle(onChange) {
-        const select = document.getElementById("trafficGroupSelect");
-        if (!select) return;
-        select.addEventListener("change", () => onChange(select.value));
     }
 
     /* ==========================================================
@@ -1155,8 +1024,8 @@ window.THD = window.THD || {};
                 <td class="number">${fmtNumber(r.users)}</td>
                 <td class="number">${fmtPercent(r.cvr)}</td>
                 <td>
-                    <span class="status ${r.trend >= 0 ? "up" : "down"}">
-                        ${r.trend >= 0 ? "▲" : "▼"} ${Math.abs(r.trend).toFixed(1)}%
+                    <span class="status ${r.trend === null || r.trend === undefined ? "" : (r.trend >= 0 ? "up" : "down")}">
+                        ${r.trend === null || r.trend === undefined ? window.I18N.t("brief.vital.partial") : (r.trend >= 0 ? "▲" : "▼") + " " + Math.abs(r.trend).toFixed(1) + "%"}
                     </span>
                 </td>
             </tr>
@@ -1255,17 +1124,20 @@ window.THD = window.THD || {};
         const btn = document.getElementById("refreshBtn");
         if (!btn) return;
 
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", async () => {
+            if (btn.disabled) return;
             const icon = btn.querySelector("svg");
             btn.disabled = true;
             if (icon) icon.style.animation = "spin .6s linear infinite";
-
-            setTimeout(() => {
-                onRefresh();
+            // Wait for the reload to finish before re-enabling, so two
+            // clicks can't race and an older response can't win.
+            try {
+                await onRefresh();
                 renderLastUpdate();
+            } finally {
                 btn.disabled = false;
                 if (icon) icon.style.animation = "";
-            }, 500);
+            }
         });
     }
 
@@ -1676,7 +1548,18 @@ window.THD = window.THD || {};
             list.innerHTML = `<li class="storyEmpty">${window.I18N.t("brief.feedEmpty")}</li>`;
             return;
         }
-        list.innerHTML = briefing.stories.map(storyHtml).join("");
+        // A briefing should be short: the 5 most important stories, the
+        // rest one click away.
+        const LEAD = 5;
+        const extra = briefing.stories.length - LEAD;
+        list.innerHTML = briefing.stories.map(storyHtml).join("") +
+            (extra > 0 ? `<li class="storyMore"><button type="button" class="storyMoreBtn">${window.I18N.t("brief.moreStories", { n: extra })}</button></li>` : "");
+        list.classList.toggle("isCollapsed", extra > 0);
+        const moreBtn = list.querySelector(".storyMoreBtn");
+        if (moreBtn) moreBtn.addEventListener("click", () => {
+            list.classList.remove("isCollapsed");
+            moreBtn.parentElement.remove();
+        });
         if (window.lucide) lucide.createIcons();
 
         list.querySelectorAll(".story").forEach((li) => {
@@ -2071,7 +1954,6 @@ window.THD = window.THD || {};
         plotMetric,
         syncVitalsPlotted,
         renderLastUpdate,
-        renderKpis,
         showInitialSkeletons,
         renderInsights,
         renderTopLandingPageInsights,
@@ -2094,8 +1976,6 @@ window.THD = window.THD || {};
         wireSourceBreakdownRowClicks,
         renderSourceBreakdownDetail,
         wireLandingRisingPanelClose,
-        renderTrafficComparison,
-        wireTrafficComparisonFilter,
         showChannelTrendMode,
         hideChannelTrendMode,
         getChannelTrendMetric,
@@ -2104,7 +1984,6 @@ window.THD = window.THD || {};
         populateSourceFilterOptions,
         wireSourceFilterToggle,
         getTrafficGroupBy,
-        wireTrafficGroupToggle,
         renderSourceTable,
         renderSourceFilterStatus,
         wireClearSourceFilter,

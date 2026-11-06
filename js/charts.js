@@ -211,7 +211,10 @@ window.THD = window.THD || {};
 
         const rawLabels = channels.map((c) => c.label);
         const displayLabels = rawLabels.map((l) => window.I18N.channelLabel(l));
-        const values = channels.map((c) => c.percent);
+        // Raw sessions for the geometry (rounded percentages made small
+        // channels vanish and distorted the rest); % only in the tooltip.
+        const values = channels.map((c) => c.sessions);
+        const total = values.reduce((a, b) => a + b, 0) || 1;
         const palette = rawLabels.map(colorForLabel);
         const colors = getChartColors();
 
@@ -265,7 +268,7 @@ window.THD = window.THD || {};
                         padding: 12,
                         cornerRadius: 8,
                         callbacks: {
-                            label: (item) => `${item.label}: ${item.parsed}%`
+                            label: (item) => `${item.label}: ${(item.parsed / total * 100).toFixed(1)}%`
                         }
                     }
                 }
@@ -355,245 +358,6 @@ window.THD = window.THD || {};
             }
         });
     }
-
-    /* ==========================================================
-       New vs Repeat Customers
-       Two 100%-stacked bars per month — Orders and Revenue — so
-       the order-count split and the revenue split are visible
-       side by side rather than needing two separate charts
-       mentally cross-referenced. See renderNewRepeatChart below.
-    ========================================================== */
-
-    let newRepeatChartInstance = null;
-
-    const NEW_REPEAT_COLORS = {
-        newBar: "#2B59FF",
-        repeatBar: "#7C4DFF"
-    };
-
-    // Mixes a hex color toward white by `amount` (0-1) — used for the
-    // Revenue bars' lighter tint (see renderNewRepeatChart). A true
-    // lighter shade reads more predictably across light/dark themes
-    // and card backgrounds than transparency would, since transparency
-    // blends with whatever's behind the bar rather than always
-    // producing the same tone.
-    function lightenHex(hex, amount) {
-        const num = parseInt(hex.replace("#", ""), 16);
-        const r = Math.round(((num >> 16) & 0xFF) + (255 - ((num >> 16) & 0xFF)) * amount);
-        const g = Math.round(((num >> 8) & 0xFF) + (255 - ((num >> 8) & 0xFF)) * amount);
-        const b = Math.round((num & 0xFF) + (255 - (num & 0xFF)) * amount);
-        return `rgb(${r}, ${g}, ${b})`;
-    }
-
-    // One chart, both lenses at once: for each month, an Orders bar
-    // and a Revenue bar sit side by side, each a 100%-stacked
-    // New/Repeat split. Orders and Revenue share the same New/Repeat
-    // hues — opacity is what tells them apart (Orders solid, Revenue
-    // at reduced opacity), so color is reserved entirely for the
-    // New-vs-Repeat comparison, which is the thing actually worth
-    // comparing here. Grouping both stacks under the same 13 month
-    // categories (rather than 26 flat categories) is what gives the
-    // native "close together within a month, real gap between
-    // months" spacing — Chart.js does that automatically once
-    // datasets share a category axis but differ in `stack`.
-    function renderNewRepeatChart(rows) {
-        const canvas = document.getElementById("newRepeatChart");
-        if (!canvas) return;
-
-        if (newRepeatChartInstance) {
-            newRepeatChartInstance.destroy();
-            newRepeatChartInstance = null;
-        }
-
-        if (!rows || !rows.length) return;
-
-        const colors = getChartColors();
-        const labels = rows.map((r) => r.period);
-
-        const newOrdersShare = rows.map((r) => {
-            const total = r.newOrders + r.repeatOrders;
-            return total ? (r.newOrders / total) * 100 : 0;
-        });
-        const repeatOrdersShare = newOrdersShare.map((v) => 100 - v);
-
-        const newRevenueShare = rows.map((r) => {
-            const total = r.newRevenue + r.repeatRevenue;
-            return total ? (r.newRevenue / total) * 100 : 0;
-        });
-        const repeatRevenueShare = newRevenueShare.map((v) => 100 - v);
-
-        const newLabel = window.I18N.t("newRepeat.legendNew");
-        const repeatLabel = window.I18N.t("newRepeat.legendRepeat");
-        const ordersLabel = window.I18N.t("newRepeat.orders");
-        const revenueLabel = window.I18N.t("newRepeat.revenue");
-
-        // Every segment gets a labeled "chip" — a small dark rounded
-        // rect behind white text — rather than plain text colored to
-        // match whatever's underneath. This guarantees legible
-        // contrast regardless of the bar's own color, opacity, or the
-        // active theme, and (since the chip doesn't depend on the
-        // segment being tall enough to read plain text against) means
-        // every segment gets a percentage shown, not just ones above
-        // some size cutoff. For a segment too short to contain the
-        // chip, the chip is nudged toward the shared boundary with its
-        // sibling segment (which, since the two always sum to 100%,
-        // necessarily has room) rather than toward the segment's own
-        // outer edge, which may have none.
-        const segmentLabelPlugin = {
-            id: "newRepeatSegmentLabels",
-            afterDatasetsDraw(chart) {
-                const { ctx, scales } = chart;
-                const topPixel = scales.y.getPixelForValue(100);
-                const bottomPixel = scales.y.getPixelForValue(0);
-
-                chart.data.datasets.forEach((dataset, datasetIndex) => {
-                    const meta = chart.getDatasetMeta(datasetIndex);
-                    if (meta.hidden) return;
-                    meta.data.forEach((bar, index) => {
-                        const value = dataset.data[index];
-                        if (value == null) return;
-
-                        const segTop = Math.min(bar.y, bar.base);
-                        const segBottom = Math.max(bar.y, bar.base);
-                        const segHeight = segBottom - segTop;
-
-                        const text = `${Math.round(value)}%`;
-                        ctx.font = "700 10px 'IBM Plex Mono', monospace";
-                        const chipW = ctx.measureText(text).width + 10;
-                        const chipH = 16;
-
-                        let labelY = (segTop + segBottom) / 2;
-                        if (segHeight < chipH + 4) {
-                            // Which edge of this segment borders its
-                            // sibling? The bottom-of-stack segment's
-                            // own bottom sits at the axis zero-line
-                            // (shared by every bar), so matching that
-                            // fixed pixel identifies it; anything else
-                            // is the top-of-stack segment, whose own
-                            // top sits at the fixed 100%-line instead.
-                            const isBottomOfStack = Math.abs(segBottom - bottomPixel) < 1.5;
-                            labelY = isBottomOfStack
-                                ? segTop + chipH / 2 + 2
-                                : segBottom - chipH / 2 - 2;
-                            labelY = Math.min(Math.max(labelY, topPixel + chipH / 2 + 2), bottomPixel - chipH / 2 - 2);
-                        }
-
-                        ctx.save();
-                        ctx.fillStyle = "rgba(18, 20, 28, 0.82)";
-                        if (ctx.roundRect) {
-                            ctx.beginPath();
-                            ctx.roundRect(bar.x - chipW / 2, labelY - chipH / 2, chipW, chipH, 4);
-                            ctx.fill();
-                        } else {
-                            ctx.fillRect(bar.x - chipW / 2, labelY - chipH / 2, chipW, chipH);
-                        }
-                        ctx.fillStyle = "#FFFFFF";
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "middle";
-                        ctx.fillText(text, bar.x, labelY + 0.5);
-                        ctx.restore();
-                    });
-                });
-            }
-        };
-
-        newRepeatChartInstance = new Chart(canvas.getContext("2d"), {
-            type: "bar",
-            data: {
-                labels,
-                datasets: [
-                    {
-                        label: `${newLabel} · ${ordersLabel}`,
-                        data: newOrdersShare,
-                        backgroundColor: NEW_REPEAT_COLORS.newBar,
-                        stack: "orders",
-                        borderRadius: 3,
-                        categoryPercentage: 0.7,
-                        barPercentage: 0.9
-                    },
-                    {
-                        label: `${repeatLabel} · ${ordersLabel}`,
-                        data: repeatOrdersShare,
-                        backgroundColor: NEW_REPEAT_COLORS.repeatBar,
-                        stack: "orders",
-                        borderRadius: 3,
-                        categoryPercentage: 0.7,
-                        barPercentage: 0.9
-                    },
-                    {
-                        label: `${newLabel} · ${revenueLabel}`,
-                        data: newRevenueShare,
-                        backgroundColor: lightenHex(NEW_REPEAT_COLORS.newBar, 0.55),
-                        borderColor: NEW_REPEAT_COLORS.newBar,
-                        borderWidth: 1.5,
-                        stack: "revenue",
-                        borderRadius: 3,
-                        categoryPercentage: 0.7,
-                        barPercentage: 0.9
-                    },
-                    {
-                        label: `${repeatLabel} · ${revenueLabel}`,
-                        data: repeatRevenueShare,
-                        backgroundColor: lightenHex(NEW_REPEAT_COLORS.repeatBar, 0.55),
-                        borderColor: NEW_REPEAT_COLORS.repeatBar,
-                        borderWidth: 1.5,
-                        stack: "revenue",
-                        borderRadius: 3,
-                        categoryPercentage: 0.7,
-                        barPercentage: 0.9
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: "index", intersect: false },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: "top",
-                        align: "end",
-                        labels: { color: colors.text, usePointStyle: true, boxWidth: 8, padding: 16 }
-                    },
-                    tooltip: {
-                        backgroundColor: "#181A22",
-                        padding: 12,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: { display: false },
-                        ticks: { color: colors.textLight }
-                    },
-                    y: {
-                        stacked: true,
-                        min: 0,
-                        max: 100,
-                        grid: { color: colors.grid },
-                        border: { display: false },
-                        ticks: { callback: (v) => v + "%", color: colors.textLight }
-                    }
-                }
-            },
-            plugins: [segmentLabelPlugin]
-        });
-    }
-
-
-    /* ==========================================================
-       Average Order Value (AOV) Trend
-       Reuses the same monthly New/Repeat rows already loaded for
-       the chart above — revenue/orders per bucket, just divided
-       into three AOV lines (overall, new, repeat) instead of
-       stacked bars, so the pattern behind the AOV-comparison
-       insight ("repeat customers spend X% more per order") is
-       visible as a trend rather than a single-month snapshot.
-    ========================================================== */
 
     let aovChartInstance = null;
 
@@ -792,7 +556,6 @@ window.THD = window.THD || {};
     // right after a tab switch to fix that.
     function resizeCharts() {
         if (trendChartInstance) trendChartInstance.resize();
-        if (newRepeatChartInstance) newRepeatChartInstance.resize();
         if (aovChartInstance) aovChartInstance.resize();
         if (channelTrendChartInstance) channelTrendChartInstance.resize();
         if (landingRisingChartInstance) landingRisingChartInstance.resize();
@@ -803,7 +566,6 @@ window.THD = window.THD || {};
         renderTrendChart,
         renderTrafficChart,
         renderChannelTrendChart,
-        renderNewRepeatChart,
         renderAovChart,
         renderLandingPageMiniChart,
         resizeCharts

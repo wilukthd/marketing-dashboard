@@ -1510,3 +1510,25 @@ select{ max-width:100%; text-overflow:ellipsis; }
 }
 
 .tcMore:hover{ text-decoration:underline; }
+
+
+/* Briefing shows the lead stories; the rest sit behind "show more". */
+.storyList.isCollapsed .story:nth-child(n+6){ display:none; }
+
+.storyMore{ list-style:none; padding:14px 0 4px; }
+
+.storyMoreBtn{
+
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--text);
+    border-radius:999px;
+    padding:8px 16px;
+    font:inherit;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+
+}
+
+.storyMoreBtn:hover{ border-color:var(--text-light); }
