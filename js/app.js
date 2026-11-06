@@ -65,9 +65,11 @@
     let lastFiltered = null; // last filterDailyRange result — reused by metric toggles so the chart keeps the source filter
     let currentEffectiveSourceRows = [];
     let lastTrafficTree = [];
+    let sourcesCurrentSplit = [];   // current period, one row per source/medium + GA4 channel
+    let lastSourceTableRows = [];   // exactly what the Session Source table shows (for CSV export)
 
     // activeSourceFilter is { groupBy: "channel"|"platform"|"source", label } or null.
-    const sameFilter = (a, b) => !!a && !!b && a.groupBy === b.groupBy && a.label === b.label;
+    const sameFilter = (a, b) => !!a && !!b && a.groupBy === b.groupBy && a.label === b.label && (a.channel || "") === (b.channel || "");
 
     function refreshTrafficSelection() {
         THD.ui.renderTrafficTree(null, activeSourceFilter, null);
@@ -80,8 +82,8 @@
             THD.ui.hideChannelTrendMode();
             return;
         }
-        const { groupBy, label } = activeSourceFilter;
-        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, label, groupBy, currentRangeObj);
+        const { groupBy, label, channel } = activeSourceFilter;
+        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, label, groupBy, currentRangeObj, channel);
         THD.ui.showChannelTrendMode(label);
         THD.charts.renderChannelTrendChart("trafficChannelTrendChart", label, trendData, THD.ui.getChannelTrendMetric());
     }
@@ -96,9 +98,12 @@
 
     function renderFilteredSourceTable() {
         const f = activeSourceFilter;
+        // Filtered views use the channel-split rows so a channel/scoped
+        // filter counts exactly that channel's share of a source/medium.
         const rows = f
-            ? sourcesCurrentForFilter.filter((r) => THD.data.classifyForGroupBy(r, f.groupBy) === f.label)
+            ? sourcesCurrentSplit.filter((r) => THD.data.matchesTrafficFilter(r, f))
             : sourcesCurrentForFilter;
+        lastSourceTableRows = rows;
         THD.ui.renderSourceTable(rows);
         THD.ui.renderSourceFilterStatus(activeSourceFilter);
     }
@@ -610,15 +615,21 @@
         currentRangeObj = range;
         currentEffectiveSourceRows = effectiveSourceRows;
 
+        // Channel views need rows split by GA4 channel (see filterSourcesByDates).
+        const splitCurrent = THD.data.filterSourcesByDates(effectiveSourceRows, range.start, range.end, true);
+        const splitPrevious = THD.data.filterSourcesByDates(effectiveSourceRows, range.prevStart, range.prevEnd, true);
+        sourcesCurrentSplit = splitCurrent;
+        renderFilteredSourceTable();
+
         // Doughnuts + the tree's top level: channels (≈10 slices, readable).
-        const channelCurrent = THD.data.deriveTrafficBreakdown(sourcesCurrent, "channel");
-        const channelPrevious = THD.data.deriveTrafficBreakdown(sourcesPrevious, "channel");
+        const channelCurrent = THD.data.deriveTrafficBreakdown(splitCurrent, "channel");
+        const channelPrevious = THD.data.deriveTrafficBreakdown(splitPrevious, "channel");
         const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", channelCurrent.channels, channelCurrent.totalSessions);
         const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", channelPrevious.channels, channelPrevious.totalSessions);
         const channelColors = {};
         previousChannels.concat(currentChannels).forEach((c) => { channelColors[c.label] = c.color; });
 
-        lastTrafficTree = THD.data.buildTrafficTree(sourcesCurrent, sourcesPrevious);
+        lastTrafficTree = THD.data.buildTrafficTree(splitCurrent, splitPrevious);
         THD.ui.renderTrafficTree(lastTrafficTree, activeSourceFilter, channelColors);
         renderChannelTrendOrDoughnuts();
 
@@ -908,7 +919,7 @@
                     { key: "purchases", header: "Ecommerce Purchases" },
                     { key: "revenue", header: "Total Revenue" },
                     { header: "CVR (%)", value: (r) => r.cvr.toFixed(2) }
-                ], sourcesCurrentForFilter);
+                ], lastSourceTableRows);
             },
             exportTrafficCsvBtn: () => {
                 // Every level of the traffic tree, in display order.

@@ -510,9 +510,9 @@ window.THD = window.THD || {};
         if (hintEl) hintEl.style.display = "none";
 
         listEl.innerHTML = result.breakdown.map((row) => `
-            <div class="sourceBreakdownRowWrap" data-label="${row.label}">
+            <div class="sourceBreakdownRowWrap" data-label="${escAttr(row.label)}">
                 <div class="sourceBreakdownRow">
-                    <span class="sourceBreakdownLabel" title="${row.label}">${row.label}</span>
+                    <span class="sourceBreakdownLabel" title="${escAttr(row.label)}">${escAttr(row.label)}</span>
                     <div class="sourceBreakdownBarTrack"><div class="sourceBreakdownBarFill" style="width:${Math.max(row.pct, 3)}%"></div></div>
                     <span class="sourceBreakdownValue">${Math.round(row.sessions).toLocaleString("en-US")} <small>(${Math.round(row.pct)}%)</small></span>
                     <span class="sourceBreakdownChevron">›</span>
@@ -1034,7 +1034,7 @@ window.THD = window.THD || {};
         if (!select) return;
         const current = select.value;
         const optionsHtml = (channels || [])
-            .map((c) => `<option value="${c}">${window.I18N.channelLabel(c)}</option>`)
+            .map((c) => `<option value="${escAttr(c)}">${escAttr(window.I18N.channelLabel(c))}</option>`)
             .join("");
         select.innerHTML = `<option value="all" data-i18n="filter.allSources">${window.I18N.t("filter.allSources")}</option>${optionsHtml}`;
         if (channels && channels.includes(current)) select.value = current;
@@ -1075,7 +1075,7 @@ window.THD = window.THD || {};
     function sourceRowHtml(r) {
         return `
             <tr>
-                <td>${r.sourceMedium}</td>
+                <td>${escAttr(r.sourceMedium)}</td>
                 <td class="number">${fmtNumber(r.sessions)}</td>
                 <td class="number">${fmtNumber(r.users)}</td>
                 <td class="number">${fmtNumber(r.purchases)}</td>
@@ -1931,8 +1931,13 @@ window.THD = window.THD || {};
 
     function treeNodeMatches(n, filter) {
         if (!filter) return false;
-        if (n.groupBy === filter.groupBy && n.label === filter.label) return true;
-        return filter.groupBy === "platform" && n.alsoPlatform === filter.label;
+        if (n.groupBy === filter.groupBy && n.label === filter.label) {
+            // A scoped filter (platform/source picked inside a channel)
+            // only matches that channel's row; a global one (from the
+            // briefing) matches it wherever it appears.
+            return !filter.channel || filter.channel === n.channel;
+        }
+        return filter.groupBy === "platform" && !filter.channel && n.alsoPlatform === filter.label;
     }
 
     // Opens every ancestor of the node the filter points at, so a
@@ -1940,7 +1945,10 @@ window.THD = window.THD || {};
     function expandPathTo(filter) {
         const walk = (nodes, path) => {
             for (const n of nodes) {
-                if (treeNodeMatches(n, filter)) { path.forEach((id) => treeExpanded.add(id)); return true; }
+                if (treeNodeMatches(n, filter)) {
+                    path.forEach((id) => { treeExpanded.add(id); treeShowAll.add(id); });
+                    return true;
+                }
                 if (walk(n.children, path.concat(n.id))) return true;
             }
             return false;
@@ -1979,7 +1987,7 @@ window.THD = window.THD || {};
             const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
             const row = `
                 <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
-                    data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}">
+                    data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}" data-channel="${n.level === "channel" || !n.channel ? "" : escAttr(n.channel)}">
                     <td class="tcSource">
                         <span class="tcSourceInner" style="--depth:${depth}">
                             ${hasKids
@@ -2049,7 +2057,7 @@ window.THD = window.THD || {};
                 return;
             }
             if (e.target.closest(".tcCaret") || row.dataset.level === "group") { toggle(); return; }
-            onFilter({ groupBy: row.dataset.groupBy, label: row.dataset.label });
+            onFilter({ groupBy: row.dataset.groupBy, label: row.dataset.label, channel: row.dataset.channel || undefined });
         });
     }
 

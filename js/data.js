@@ -426,11 +426,14 @@ window.THD = window.THD || {};
     /* ==========================================================
        Special buckets — checked BEFORE the normal channel/platform
        rules, in both groupings.
-       • Internal / Payment: the company's own sites and tools, and
-         payment / carrier-billing pages. A customer who goes to the
-         payment page and comes back starts a NEW session credited to
-         that page, which steals the sale from the real source and
-         made "Referral (Other)" look like an 18%-CVR channel. These
+       • Internal / Payment: the company's own sites, and payment /
+         carrier-billing pages. When the return from a payment page
+         lands in a new session (the customer took >30 min, switched
+         browser/app for carrier billing, or the tracking cookie didn't
+         carry across domains), GA4 credits that session to the payment
+         page — which steals the sale from the real source and made
+         "Referral (Other)" look like an 18%-CVR channel. (GA4 does NOT
+         start a new session just because the referrer changes.) These
          aren't acquisition channels at all, so they get their own
          bucket and are kept out of the channel-efficiency stories.
          (The real fix is GA4's "unwanted referrals" list + cross-
@@ -446,9 +449,8 @@ window.THD = window.THD || {};
     const OWN_HOSTS = [
         /(^|\.)totalhealthdesign\.jp$/,
         /(^|\.)th-d\.co\.jp$/,
-        /(^|\.)makerepeater\.jp$/,
-        /(^|\.)utage-system\.com$/,
-        /studioiframesandbox\.com$/
+        /studioiframesandbox\.com$/,
+        /(^|\.)makeshop\.jp$/           // MakeShop-hosted cart/checkout pages
     ];
     const PAYMENT_HOSTS = [
         /(^|\.)mul-pay\.jp$/,          // GMO Payment Gateway
@@ -458,14 +460,14 @@ window.THD = window.THD || {};
         /^service\.smt\.docomo\.ne\.jp$/,
         // (auone.jp deliberately absent: search.portal.auone.jp is au's
         // search engine — real visitors, not a payment page.)
-        /(^|\.)softbank\.jp$/,
         /(^|\.)paypay\.ne\.jp$/,
         /(^|\.)paypal\.com$/,
         /(^|\.)stripe\.com$/,
         /(^|\.)sbpayment\.jp$/,
         /(^|\.)veritrans\.co\.jp$/,
         /(^|\.)paygent\.co\.jp$/,
-        /(^|\.)pay\.amazon\./,
+        /^payments\.amazon\.co\.jp$/,   // Amazon Pay (per MakeShop's own exclusion list)
+        /^pay-v2\.amazon\.co\.jp$/,
         /(^|\.)pay\.rakuten\.co\.jp$/
     ];
     const AI_SOURCE = /^(chatgpt\.com|chat\.openai\.com|openai|chatgpt|perplexity|perplexity\.ai|gemini|gemini\.google\.com|bard\.google\.com|claude\.ai|copilot\.microsoft\.com|copilot)$/;
@@ -476,6 +478,9 @@ window.THD = window.THD || {};
         // Webmail first: carrier webmail hosts (mail.smt.docomo.ne.jp)
         // share a domain with carrier payment pages.
         if (WEBMAIL_SOURCE.test(source)) return "Email";
+        // MakeRepeater sends the shop's campaign / abandoned-cart emails —
+        // an untagged click from it is an email click, not an internal hop.
+        if (/(^|\.)makerepeater\.jp$/.test(source)) return "Email";
         if (OWN_HOSTS.some((re) => re.test(source)) || PAYMENT_HOSTS.some((re) => re.test(source))) return "Internal / Payment";
         if (AI_SOURCE.test(source)) return "AI Assistants";
         return null;
@@ -569,7 +574,8 @@ window.THD = window.THD || {};
     const PLATFORM_MATCHERS = [
         { test: /youtube|youtu\.be/, label: "YouTube" },
         { test: /google|doubleclick|admanager/, label: "Google" },
-        { test: /facebook|instagram|meta|^ig$|^fb$/, label: "Meta" },
+        // anchored: a bare /meta/ also caught unrelated domains like metamoji.com
+        { test: /(^|\.)(facebook|instagram)\.com$|^(facebook|instagram|meta|ig|fb)$|^(l|m|lm)\.facebook\.com$/, label: "Meta" },
         { test: /yahoo|^ydn$|overture/, label: "Yahoo" },
         { test: /criteo/, label: "Criteo" },
         { test: /^line$|\bline\b/, label: "LINE" },
@@ -627,6 +633,13 @@ window.THD = window.THD || {};
     // Memoized on the row: the per-channel trend/anomaly code re-classifies
     // every source row once per channel on every render (≈4s for "This
     // Year"), and a row's sourceMedium never changes after load.
+    // {groupBy, label, channel?} filter from the traffic tree / briefing.
+    function matchesTrafficFilter(row, f) {
+        if (!f) return true;
+        if (classifyForGroupBy(row, f.groupBy) !== f.label) return false;
+        return !f.channel || classifyForGroupBy(row, "channel") === f.channel;
+    }
+
     function classifyForGroupBy(row, groupBy) {
         if (groupBy === "source") return row.sourceMedium;
         if (groupBy === "platform") {
@@ -1643,7 +1656,9 @@ window.THD = window.THD || {};
                 const pl = classifyForGroupBy(r, "platform");
                 const cN = node("c:" + ch, "channel", "channel", ch, null);
                 const pN = node("p:" + ch + "|" + pl, "platform", "platform", pl, cN);
-                const sN = node("s:" + r.sourceMedium, "source", "source", r.sourceMedium, pN);
+                const sN = node(pN.id + "|s:" + r.sourceMedium, "source", "source", r.sourceMedium, pN);
+                sN.channel = ch;
+                pN.channel = ch;
                 [cN, pN, sN].forEach((n) => {
                     n[period].sessions += r.sessions;
                     n[period].users += r.users;
@@ -1711,19 +1726,27 @@ window.THD = window.THD || {};
        period so the two are built the exact same way.
     ========================================================== */
 
-    function filterSourcesByDates(sourceRows, start, end) {
+    // splitByChannel: GA4 can put the SAME source/medium in different
+    // channels on different days (google / cpc is Paid Search one day,
+    // Cross-network the next). Merging by source/medium alone kept the
+    // first row's channel and moved every session under it, so the
+    // channel doughnut/tree disagreed with the trend chart. The channel
+    // views pass true; the plain Session Source table keeps one row per
+    // source/medium.
+    function filterSourcesByDates(sourceRows, start, end, splitByChannel) {
         const inWindow = sourceRows.filter((r) => inRange(r.date, start, end));
 
         const totals = {};
         inWindow.forEach((r) => {
-            if (!totals[r.sourceMedium]) {
-                totals[r.sourceMedium] = {
+            const key = splitByChannel ? r.sourceMedium + "\u0000" + (r.channel || "") : r.sourceMedium;
+            if (!totals[key]) {
+                totals[key] = {
                     sourceMedium: r.sourceMedium,
                     sessions: 0, users: 0, purchases: 0, revenue: 0,
                     channel: r.channel || null
                 };
             }
-            const t = totals[r.sourceMedium];
+            const t = totals[key];
             t.sessions += r.sessions;
             t.users += r.users;
             t.purchases += r.purchases;
@@ -2362,8 +2385,12 @@ window.THD = window.THD || {};
         return v;
     }
 
-    function buildChannelTrend(sourceRows, channelKey, groupBy, range) {
-        const filtered = sourceRows.filter((r) => classifyForGroupBy(r, groupBy) === channelKey);
+    // channelScope (optional): restrict to rows in that channel too — a
+    // "Google Ads" row clicked under Cross-network means Google Ads
+    // traffic IN Cross-network, not every Google Ads session.
+    function buildChannelTrend(sourceRows, channelKey, groupBy, range, channelScope) {
+        const filtered = sourceRows.filter((r) => classifyForGroupBy(r, groupBy) === channelKey &&
+            (!channelScope || classifyForGroupBy(r, "channel") === channelScope));
 
         const byDate = {};
         filtered.forEach((r) => {
@@ -2662,6 +2689,7 @@ window.THD = window.THD || {};
         buildLandingPageDetail,
         buildTrafficComparison,
         buildTrafficTree,
+        matchesTrafficFilter,
         flattenTrafficTree,
         buildChannelTrend,
         computeMovingAverage,

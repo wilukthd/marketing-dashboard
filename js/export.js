@@ -34,7 +34,12 @@ window.THD = window.THD || {};
     // Wraps a value in quotes (doubling any internal quotes) only
     // when it actually needs it — commas, quotes, or newlines.
     function csvEscape(value) {
-        const str = value === null || value === undefined ? "" : String(value);
+        let str = value === null || value === undefined ? "" : String(value);
+        // Text that starts like a formula (=, +, -, @, tab, CR) is run as
+        // one by Excel/Sheets when the CSV is opened — source names come
+        // from analytics data anyone can influence, so neutralize it.
+        // Numbers are left alone so negative values stay numeric.
+        if (typeof value === "string" && /^[=+\-@\t\r]/.test(str)) str = "'" + str;
         if (/[",\n\r]/.test(str)) {
             return `"${str.replace(/"/g, '""')}"`;
         }
