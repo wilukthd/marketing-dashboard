@@ -642,10 +642,26 @@
 
         const channelAnomalies = THD.data.buildChannelAnomalyInsights(effectiveSourceRows, trafficCurrent.channels, groupBy, range);
 
+        // Year-over-year context for the headline when the main comparison
+        // is the previous period (skipped for partial days and when last
+        // year isn't in the data).
+        let yoyRevenueDelta = null;
+        if (!range.isYoy && !range.partial) {
+            const yoyRange = THD.data.resolveRange(rangeKey, currentCustomRange, "yoy");
+            if (THD.data.hasDataInRange(effectiveDailyRows, yoyRange.prevStart, yoyRange.prevEnd)) {
+                yoyRevenueDelta = THD.data.filterDailyRange(effectiveDailyRows, rangeKey, currentCustomRange, "yoy").kpi.revenue.delta;
+            }
+        }
+        const weekdayIndex = THD.data.buildWeekdayIndex(effectiveDailyRows);
+
         THD.ui.renderBriefing(THD.data.buildBriefing({
             kpi: filtered.kpi,
             hasCompareData,
             labels: filtered.labels,
+            dates: filtered.dates,
+            weekdayIndex,
+            yoyRevenueDelta,
+            customerTrend: THD.data.newCustomerYoY(fullNewRepeatRows),
             series: filtered.series,
             channels: trafficCurrent.channels,
             comparisonRows: lastTrafficComparisonRows,
@@ -659,7 +675,7 @@
 
         const insightSentences = [
             ...THD.data.buildInsights(filtered.kpi, trafficCurrent.channels, hasCompareData),
-            ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series)
+            ...THD.data.buildAnomalyInsights(filtered.labels, filtered.series, { dates: filtered.dates, weekdayIndex })
         ];
 
         THD.ui.renderInsights(insightSentences, {
@@ -1040,6 +1056,9 @@
         // passes it into THD.ui.renderInsights.
         risingPageInsight = THD.data.buildRisingLandingPageInsight(landingRows);
         pageSpikes = THD.data.buildTodayYesterdaySpikeInsights(landingRows);
+
+        // Needed by the briefing's new-customer story, so set before the first render.
+        fullNewRepeatRows = newRepeat;
 
         renderForRange(currentRange, currentCustomRange);
         renderLandingPagesForDevice();

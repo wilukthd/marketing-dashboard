@@ -897,6 +897,7 @@ window.THD = window.THD || {};
 
         return {
             labels: current.map((r) => window.I18N.formatDayLabel(r.date)),
+            dates: current.map((r) => r.date),
             series: {
                 users: current.map((r) => r.users),
                 sessions: current.map((r) => r.sessions),
@@ -905,10 +906,10 @@ window.THD = window.THD || {};
                 cvr: current.map((r) => (r.sessions ? (r.purchases / r.sessions) * 100 : 0))
             },
             kpi: {
-                users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / dayCount },
-                sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / dayCount },
-                purchases: { value: curPurchases, delta: pctDelta(curPurchases, prevPurchases), daily: curPurchases / dayCount },
-                revenue: { value: curRevenue, delta: pctDelta(curRevenue, prevRevenue), daily: curRevenue / dayCount },
+                users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / dayCount, previous: prevUsers },
+                sessions: { value: curSessions, delta: pctDelta(curSessions, prevSessions), daily: curSessions / dayCount, previous: prevSessions },
+                purchases: { value: curPurchases, delta: pctDelta(curPurchases, prevPurchases), daily: curPurchases / dayCount, previous: prevPurchases },
+                revenue: { value: curRevenue, delta: pctDelta(curRevenue, prevRevenue), daily: curRevenue / dayCount, previous: prevRevenue },
                 aov: { value: curAov, delta: pctDelta(curAov, prevAov), previous: prevAov },
                 // CVR change is reported in percentage POINTS (deltaPts),
                 // which is how it's usually read — "6.07% -> 6.79%" is
@@ -1134,20 +1135,60 @@ window.THD = window.THD || {};
         return { labels: labels.slice(0, -1), series: trimmedSeries };
     }
 
-    function detectAnomalies(labels, series) {
+    // opts.dates (YYYY-MM-DD per value) + opts.weekdayIndex (from
+    // buildWeekdayIndex): when both are there, each day is judged against
+    // the typical level FOR ITS WEEKDAY, using a robust z-score (median /
+    // MAD) so the outlier itself can't inflate the yardstick it's measured
+    // with. Without them (short windows, CVR) it falls back to the plain
+    // mean / standard-deviation z-score.
+    const ROBUST_Z_THRESHOLD = 3.5;
+    const ROBUST_MIN_DAYS = 10;
+
+    function detectAnomalies(labels, series, opts) {
         const anomalies = [];
+        const dates = opts && opts.dates;
+        const wIdx = opts && opts.weekdayIndex;
 
         Object.keys(series || {}).forEach((key) => {
             const values = series[key] || [];
             const n = values.length;
             if (n < ANOMALY_MIN_DAYS) return;
+            const format = ANOMALY_FORMATTERS[key] || ((v) => v);
+
+            const idx = wIdx && wIdx[key];
+            if (idx && dates && dates.length >= n && n >= ROBUST_MIN_DAYS) {
+                const dow = values.map((_, i) => parseLocalDate(dates[i]).getDay());
+                const adjusted = values.map((v, i) => v / (idx[dow[i]] || 1));
+                const med = median(adjusted);
+                const mad = median(adjusted.map((v) => Math.abs(v - med)));
+                const scale = 1.4826 * mad;
+                if (!scale) return;
+                adjusted.forEach((a, i) => {
+                    const z = (a - med) / scale;
+                    if (Math.abs(z) < ROBUST_Z_THRESHOLD) return;
+                    const expected = med * (idx[dow[i]] || 1);
+                    anomalies.push({
+                        key,
+                        index: i,
+                        value: values[i],
+                        mean: expected,
+                        weekdayAdjusted: true,
+                        metric: window.I18N.t(ANOMALY_METRIC_I18N_KEYS[key] || key),
+                        date: labels[i],
+                        valueText: format(values[i]),
+                        meanText: format(expected),
+                        // scaled to the plain-z range so story scoring stays comparable
+                        z: z * (ANOMALY_Z_THRESHOLD / ROBUST_Z_THRESHOLD),
+                        direction: z > 0 ? "spike" : "drop"
+                    });
+                });
+                return;
+            }
 
             const mean = values.reduce((a, b) => a + b, 0) / n;
             const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
             const stdDev = Math.sqrt(variance);
             if (!stdDev) return;
-
-            const format = ANOMALY_FORMATTERS[key] || ((v) => v);
 
             values.forEach((v, i) => {
                 const z = (v - mean) / stdDev;
@@ -1172,9 +1213,10 @@ window.THD = window.THD || {};
         return anomalies;
     }
 
-    function buildAnomalyInsights(labels, series) {
+    function buildAnomalyInsights(labels, series, opts) {
         const trimmed = excludeToday(labels, series);
-        return detectAnomalies(trimmed.labels, trimmed.series)
+        const dates = opts && opts.dates ? opts.dates.slice(0, trimmed.labels.length) : null;
+        return detectAnomalies(trimmed.labels, trimmed.series, { dates, weekdayIndex: opts && opts.weekdayIndex })
             .slice(0, 2)
             .map((a) => {
                 const verb = window.I18N.t(a.direction === "spike" ? "anomaly.spike" : "anomaly.drop");
@@ -1399,10 +1441,19 @@ window.THD = window.THD || {};
         }
 
         // ---- 3. Channel efficiency: traffic that doesn't convert / converts unusually well ----
-        if (siteCvr > 0) {
+        // Not on a partial day: GA4 attributes the freshest purchases late,
+        // so channel CVRs read artificially low until the day is processed.
+        if (siteCvr > 0 && !(range && range.partial)) {
             const eligible = channels.filter((c) => c.sessions >= BRIEF_MIN_CHANNEL_SESSIONS && !NOT_A_CHANNEL.has(c.label));
+            // vs the REST of the site, so a big channel isn't compared with itself
+            const sitePurchases = kpi.purchases.value;
+            const siteSessions = kpi.sessions.value;
+            const zVsRest = (c) => {
+                const p = (c.cvr / 100) * c.sessions;
+                return twoProportionZ(p, c.sessions, sitePurchases - p, siteSessions - c.sessions);
+            };
             const weak = eligible
-                .filter((c) => c.cvr < siteCvr * BRIEF_LOW_CVR_RATIO)
+                .filter((c) => c.cvr < siteCvr * BRIEF_LOW_CVR_RATIO && zVsRest(c) <= -2)
                 .sort((a, b) => b.sessions - a.sessions)[0];
             if (weak) {
                 const row = comparisonRows.find((r) => r.label === weak.label);
@@ -1426,7 +1477,7 @@ window.THD = window.THD || {};
                 });
             }
             const strong = eligible
-                .filter((c) => c.cvr >= siteCvr * BRIEF_HIGH_CVR_RATIO)
+                .filter((c) => c.cvr >= siteCvr * BRIEF_HIGH_CVR_RATIO && zVsRest(c) >= 2)
                 .sort((a, b) => b.revenue - a.revenue)[0];
             if (strong) {
                 stories.push({
@@ -1455,7 +1506,8 @@ window.THD = window.THD || {};
         });
         const seenDays = new Set();
         const dayStories = {}; // date label -> story, so channel spikes on the same day can explain it
-        detectAnomalies(trimmed.labels, trimmed.series).forEach((a) => {
+        const anomalyDates = input.dates ? input.dates.slice(0, trimmed.labels.length) : null;
+        detectAnomalies(trimmed.labels, trimmed.series, { dates: anomalyDates, weekdayIndex: input.weekdayIndex }).forEach((a) => {
             // One story per day — a revenue spike usually comes with a
             // purchases spike on the same day; that's one event.
             if (seenDays.has(a.date) || seenDays.size >= 2) return;
@@ -1468,7 +1520,7 @@ window.THD = window.THD || {};
                 tone: spike ? "good" : "bad",
                 kicker: t("brief.kicker.day"),
                 title: t(spike ? "brief.day.spikeTitle" : "brief.day.dropTitle", { date: a.date, metric: a.metric }),
-                body: t("brief.day.body", { value: fmt(a.value), mean: fmt(a.mean) }),
+                body: t(a.weekdayAdjusted ? "brief.day.bodyDow" : "brief.day.body", { value: fmt(a.value), mean: fmt(a.mean) }),
                 stat: (a.value / (a.mean || 1)).toFixed(1) + "×",
                 spark: { values: trimmed.series[a.key], highlight: a.index },
                 action: { type: "metric", metric: a.key },
@@ -1565,9 +1617,291 @@ window.THD = window.THD || {};
             });
         }
 
+        addDriverStories(input, stories, fairCompare);
+
         stories.sort((a, b) => b.score - a.score);
 
         return { headline: buildHeadline(input, stories), stories };
+    }
+
+    /* ==========================================================
+       Insight statistics
+       Small, dependency-free helpers the insight finder leans on.
+       Kept together so the thresholds that decide "is this worth
+       saying" live in one place.
+    ========================================================== */
+
+    function median(values) {
+        const s = values.slice().sort((a, b) => a - b);
+        if (!s.length) return 0;
+        const m = Math.floor(s.length / 2);
+        return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    }
+
+    // Two-proportion z-test: is rate x1/n1 really different from x2/n2,
+    // or is it within noise? |z| >= 2 ≈ 95% confidence. Used so a CVR
+    // "drop" on 40 sessions doesn't get reported like one on 40,000.
+    function twoProportionZ(x1, n1, x2, n2) {
+        if (!(n1 > 0 && n2 > 0)) return 0;
+        const p = (x1 + x2) / (n1 + n2);
+        const se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
+        return se ? (x1 / n1 - x2 / n2) / se : 0;
+    }
+
+    // Day-of-week index per metric (Sun=0 … Sat=6): how a weekday runs
+    // relative to the average day, from the last 52 complete weeks
+    // (whole weeks, so every weekday is counted equally). On this shop
+    // Sunday revenue runs ~26% below average and Monday ~11% above — so
+    // without this, every quiet Sunday looked like a "drop".
+    const WEEKDAY_METRICS = ["users", "sessions", "purchases", "revenue"];
+
+    function buildWeekdayIndex(dailyRows) {
+        const rows = (dailyRows || []).slice();
+        if (rows.length < 56) return null; // need 8+ weeks for a stable pattern
+        // Drop a still-filling today, then keep a whole number of weeks.
+        const todayKey = toLocalDateKey(startOfDay(new Date()));
+        if (rows.length && rows[rows.length - 1].date === todayKey) rows.pop();
+        const weeks = Math.min(52, Math.floor(rows.length / 7));
+        const span = rows.slice(-weeks * 7);
+        const index = {};
+        WEEKDAY_METRICS.forEach((metric) => {
+            const sums = [0, 0, 0, 0, 0, 0, 0];
+            const counts = [0, 0, 0, 0, 0, 0, 0];
+            span.forEach((r) => {
+                const d = parseLocalDate(r.date).getDay();
+                sums[d] += r[metric] || 0;
+                counts[d] += 1;
+            });
+            const overall = sums.reduce((a, b) => a + b, 0) / Math.max(counts.reduce((a, b) => a + b, 0), 1);
+            index[metric] = overall
+                ? sums.map((s, d) => (counts[d] ? s / counts[d] / overall : 1) || 1)
+                : null;
+        });
+        return index;
+    }
+
+    // Revenue = sessions × CVR × order value, so a revenue change splits
+    // exactly into those three effects (log-mean / LMDI decomposition —
+    // the three yen amounts add up to the total change with nothing left
+    // over). Answers "why did revenue move" in money, not percentages.
+    function decomposeRevenue(cur, prev) {
+        const ok = (o) => o && o.sessions > 0 && o.purchases > 0 && o.revenue > 0;
+        if (!ok(cur) || !ok(prev)) return null;
+        const total = cur.revenue - prev.revenue;
+        const L = Math.abs(total) < 1e-9 ? cur.revenue : total / Math.log(cur.revenue / prev.revenue);
+        return {
+            total,
+            sessions: L * Math.log(cur.sessions / prev.sessions),
+            cvr: L * Math.log((cur.purchases / cur.sessions) / (prev.purchases / prev.sessions)),
+            aov: L * Math.log((cur.revenue / cur.purchases) / (prev.revenue / prev.purchases))
+        };
+    }
+
+    // New-customer orders vs the same business month a year earlier,
+    // closed months only (business months close on the 20th). Matched by
+    // (year, month) so a missing month can't shift the comparison.
+    function newCustomerYoY(rows) {
+        const byYm = new Map();
+        (rows || []).forEach((r) => {
+            if (Number.isFinite(r.year) && Number.isFinite(r.month)) byYm.set(r.year * 12 + r.month, r);
+        });
+        const now = new Date();
+        const closed = (rows || []).filter((r) => Number.isFinite(r.year) && Number.isFinite(r.month) &&
+            now > new Date(r.year, r.month - 1, 20, 23, 59, 59));
+        const recent = closed.slice(-13);
+        const pairs = recent
+            .map((r) => ({ r, ly: byYm.get((r.year - 1) * 12 + r.month) }))
+            .filter((p) => p.ly && p.ly.newOrders > 0);
+        if (!pairs.length) return null;
+        const latest = pairs[pairs.length - 1];
+        return {
+            total: pairs.length,
+            below: pairs.filter((p) => p.r.newOrders < p.ly.newOrders).length,
+            above: pairs.filter((p) => p.r.newOrders > p.ly.newOrders).length,
+            latest: { year: latest.r.year, month: latest.r.month, cur: latest.r.newOrders, ly: latest.ly.newOrders }
+        };
+    }
+
+    const fmtYenSigned = (v) => (v >= 0 ? "+" : "−") + fmtYenShort(Math.abs(v));
+
+    const BRIEF_CONCENTRATION_SHARE = 40;   // % of revenue from one platform
+    const BRIEF_LOWYIELD_MIN_ADDED = 1000;  // added sessions before we judge their yield
+    const BRIEF_LOWYIELD_RATIO = 0.5;       // added revenue/session < 50% of site average
+
+    // "Why" stories built from the revenue decomposition, per-platform
+    // contribution to the change, low-yield traffic growth, revenue
+    // concentration and the new-customer trend.
+    function addDriverStories(input, stories, fairCompare) {
+        const t = window.I18N.t;
+        const chLabel = (l) => escapeHtml(window.I18N.channelLabel(l));
+        const { kpi, comparisonRows = [] } = input;
+        const existing = new Set(stories.map((s) => s.action && s.action.channel).filter(Boolean));
+
+        // ---- A. Traffic up, conversion down (or the reverse) ----
+        if (fairCompare) {
+            const dec = decomposeRevenue(
+                { sessions: kpi.sessions.value, purchases: kpi.purchases.value, revenue: kpi.revenue.value },
+                { sessions: kpi.sessions.previous, purchases: kpi.purchases.previous, revenue: kpi.revenue.previous });
+            const zCvr = twoProportionZ(kpi.purchases.value, kpi.sessions.value, kpi.purchases.previous, kpi.sessions.previous);
+            // Only when CVR moved against traffic, clearly (not noise), and
+            // by enough money to matter (>= 5% of last period's revenue).
+            if (dec && dec.sessions > 0 && dec.cvr < 0 && zCvr <= -2 && Math.abs(dec.cvr) >= 0.05 * kpi.revenue.previous) {
+                stories.push({
+                    id: "cvrDrag",
+                    tone: "bad",
+                    kicker: t("brief.kicker.drivers"),
+                    title: t("brief.drivers.cvrDragTitle", { sess: fmtYenSigned(dec.sessions), cvr: fmtYenSigned(dec.cvr) }),
+                    body: t("brief.drivers.body", {
+                        total: fmtYenSigned(dec.total), s: fmtYenSigned(dec.sessions), c: fmtYenSigned(dec.cvr), a: fmtYenSigned(dec.aov)
+                    }),
+                    stat: fmtYenSigned(dec.cvr),
+                    spark: { values: input.series.cvr },
+                    action: { type: "metric", metric: "cvr" },
+                    score: 74 + Math.min(Math.abs(dec.cvr) / Math.max(kpi.revenue.previous, 1) * 100, 10)
+                });
+            } else if (dec && Math.abs(dec.total) >= 0.03 * kpi.revenue.previous) {
+                // Otherwise: name the single biggest driver in the direction
+                // revenue actually moved (e.g. a 10% fall that was mostly a
+                // drop in order value, not traffic).
+                const effects = [["sessions", dec.sessions], ["cvr", dec.cvr], ["aov", dec.aov]]
+                    .filter(([, v]) => Math.sign(v) === Math.sign(dec.total))
+                    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+                const lead = effects[0];
+                if (lead && Math.abs(lead[1]) >= 0.5 * Math.abs(dec.total)) {
+                    const down = dec.total < 0;
+                    stories.push({
+                        id: "leadDriver",
+                        tone: down ? "bad" : "good",
+                        kicker: t("brief.kicker.drivers"),
+                        title: t(down ? "brief.drivers.leadDownTitle" : "brief.drivers.leadUpTitle", {
+                            name: t("brief.drivers.name." + lead[0]), amount: fmtYenSigned(lead[1])
+                        }),
+                        body: t("brief.drivers.body", {
+                            total: fmtYenSigned(dec.total), s: fmtYenSigned(dec.sessions), c: fmtYenSigned(dec.cvr), a: fmtYenSigned(dec.aov)
+                        }),
+                        stat: fmtYenSigned(lead[1]),
+                        spark: lead[0] === "aov" ? null : { values: input.series[lead[0] === "cvr" ? "cvr" : "sessions"] },
+                        action: lead[0] === "aov" ? { type: "view", view: "sales" } : { type: "metric", metric: lead[0] === "cvr" ? "cvr" : "sessions" },
+                        score: down ? 66 : 44
+                    });
+                }
+            }
+        }
+
+        // Per-platform current/previous totals (Internal / (not set) aren't channels you can act on).
+        const rows = comparisonRows
+            .filter((r) => !["Internal / Payment", "(not set)"].includes(r.label))
+            .map((r) => {
+                const c = r.current || { sessions: 0, revenue: 0, cvr: 0 };
+                const p = r.previous || { sessions: 0, revenue: 0, cvr: 0 };
+                return {
+                    label: r.label,
+                    cs: c.sessions, ps: p.sessions, cr: c.revenue, pr: p.revenue,
+                    cp: (c.cvr / 100) * c.sessions, pp: (p.cvr / 100) * p.sessions
+                };
+            });
+
+        if (fairCompare && rows.length) {
+            // ---- B. Traffic added without revenue ----
+            const sitePerSession = kpi.sessions.value ? kpi.revenue.value / kpi.sessions.value : 0;
+            const lowYield = rows
+                .filter((r) => r.ps > 0 && r.cs - r.ps >= BRIEF_LOWYIELD_MIN_ADDED && (r.cs - r.ps) / r.ps >= 0.2)
+                .map((r) => ({ ...r, addedS: r.cs - r.ps, addedR: r.cr - r.pr, z: twoProportionZ(r.cp, r.cs, r.pp, r.ps) }))
+                .filter((r) => sitePerSession && r.addedR / r.addedS < sitePerSession * BRIEF_LOWYIELD_RATIO && r.z <= -2)
+                .sort((a, b) => b.addedS - a.addedS)[0];
+            if (lowYield) {
+                // the generic "weak channel" story would say less about the same channel
+                for (let i = stories.length - 1; i >= 0; i--) {
+                    if (stories[i].id === "weakChannel" && stories[i].action && stories[i].action.channel === lowYield.label) stories.splice(i, 1);
+                }
+                stories.push({
+                    id: "lowYield",
+                    tone: "bad",
+                    kicker: t("brief.kicker.channel"),
+                    title: t(lowYield.addedR > 0 ? "brief.lowyield.title" : "brief.lowyield.fellTitle", { label: chLabel(lowYield.label), sessions: fmtInt(lowYield.addedS), revenue: fmtYenSigned(lowYield.addedR) }),
+                    body: t("brief.lowyield.body", {
+                        prev: (lowYield.pp / lowYield.ps * 100).toFixed(2),
+                        cur: (lowYield.cp / lowYield.cs * 100).toFixed(2),
+                        perSession: "¥" + Math.round(lowYield.addedR / lowYield.addedS).toLocaleString("en-US"),
+                        sitePerSession: "¥" + Math.round(sitePerSession).toLocaleString("en-US")
+                    }),
+                    stat: "+" + fmtInt(lowYield.addedS),
+                    spark: null,
+                    action: { type: "channel", channel: lowYield.label },
+                    score: 76
+                });
+            }
+
+            // ---- C. What drove the revenue change, in yen ----
+            const moved = rows.map((r) => ({ label: r.label, d: r.cr - r.pr })).filter((r) => Math.abs(r.d) >= 1);
+            const total = kpi.revenue.value - kpi.revenue.previous;
+            const up = moved.filter((r) => r.d > 0).sort((a, b) => b.d - a.d).slice(0, 2);
+            const down = moved.filter((r) => r.d < 0).sort((a, b) => a.d - b.d).slice(0, 2);
+            const lead = total >= 0 ? up[0] : down[0];
+            // Worth a story only when one platform explains a real share of the move.
+            if (lead && Math.abs(total) >= 0.03 * Math.max(kpi.revenue.previous, 1) && Math.abs(lead.d) >= 0.3 * Math.abs(total)) {
+                const item = (r) => t("brief.contrib.item", { label: chLabel(r.label), amount: fmtYenSigned(r.d) });
+                stories.push({
+                    id: "contribution",
+                    tone: total >= 0 ? "good" : "bad",
+                    kicker: t("brief.kicker.drivers"),
+                    title: t("brief.contrib.title", { label: chLabel(lead.label), amount: fmtYenSigned(lead.d), total: fmtYenSigned(total) }),
+                    body: t("brief.contrib.body", {
+                        up: up.length ? up.map(item).join("、") : "—",
+                        down: down.length ? down.map(item).join("、") : "—"
+                    }),
+                    stat: fmtYenSigned(lead.d),
+                    spark: null,
+                    action: { type: "channel", channel: lead.label },
+                    score: 58
+                });
+            }
+        }
+
+        // ---- D. Revenue concentration ----
+        const revRows = comparisonRows.filter((r) => r.current && !["Internal / Payment", "(not set)", "Direct"].includes(r.label));
+        // Share of ALL revenue, so it matches the headline's "X% of revenue".
+        const revTotal = comparisonRows.reduce((s, r) => s + (r.current ? r.current.revenue : 0), 0);
+        const ranked = revRows.slice().sort((a, b) => b.current.revenue - a.current.revenue);
+        if (revTotal && ranked[0] && !existing.has(ranked[0].label)) {
+            const share = ranked[0].current.revenue / revTotal * 100;
+            if (share >= BRIEF_CONCENTRATION_SHARE) {
+                stories.push({
+                    id: "concentration",
+                    tone: "info",
+                    kicker: t("brief.kicker.risk"),
+                    title: t("brief.concentration.title", { share: share.toFixed(0), label: chLabel(ranked[0].label) }),
+                    body: t("brief.concentration.body", {
+                        next: ranked[1] ? chLabel(ranked[1].label) : "—",
+                        nextShare: ranked[1] ? (ranked[1].current.revenue / revTotal * 100).toFixed(0) : "0"
+                    }),
+                    stat: share.toFixed(0) + "%",
+                    spark: null,
+                    action: { type: "channel", channel: ranked[0].label },
+                    score: 38
+                });
+            }
+        }
+
+        // ---- E. New-customer acquisition vs last year ----
+        const ct = input.customerTrend;
+        if (ct && ct.total >= 6 && (ct.below / ct.total >= 0.7 || ct.above / ct.total >= 0.7)) {
+            const down = ct.below / ct.total >= 0.7;
+            stories.push({
+                id: "customers",
+                tone: down ? "bad" : "good",
+                kicker: t("brief.kicker.customers"),
+                title: t(down ? "brief.customers.downTitle" : "brief.customers.upTitle", { n: down ? ct.below : ct.above, total: ct.total }),
+                body: t("brief.customers.body", {
+                    month: window.I18N.formatMonth(ct.latest.year, ct.latest.month - 1),
+                    cur: fmtInt(ct.latest.cur), ly: fmtInt(ct.latest.ly)
+                }),
+                stat: fmtPctSigned((ct.latest.cur - ct.latest.ly) / ct.latest.ly * 100),
+                spark: null,
+                action: { type: "view", view: "sales" },
+                score: down ? 62 : 30
+            });
+        }
     }
 
     function escapeHtml(s) {
@@ -1606,11 +1940,21 @@ window.THD = window.THD || {};
                 share: Math.round((top.revenue / totalRevenue) * 100)
             }));
         }
-        if (hasCompareData && kpi.purchases.delta !== null && kpi.aov && kpi.aov.delta !== null) {
+        const dec = hasCompareData ? decomposeRevenue(
+            { sessions: kpi.sessions.value, purchases: kpi.purchases.value, revenue: kpi.revenue.value },
+            { sessions: kpi.sessions.previous, purchases: kpi.purchases.previous, revenue: kpi.revenue.previous }) : null;
+        if (dec) {
+            parts.push(t("brief.dek.decomp", {
+                sessions: fmtYenSigned(dec.sessions), cvr: fmtYenSigned(dec.cvr), aov: fmtYenSigned(dec.aov)
+            }));
+        } else if (hasCompareData && kpi.purchases.delta !== null && kpi.aov && kpi.aov.delta !== null) {
             parts.push(t("brief.dek.drivers", {
                 orders: fmtPctSigned(kpi.purchases.delta),
                 aov: fmtPctSigned(kpi.aov.delta)
             }));
+        }
+        if (Number.isFinite(input.yoyRevenueDelta)) {
+            parts.push(t("brief.dek.yoy", { pct: fmtPctSigned(input.yoyRevenueDelta) }));
         }
         const firstWarning = stories.find((s) => s.tone === "alert" || s.tone === "bad");
         if (firstWarning) parts.push(t("brief.dek.watch", { title: firstWarning.title }));
@@ -2674,6 +3018,9 @@ window.THD = window.THD || {};
         buildAnomalyInsights,
         buildChannelAnomalyInsights,
         buildBriefing,
+        buildWeekdayIndex,
+        newCustomerYoY,
+        decomposeRevenue,
         setLatestDataDate,
         parseLocalDate,
         resolveRange,
