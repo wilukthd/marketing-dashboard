@@ -453,8 +453,11 @@ window.THD = window.THD || {};
     const PAYMENT_HOSTS = [
         /(^|\.)mul-pay\.jp$/,          // GMO Payment Gateway
         /(^|\.)gmo-pg\.com$/,
-        /(^|\.)docomo\.ne\.jp$/,       // d払い / carrier billing
-        /(^|\.)auone\.jp$/,             // au PAY / carrier billing
+        // docomo carrier billing / d払い only — NOT all of docomo.ne.jp:
+        // mail.smt.docomo.ne.jp is docomo webmail (→ Email).
+        /^service\.smt\.docomo\.ne\.jp$/,
+        // (auone.jp deliberately absent: search.portal.auone.jp is au's
+        // search engine — real visitors, not a payment page.)
         /(^|\.)softbank\.jp$/,
         /(^|\.)paypay\.ne\.jp$/,
         /(^|\.)paypal\.com$/,
@@ -470,9 +473,11 @@ window.THD = window.THD || {};
     const WEBMAIL_SOURCE = /^((web)?mail\d*|wm|webmail)\.[a-z0-9.-]+$|^outlook\.(live|office|office365)\.com$/;
 
     function specialBucket(source) {
+        // Webmail first: carrier webmail hosts (mail.smt.docomo.ne.jp)
+        // share a domain with carrier payment pages.
+        if (WEBMAIL_SOURCE.test(source)) return "Email";
         if (OWN_HOSTS.some((re) => re.test(source)) || PAYMENT_HOSTS.some((re) => re.test(source))) return "Internal / Payment";
         if (AI_SOURCE.test(source)) return "AI Assistants";
-        if (WEBMAIL_SOURCE.test(source)) return "Email";
         return null;
     }
 
