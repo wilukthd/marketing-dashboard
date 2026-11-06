@@ -785,7 +785,7 @@ window.I18N = (function () {
             "YouTube": "YouTube",
             "Video": "動画",
             "Shopping": "ショッピング",
-            "Cross-network": "クロスネットワーク"
+            "Cross-network": "クロスネットワーク（P-MAX等）"
         }
     };
 
