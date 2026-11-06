@@ -518,10 +518,16 @@ window.THD = window.THD || {};
     // Source table can be filtered down to exactly the rows behind
     // one doughnut/comparison-table bucket (e.g. drilling into
     // "Referral (Other)" to see which sites make it up).
+    // Memoized on the row: the per-channel trend/anomaly code re-classifies
+    // every source row once per channel on every render (≈4s for "This
+    // Year"), and a row's sourceMedium never changes after load.
     function classifyForGroupBy(row, groupBy) {
-        return groupBy === "platform"
-            ? classifyPlatform(row.sourceMedium)
-            : (row.channel || classifySourceChannel(row.sourceMedium));
+        if (groupBy === "platform") {
+            if (row._platform === undefined) row._platform = classifyPlatform(row.sourceMedium);
+            return row._platform;
+        }
+        if (row._channel === undefined) row._channel = row.channel || classifySourceChannel(row.sourceMedium);
+        return row._channel;
     }
 
     // Distinct channel values actually present in the data, used to
@@ -2124,6 +2130,20 @@ window.THD = window.THD || {};
     // days entirely, aligning by offset is what makes the two lines
     // actually comparable side by side, same idea GA4's own
     // date-range-comparison charts use.
+    // toLocaleDateString is slow, and the per-channel trends format the
+    // same few hundred dates once per channel per render (~15k calls
+    // for "This Year") — cache by language + date key.
+    const dayLabelCache = new Map();
+    function dayLabel(key, date) {
+        const k = window.I18N.getLang() + "|" + key;
+        let v = dayLabelCache.get(k);
+        if (v === undefined) {
+            v = window.I18N.formatDayLabel(date);
+            dayLabelCache.set(k, v);
+        }
+        return v;
+    }
+
     function buildChannelTrend(sourceRows, channelKey, groupBy, range) {
         const filtered = sourceRows.filter((r) => classifyForGroupBy(r, groupBy) === channelKey);
 
@@ -2163,8 +2183,8 @@ window.THD = window.THD || {};
             const cur = byDate[curKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
             const prev = byDate[prevKey] || { users: 0, sessions: 0, purchases: 0, revenue: 0 };
 
-            labels.push(window.I18N.formatDayLabel(curDate));
-            previousLabels.push(window.I18N.formatDayLabel(prevDate));
+            labels.push(dayLabel(curKey, curDate));
+            previousLabels.push(dayLabel(prevKey, prevDate));
 
             series.users.current.push(cur.users);
             series.users.previous.push(prev.users);

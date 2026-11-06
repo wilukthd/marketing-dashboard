@@ -1417,3 +1417,8 @@ body[data-view="overview"] .rangeCompareBar{
 .vitals + .trendCard .chartHeader{ display:none; }
 
 .vitals + .trendCard .trendOverlayRow{ margin:0 0 14px; }
+
+/* Dropdowns size to their longest option — on a phone the Traffic tab's
+   "By ad platform (Google, Meta, Yahoo, Criteo…)" select was 439px wide
+   and pushed the whole page sideways. */
+select{ max-width:100%; text-overflow:ellipsis; }

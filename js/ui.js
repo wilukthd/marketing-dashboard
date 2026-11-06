@@ -454,7 +454,9 @@ window.THD = window.THD || {};
                 ? window.I18N.t("landing.risingPanelSpike", {
                     date: insight.spikeDate,
                     value: Math.round(insight.spikeValue).toLocaleString("en-US"),
-                    mean: Math.round(insight.mean).toLocaleString("en-US")
+                    // Today/yesterday spike insights carry their typical
+                    // day as `baseline`, not `mean` — this printed "NaN".
+                    mean: Math.round(insight.mean !== undefined ? insight.mean : insight.baseline).toLocaleString("en-US")
                 })
                 : "";
         }
@@ -1557,6 +1559,7 @@ window.THD = window.THD || {};
             const plotted = v.chart && checked.includes(v.chart);
             return `
                 <button class="vital${plotted ? " isPlotted" : ""}" type="button" data-vital="${v.key}" style="--vital:var(--m-${v.key})"
+                        ${v.chart ? `aria-pressed="${plotted ? "true" : "false"}"` : ""}
                         ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
                     <span class="vitalLabel">${window.I18N.t(v.labelKey)}${v.chart ? `<span class="vitalOnChart">${window.I18N.t("brief.vital.onChart")}</span>` : ""}</span>
                     <span class="vitalValue">${v.fmt(data.value)}</span>
@@ -1607,7 +1610,9 @@ window.THD = window.THD || {};
         const checked = getCheckedMetrics();
         document.querySelectorAll(".vital").forEach((b) => {
             const def = VITALS.find((v) => v.key === b.dataset.vital);
-            b.classList.toggle("isPlotted", !!(def && def.chart && checked.includes(def.chart)));
+            const on = !!(def && def.chart && checked.includes(def.chart));
+            b.classList.toggle("isPlotted", on);
+            if (def && def.chart) b.setAttribute("aria-pressed", on ? "true" : "false");
         });
     }
 
@@ -1703,7 +1708,14 @@ window.THD = window.THD || {};
     const svgEsc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
     // "2025年9月" -> "9月", "Sep 2025" -> "Sep"; year shown separately on January.
-    function shortMonth(period) {
+    function shortMonth(period, row) {
+        if (row && Number.isFinite(row.year) && Number.isFinite(row.month)) {
+            const d = new Date(row.year, row.month - 1, 1);
+            const month = window.I18N.getLang() === "ja"
+                ? row.month + "月"
+                : d.toLocaleDateString("en-US", { month: "short" });
+            return { month, year: String(row.year), isJan: row.month === 1 };
+        }
         const ja = /^(\d{4})年(\d{1,2})月/.exec(period);
         if (ja) return { month: ja[2] + "月", year: ja[1], isJan: ja[2] === "1" };
         const en = /^([A-Za-z]{3})\w*\s+(\d{4})/.exec(period);
@@ -1768,7 +1780,8 @@ window.THD = window.THD || {};
         const max = niceMax(Math.max(...vals) * 1.08);
         const f = cfFrame(rows.length, max, months);
         const sorted = vals.slice().sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
+        const mid = Math.floor(sorted.length / 2);
+        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         const closedVals = vals.filter((_, i) => !isOpenMonth(rows[i]));
         const minIdx = closedVals.length ? vals.indexOf(Math.min(...closedVals)) : -1;
         const barW = Math.min(14, f.step * 0.36);
@@ -1807,15 +1820,18 @@ window.THD = window.THD || {};
 
         const full = fullRows && fullRows.length ? fullRows : recentRows;
         const offset = full.length - recentRows.length;
-        const lastYear = recentRows.map((_, i) => {
-            const ly = full[offset + i - 12];
-            return ly ? ly.newOrders : NaN;
-        });
-        const lastYearRepeat = recentRows.map((_, i) => {
-            const ly = full[offset + i - 12];
-            return ly ? ly.repeatOrders : NaN;
-        });
-        const months = recentRows.map((r) => shortMonth(r.period));
+        const byYm = new Map();
+        full.forEach((r) => { if (Number.isFinite(r.year) && Number.isFinite(r.month)) byYm.set(r.year * 12 + r.month, r); });
+        // Same month last year, looked up by (year - 1, month) so a month
+        // missing from the sheet can't shift every comparison by one.
+        // Falls back to position only for rows without year/month (demo data).
+        const lastYearRow = (r, i) => (Number.isFinite(r.year) && Number.isFinite(r.month))
+            ? byYm.get((r.year - 1) * 12 + r.month)
+            : full[offset + i - 12];
+        const lyRows = recentRows.map(lastYearRow);
+        const lastYear = lyRows.map((ly) => (ly ? ly.newOrders : NaN));
+        const lastYearRepeat = lyRows.map((ly) => (ly ? ly.repeatOrders : NaN));
+        const months = recentRows.map((r) => shortMonth(r.period, r));
         const t = window.I18N.t;
 
         // ---- notes: biggest month-on-month drop in new customers, and the peak ----
@@ -1839,23 +1855,23 @@ window.THD = window.THD || {};
         // months came in below the same month last year?
         const compared = recentRows.map((r, i) => (i < closedCount && Number.isFinite(lastYear[i]) ? r.newOrders - lastYear[i] : null)).filter((d) => d !== null);
         const below = compared.filter((d) => d < 0).length;
-        if (compared.length >= 6 && (below / compared.length >= 0.7 || below / compared.length <= 0.3)) {
-            notes.push({
-                tone: below > compared.length / 2 ? "bad" : "good",
-                text: t(below > compared.length / 2 ? "customers.noteStreakDown" : "customers.noteStreakUp", {
-                    n: below > compared.length / 2 ? below : compared.length - below, total: compared.length
-                })
-            });
+        const above = compared.filter((d) => d > 0).length; // ties count as neither
+        if (compared.length >= 6 && below / compared.length >= 0.7) {
+            notes.push({ tone: "bad", text: t("customers.noteStreakDown", { n: below, total: compared.length }) });
+        } else if (compared.length >= 6 && above / compared.length >= 0.7) {
+            notes.push({ tone: "good", text: t("customers.noteStreakUp", { n: above, total: compared.length }) });
         }
         if (worst) {
             marks[worst.i] = true;
             notes.push({ tone: "bad", text: t("customers.noteDrop", { month: months[worst.i].month, pct: signedPct(worst.ch), prev: fmtNumber(worst.prev), cur: fmtNumber(worst.cur) }) });
         }
-        const peakIdx = recentRows.reduce((best, r, i) => (i < closedCount && r.newOrders > recentRows[best].newOrders ? i : best), 0);
-        marks[peakIdx] = true;
-        notes.push({ tone: "good", text: t("customers.notePeak", { month: months[peakIdx].month, value: fmtNumber(recentRows[peakIdx].newOrders) }) });
+        if (closedCount > 0) {
+            const peakIdx = recentRows.reduce((best, r, i) => (i < closedCount && r.newOrders > recentRows[best].newOrders ? i : best), 0);
+            marks[peakIdx] = true;
+            notes.push({ tone: "good", text: t("customers.notePeak", { month: months[peakIdx].month, value: fmtNumber(recentRows[peakIdx].newOrders) }) });
+        }
         const latestI = Math.max(closedCount - 1, 0); // latest CLOSED month
-        if (Number.isFinite(lastYear[latestI]) && (!worst || worst.i !== latestI)) {
+        if (closedCount > 0 && Number.isFinite(lastYear[latestI]) && (!worst || worst.i !== latestI)) {
             const ch = pctChange(recentRows[latestI].newOrders, lastYear[latestI]);
             if (ch !== null && Math.abs(ch) >= 10) {
                 notes.push({ tone: ch >= 0 ? "good" : "bad", text: t("customers.noteYoy", { month: months[latestI].month, pct: signedPct(ch) }) });
@@ -1865,7 +1881,7 @@ window.THD = window.THD || {};
         // ---- headline figures for the latest month ----
         const latest = recentRows[latestI];
         const share = (r) => (r.newOrders + r.repeatOrders ? (r.newOrders / (r.newOrders + r.repeatOrders)) * 100 : 0);
-        const lyRow = full[offset + latestI - 12];
+        const lyRow = lyRows[latestI];
         const stat = (label, value, compare) => `
             <div class="custStat">
                 <span class="custStatLabel">${label}</span>
@@ -1875,7 +1891,7 @@ window.THD = window.THD || {};
         const vsLy = (cur, ly) => Number.isFinite(ly) ? t("customers.vsLy", { pct: signedPct(pctChange(cur, ly)), value: fmtNumber(ly) }) : "";
         if (statsEl) {
             statsEl.innerHTML =
-                `<div class="custStatMonth">${svgEsc(latest.period)}</div>` +
+                `<div class="custStatMonth">${svgEsc(Number.isFinite(latest.year) ? window.I18N.formatMonth(latest.year, latest.month - 1) : latest.period)}${closedCount === 0 ? " · " + svgEsc(t("brief.vital.partial")) : ""}</div>` +
                 stat(t("customers.statNew"), fmtNumber(latest.newOrders), vsLy(latest.newOrders, lastYear[latestI])) +
                 stat(t("customers.statRepeat"), fmtNumber(latest.repeatOrders), vsLy(latest.repeatOrders, lastYearRepeat[latestI])) +
                 stat(t("customers.statShare"), share(latest).toFixed(1) + "%",

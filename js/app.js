@@ -957,6 +957,30 @@
             THD.exportUtil.printCurrentView();
         });
 
+        // Dark theme prints as pale text on white paper — switch to the
+        // light palette for the duration of the print (charts bake their
+        // colors in at render time, so they're re-rendered both ways).
+        let printThemeRestore = null;
+        const rerenderCharts = () => {
+            const prev = Chart.defaults.animation;
+            Chart.defaults.animation = false;
+            renderForRange(currentRange, currentCustomRange);
+            renderNewRepeatChartOnly();
+            Chart.defaults.animation = prev;
+        };
+        window.addEventListener("beforeprint", () => {
+            if (document.documentElement.getAttribute("data-theme") !== "dark") return;
+            printThemeRestore = "dark";
+            document.documentElement.setAttribute("data-theme", "light");
+            rerenderCharts();
+        });
+        window.addEventListener("afterprint", () => {
+            if (!printThemeRestore) return;
+            document.documentElement.setAttribute("data-theme", printThemeRestore);
+            printThemeRestore = null;
+            rerenderCharts();
+        });
+
         wireDateRange();
 
         await loadAndRenderAll();
