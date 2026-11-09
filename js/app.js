@@ -675,7 +675,13 @@
             dates: filtered.dates,
             history: dailyHistory,
             yoyRevenueDelta,
-            customerTrend: THD.data.newCustomerYoY(fullNewRepeatRows),
+            // Site-wide, business-month data: only from the live feed, and
+            // only when the view itself is site-wide (not a single channel).
+            customerTrend: dataSourceStatus.newRepeat !== false && sourceFilterChannel === "all"
+                ? THD.data.newCustomerYoY(fullNewRepeatRows) : null,
+            sourcesComparable: sourcesLive &&
+                THD.data.hasDataInRange(effectiveSourceRows, range.start, range.end) &&
+                THD.data.hasDataInRange(effectiveSourceRows, range.prevStart, range.prevEnd),
             series: filtered.series,
             channels: sourcesLive ? trafficCurrent.channels : [],
             comparisonRows: sourcesLive ? lastTrafficComparisonRows : [],

@@ -393,8 +393,8 @@ window.I18N = (function () {
             "brief.aov.body": "{prev} → {cur} per order. Revenue moved more than order count did.",
             "brief.rise.title": "{title} is taking off",
             "brief.rise.body": "{prev} → {cur} sessions, last 7 days vs the 7 before.",
-            "brief.spikes.oneTitle": "{title} spiked today/yesterday",
-            "brief.spikes.manyTitle": "{n} pages spiked today/yesterday",
+            "brief.spikes.oneTitle": "{title} spiked in the latest data",
+            "brief.spikes.manyTitle": "{n} pages spiked in the latest data",
             "brief.spikes.item": "{title} — {value} sessions (usually {mean})"
         },
         ja: {
@@ -761,8 +761,8 @@ window.I18N = (function () {
             "brief.aov.body": "1注文あたり {prev} → {cur}。注文数以上に売上が動いています。",
             "brief.rise.title": "「{title}」が伸びています",
             "brief.rise.body": "直近7日間 {cur} セッション（その前の7日間は {prev}）。",
-            "brief.spikes.oneTitle": "「{title}」が今日・昨日に急上昇",
-            "brief.spikes.manyTitle": "今日・昨日に{n}ページが急上昇",
+            "brief.spikes.oneTitle": "「{title}」が直近のデータで急上昇",
+            "brief.spikes.manyTitle": "直近のデータで{n}ページが急上昇",
             "brief.spikes.item": "{title} — {value} セッション（通常 {mean}）"
         }
     };

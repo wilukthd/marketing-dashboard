@@ -868,10 +868,10 @@ window.THD = window.THD || {};
     // same-period-last-year comparison reaching further back than
     // the data actually goes), so the latter can show a warning
     // instead of a silently misleading "0.0% change".
-    // "Has data" means near-complete coverage (>= 90% of the window's
-    // days), not "at least one row": a 31-day comparison containing only
-    // Jan 31 used to pass and produced a meaningless delta.
-    const MIN_COMPARE_COVERAGE = 0.9;
+    // "Has data" means EVERY day of the window is present, not "at least
+    // one row": a 31-day comparison with only Jan 31 used to pass, and
+    // even 28 of 31 days inflates an otherwise flat total by ~10%.
+    const MIN_COMPARE_COVERAGE = 1;
 
     function hasDataInRange(dailyRows, start, end) {
         const days = Math.round((end - start) / 86400000) + 1;
@@ -1818,7 +1818,9 @@ window.THD = window.THD || {};
                 };
             });
 
-        if (fairCompare && rows.length) {
+        // Contribution / low-yield compare the SOURCE feed's two windows,
+        // so they need that feed's own coverage, not just the daily feed's.
+        if (fairCompare && input.sourcesComparable && rows.length) {
             // ---- B. Traffic added without revenue ----
             const sitePerSession = kpi.sessions.value ? kpi.revenue.value / kpi.sessions.value : 0;
             const lowYield = rows
