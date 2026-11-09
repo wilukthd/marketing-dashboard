@@ -1638,21 +1638,24 @@ window.THD = window.THD || {};
         return { x, y, step, grid: g };
     }
 
-    // Difference vs the same month last year, as a small labelled chip:
+    // Difference vs the same month last year, as a small coloured label:
     // green and ABOVE the point when up, red and BELOW it when down — so
     // the sign can be read from position and colour before the number.
-    function cfDiffChip(cx, yAnchor, diff, f) {
+    // onBar: the label sits on top of a bar, where the card-coloured
+    // outline would cut a notch into it — draw it without the outline.
+    function cfDiffChip(cx, yAnchor, diff, f, onBar) {
         if (!Number.isFinite(diff)) return "";
         const up = diff >= 0;
         const text = (up ? "+" : "−") + fmtNumber(Math.abs(diff));
-        const w = Math.max(28, text.length * 6.6 + 10);
-        const h = 16;
+        const h = 14;
         // above the higher point for "up", below the lower point for "down",
         // kept inside the plot area
         let cy = up ? yAnchor - 14 : yAnchor + 14;
         cy = Math.min(Math.max(cy, CF.padT + h / 2), f.y(0) - h / 2 - 2);
-        return `<g class="cfDiff ${up ? "up" : "down"}">` +
-            `<rect x="${(cx - w / 2).toFixed(1)}" y="${(cy - h / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="8"/>` +
+        // Plain coloured text (no box, which competed with the marks); a
+        // background-coloured outline keeps it legible where it crosses a
+        // line or bar — see .cfDiff text in briefing.css.
+        return `<g class="cfDiff ${up ? "up" : "down"}${onBar ? " onBar" : ""}">` +
             `<text x="${cx.toFixed(1)}" y="${(cy + 3.8).toFixed(1)}" text-anchor="middle">${text}</text></g>`;
     }
 
@@ -1709,7 +1712,7 @@ window.THD = window.THD || {};
                 if (!open) {
                     const diff = r.repeatOrders - ly;
                     const anchor = diff >= 0 ? Math.min(top, f.y(ly)) : Math.max(top, f.y(ly));
-                    s += cfDiffChip(cx, anchor, diff, f);
+                    s += cfDiffChip(cx, anchor, diff, f, diff < 0);
                 }
             }
             s += "</g>";

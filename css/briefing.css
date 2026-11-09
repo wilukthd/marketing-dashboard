@@ -1544,11 +1544,20 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 }
 
-.cfSvg .cfDiff rect{ fill:var(--surface); stroke-width:1.2; }
-.cfSvg .cfDiff text{ font-size:10.5px; font-weight:700; font-family:var(--font-mono); }
-.cfSvg .cfDiff.up rect{ stroke:var(--tone-good); }
+.cfSvg .cfDiff text{
+
+    font-size:11px;
+    font-weight:700;
+    font-family:var(--font-mono);
+    /* halo in the card colour, drawn under the fill */
+    stroke:var(--surface);
+    stroke-width:3.5px;
+    stroke-linejoin:round;
+    paint-order:stroke;
+
+}
+
 .cfSvg .cfDiff.up text{ fill:var(--tone-good); }
-.cfSvg .cfDiff.down rect{ stroke:var(--tone-alert); }
 .cfSvg .cfDiff.down text{ fill:var(--tone-alert); }
 
 .cfSvg .cfCol{ fill:var(--text-faint); opacity:.55; }
@@ -1580,3 +1589,5 @@ select{ max-width:100%; text-overflow:ellipsis; }
    panels were too narrow to read comfortably. */
 .custPanels{ grid-template-columns:minmax(0,1fr); gap:22px; }
 .custPanel .cfSvg{ max-height:260px; }
+
+.cfSvg .cfDiff.onBar text{ stroke:none; }
