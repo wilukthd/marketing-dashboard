@@ -36,14 +36,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css?v=57">
-    <link rel="stylesheet" href="css/layout.css?v=57">
-    <link rel="stylesheet" href="css/cards.css?v=57">
-    <link rel="stylesheet" href="css/charts.css?v=57">
-    <link rel="stylesheet" href="css/tables.css?v=57">
-    <link rel="stylesheet" href="css/dark.css?v=57">
-    <link rel="stylesheet" href="css/briefing.css?v=57">
-    <link rel="stylesheet" href="css/print.css?v=57" media="print">
+    <link rel="stylesheet" href="css/main.css?v=58">
+    <link rel="stylesheet" href="css/layout.css?v=58">
+    <link rel="stylesheet" href="css/cards.css?v=58">
+    <link rel="stylesheet" href="css/charts.css?v=58">
+    <link rel="stylesheet" href="css/tables.css?v=58">
+    <link rel="stylesheet" href="css/dark.css?v=58">
+    <link rel="stylesheet" href="css/briefing.css?v=58">
+    <link rel="stylesheet" href="css/print.css?v=58" media="print">
 
 </head>
 
@@ -131,7 +131,7 @@ Replaces the old fixed sidebar. Nav links keep the
         <div class="topbarActions">
 
             <div class="updateCard">
-                <small data-i18n="header.lastUpdate">Last Update</small>
+                <small data-i18n="header.dataAsOf">Data through</small>
                 <strong id="lastUpdate">--</strong>
             </div>
 
@@ -139,7 +139,7 @@ Replaces the old fixed sidebar. Nav links keep the
                 <i data-lucide="file-down"></i>
             </button>
 
-            <button class="primaryButton" id="refreshBtn">
+            <button class="primaryButton" id="refreshBtn" data-i18n-title="header.refreshTitle" title="Check for new data">
                 <i data-lucide="refresh-cw"></i>
                 <span data-i18n="header.refresh">Refresh</span>
             </button>
@@ -1216,19 +1216,19 @@ MAIN
 
 </script>
 
-<script src="js/i18n.js?v=57"></script>
-<script src="js/gate.js?v=57"></script>
-<script src="js/charts.js?v=57"></script>
-<script src="js/ui.js?v=57"></script>
-<script src="js/data.js?v=57"></script>
-<script src="js/export.js?v=57"></script>
+<script src="js/i18n.js?v=58"></script>
+<script src="js/gate.js?v=58"></script>
+<script src="js/charts.js?v=58"></script>
+<script src="js/ui.js?v=58"></script>
+<script src="js/data.js?v=58"></script>
+<script src="js/export.js?v=58"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/notes.js?v=57"></script>
+<script src="js/notes.js?v=58"></script>
 <!-- js/goals.js (Monthly Targets) — built for v2 but paused before ship,
      see thd-dashboard-changelog.md. Re-add this tag plus the wiring
      commented out in app.js's init() to bring it back. -->
-<script src="js/app.js?v=57"></script>
+<script src="js/app.js?v=58"></script>
 
 </body>
 </html>

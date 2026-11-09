@@ -839,6 +839,7 @@
     // re-applies [data-i18n] static text before calling this.
     function onLanguageChange() {
         THD.ui.refreshActiveHeader();
+        THD.ui.renderDataFreshness();
         THD.ui.populateSourceFilterOptions(availableChannels);
         THD.ui.renderDataSourceWarning(dataSourceStatus);
         // Rebuilt (not just re-rendered) since insight.sentence is a
@@ -887,9 +888,17 @@
         document.body.dataset.view = "overview";
 
         THD.ui.showInitialSkeletons();
-        THD.ui.renderLastUpdate();
         THD.ui.wireSourceTableToggle();
-        THD.ui.wireRefreshButton(loadAndRenderAll);
+        THD.ui.wireRefreshButton(() => refreshData({ silent: false }));
+
+        // A dashboard left open all day goes stale: when the tab comes back
+        // into view after 30+ minutes, quietly check for new data (and only
+        // say something if there is some).
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible" && Date.now() - lastLoadAt > AUTO_CHECK_MS) {
+                refreshData({ silent: true });
+            }
+        });
         THD.ui.wireMetricToggles(renderTrendOnly);
         THD.ui.wireMetricToggles(renderAovChartOnly, "aovMetricToggles");
         THD.ui.wireTrendOverlayToggle(renderTrendOnly);
@@ -1048,6 +1057,57 @@
         await loadAndRenderAll();
     }
 
+    /* ==========================================================
+       Refresh / data freshness
+       The sheet behind the dashboard is refreshed by the GA4 add-on
+       about once an hour, so most manual refreshes legitimately bring
+       back the same data — which used to look like "the button does
+       nothing". Now every load fingerprints the data, the top bar shows
+       how fresh the data really is, and a refresh says what happened.
+    ========================================================== */
+
+    const AUTO_CHECK_MS = 30 * 60 * 1000;
+    let lastLoadAt = 0;
+    let dataFingerprint = null;
+    let refreshing = false;
+    let lastLoadPartialFailure = false; // a feed failed this load and kept its previous data
+
+    function fingerprintData() {
+        const last = dailyRows.length ? dailyRows[dailyRows.length - 1] : null;
+        // Latest date + row counts + the latest day's numbers: catches a new
+        // day AND today's partial figures being topped up.
+        return [
+            last ? last.date : "",
+            dailyRows.length, sourceRows.length, landingRows.length,
+            last ? Math.round(last.sessions) : 0,
+            last ? Math.round(last.revenue) : 0
+        ].join("|");
+    }
+
+    async function refreshData({ silent }) {
+        if (refreshing) return;
+        refreshing = true;
+        try {
+            const before = dataFingerprint;
+            await loadAndRenderAll();
+            const changed = before !== null && before !== dataFingerprint;
+            const date = latestDataDate(dailyRows);
+            const dateText = date ? window.I18N.formatDayLabel(date) : "--";
+            if (lastLoadPartialFailure) {
+                THD.ui.showToast(window.I18N.t("refresh.failed"), "bad");
+            } else if (changed) {
+                THD.ui.showToast(window.I18N.t("refresh.updated", { date: dateText }), "good");
+            } else if (!silent) {
+                THD.ui.showToast(window.I18N.t("refresh.noNew", { date: dateText }), "info");
+            }
+        } catch (e) {
+            if (!silent) THD.ui.showToast(window.I18N.t("refresh.failed"), "bad");
+            console.warn("[THD.app] Refresh failed:", e.message);
+        } finally {
+            refreshing = false;
+        }
+    }
+
     async function loadAndRenderAll() {
 
         // Each source loads independently and falls back to dummy
@@ -1061,19 +1121,37 @@
             ADS_ENABLED ? THD.data.loadTransactions() : Promise.resolve(null)
         ]);
 
-        dailyRows = liveDaily && liveDaily.length ? liveDaily : buildDummyDailyRows();
+        // On a REFRESH, a feed that fails keeps its last good data instead
+        // of being swapped for demo numbers (a network blip used to turn a
+        // live dashboard into a fictional one). Demo data is only used when
+        // a feed has never loaded.
+        const prev = dataSourceStatus;
+        const keep = (live, ok, current) => !!(live && live.length) ? null : (ok && current && current.length ? current : null);
+        lastLoadPartialFailure = false;
+        const pick = (live, wasLive, current, dummy) => {
+            if (live && live.length) return { rows: live, live: true };
+            const kept = keep(live, wasLive, current);
+            if (kept) { lastLoadPartialFailure = true; return { rows: kept, live: true }; }
+            return { rows: dummy(), live: false };
+        };
+        const dailyPick = pick(liveDaily, prev.daily && dataFingerprint !== null, dailyRows, buildDummyDailyRows);
+        const sourcesPick = pick(liveSources, prev.sources && dataFingerprint !== null, sourceRows, buildDummySourcesDaily);
+        const landingPick = pick(liveLandingPages, prev.landingPages && dataFingerprint !== null, landingRows, buildDummyLandingPagesDaily);
+        const newRepeatPick = pick(liveNewRepeat, prev.newRepeat && dataFingerprint !== null, fullNewRepeatRows, buildDummyNewRepeat);
+
+        dailyRows = dailyPick.rows;
         THD.data.setLatestDataDate(latestDataDate(dailyRows));
-        sourceRows = liveSources && liveSources.length ? liveSources : buildDummySourcesDaily();
-        landingRows = liveLandingPages && liveLandingPages.length ? liveLandingPages : buildDummyLandingPagesDaily();
+        sourceRows = sourcesPick.rows;
+        landingRows = landingPick.rows;
         adSpendRows = !ADS_ENABLED ? [] : (liveAdSpend && liveAdSpend.length ? liveAdSpend : buildDummyAdSpend());
         transactionRows = !ADS_ENABLED ? [] : (liveTransactions && liveTransactions.length ? liveTransactions : buildDummyTransactions());
-        const newRepeat = liveNewRepeat && liveNewRepeat.length ? liveNewRepeat : buildDummyNewRepeat();
+        const newRepeat = newRepeatPick.rows;
 
         dataSourceStatus = {
-            daily: !!(liveDaily && liveDaily.length),
-            sources: !!(liveSources && liveSources.length),
-            landingPages: !!(liveLandingPages && liveLandingPages.length),
-            newRepeat: !!(liveNewRepeat && liveNewRepeat.length),
+            daily: dailyPick.live,
+            sources: sourcesPick.live,
+            landingPages: landingPick.live,
+            newRepeat: newRepeatPick.live,
             adSpend: !!(liveAdSpend && liveAdSpend.length),
             transactions: !!(liveTransactions && liveTransactions.length)
         };
@@ -1117,7 +1195,9 @@
         THD.ui.renderNewRepeatInsights(THD.data.buildNewRepeatInsights(newRepeat));
         renderNewRepeatSourceNote();
 
-        THD.ui.renderLastUpdate();
+        dataFingerprint = fingerprintData();
+        lastLoadAt = Date.now();
+        THD.ui.renderDataFreshness(latestDataDate(dailyRows));
     }
 
     document.addEventListener("DOMContentLoaded", init);

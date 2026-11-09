@@ -119,10 +119,33 @@ window.THD = window.THD || {};
        Last Update
     ========================================================== */
 
-    function renderLastUpdate() {
+    // How fresh the DATA is (latest date in the feed) — not when the page
+    // was loaded, which said nothing about whether the numbers were new.
+    let lastFreshnessDate = null;
+    function renderDataFreshness(date) {
+        if (date !== undefined) lastFreshnessDate = date;
         const el = document.getElementById("lastUpdate");
         if (!el) return;
-        el.textContent = window.I18N.formatDateTime(new Date());
+        el.textContent = lastFreshnessDate ? window.I18N.formatDayLabel(lastFreshnessDate) : "--";
+    }
+
+    // Small status message at the bottom of the screen (refresh results).
+    let toastTimer = null;
+    function showToast(text, tone) {
+        let el = document.getElementById("toast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "toast";
+            el.className = "toast";
+            el.setAttribute("role", "status");
+            el.setAttribute("aria-live", "polite");
+            document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.dataset.tone = tone || "info";
+        el.classList.add("isShown");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove("isShown"), 4500);
     }
 
     /* ==========================================================
@@ -1133,7 +1156,6 @@ window.THD = window.THD || {};
             // clicks can't race and an older response can't win.
             try {
                 await onRefresh();
-                renderLastUpdate();
             } finally {
                 btn.disabled = false;
                 if (icon) icon.style.animation = "";
@@ -1983,7 +2005,8 @@ window.THD = window.THD || {};
         renderVitals,
         plotMetric,
         syncVitalsPlotted,
-        renderLastUpdate,
+        renderDataFreshness,
+        showToast,
         showInitialSkeletons,
         renderInsights,
         renderTopLandingPageInsights,
