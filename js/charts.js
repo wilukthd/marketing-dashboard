@@ -204,18 +204,38 @@ window.THD = window.THD || {};
         return trafficColorAssignments[label];
     }
 
+    function colors_smallSlice() {
+        return cssVar("--text-faint", "#A39B8E");
+    }
+
     function renderTrafficChart(canvasId, channels, totalSessions) {
 
         const canvas = document.getElementById(canvasId);
         if (!canvas) return [];
 
-        const rawLabels = channels.map((c) => c.label);
-        const displayLabels = rawLabels.map((l) => window.I18N.channelLabel(l));
+        // Channels under 1.5% of sessions become one grey "small sources"
+        // slice: a sliver thinner than the slice separators looked cut off.
+        // (The table below still lists each one.) Colours are still
+        // assigned per channel so the table's dots stay consistent.
+        const allTotal = channels.reduce((a, c) => a + c.sessions, 0) || 1;
+        const SMALL_SLICE = 0.015;
+        const big = channels.filter((c) => c.sessions / allTotal >= SMALL_SLICE);
+        const small = channels.filter((c) => c.sessions / allTotal < SMALL_SLICE);
+        channels.forEach((c) => colorForLabel(c.label));
+        const slices = big.map((c) => ({ label: window.I18N.channelLabel(c.label), sessions: c.sessions, color: colorForLabel(c.label) }));
+        if (small.length) {
+            slices.push({
+                label: window.I18N.t("traffic.smallSources", { n: small.length }),
+                sessions: small.reduce((a, c) => a + c.sessions, 0),
+                color: colors_smallSlice()
+            });
+        }
+        const displayLabels = slices.map((x) => x.label);
         // Raw sessions for the geometry (rounded percentages made small
         // channels vanish and distorted the rest); % only in the tooltip.
-        const values = channels.map((c) => c.sessions);
+        const values = slices.map((x) => x.sessions);
         const total = values.reduce((a, b) => a + b, 0) || 1;
-        const palette = rawLabels.map(colorForLabel);
+        const palette = slices.map((x) => x.color);
         const colors = getChartColors();
 
         if (trafficChartInstances[canvasId]) {
@@ -253,7 +273,7 @@ window.THD = window.THD || {};
                     data: values,
                     backgroundColor: palette,
                     borderColor: colors.surface,
-                    borderWidth: 3,
+                    borderWidth: 1.5,
                     hoverOffset: 6
                 }]
             },
