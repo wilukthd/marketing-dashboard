@@ -51,7 +51,8 @@ window.THD = window.THD || {};
         sessions: metricEntry("sessions", "#0F8A8A", (v) => Math.round(v).toLocaleString("en-US")),
         purchases: metricEntry("purchases", "#2B7A4B", (v) => Math.round(v).toLocaleString("en-US")),
         revenue: metricEntry("revenue", "#B8325E", (v) => "¥" + Math.round(v).toLocaleString("en-US")),
-        cvr: metricEntry("cvr", "#6B47D6", (v) => v.toFixed(2) + "%")
+        cvr: metricEntry("cvr", "#6B47D6", (v) => v.toFixed(2) + "%"),
+        aov: metricEntry("aov", "#A86A12", (v) => "¥" + Math.round(v).toLocaleString("en-US"))
     };
 
     // Reuses the same dictionary keys as the KPI cards, so a metric's
@@ -61,7 +62,8 @@ window.THD = window.THD || {};
         sessions: "kpi.sessions",
         purchases: "kpi.purchases",
         revenue: "kpi.revenue",
-        cvr: "kpi.cvr"
+        cvr: "kpi.cvr",
+        aov: "brief.vital.aov"
     };
 
     function metricLabel(key) {

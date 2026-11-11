@@ -1419,7 +1419,7 @@ window.THD = window.THD || {};
     const VITALS = [
         { key: "revenue", labelKey: "brief.vital.revenue", fmt: fmtYenShort, chart: "revenue" },
         { key: "purchases", labelKey: "brief.vital.purchases", fmt: fmtNumber, chart: "purchases" },
-        { key: "aov", labelKey: "brief.vital.aov", fmt: (v) => "¥" + Math.round(v).toLocaleString("en-US"), chart: null },
+        { key: "aov", labelKey: "brief.vital.aov", fmt: (v) => "¥" + Math.round(v).toLocaleString("en-US"), chart: "aov" },
         { key: "cvr", labelKey: "brief.vital.cvr", fmt: fmtPercent, chart: "cvr" },
         { key: "sessions", labelKey: "brief.vital.sessions", fmt: fmtNumber, chart: "sessions" },
         { key: "users", labelKey: "brief.vital.users", fmt: fmtNumber, chart: "users" }
@@ -1641,15 +1641,39 @@ window.THD = window.THD || {};
 
     const CF = { w: 640, h: 210, padL: 44, padR: 12, padT: 18, padB: 34 };
 
-    function cfFrame(n, max, months) {
+    // Axis range for a dot chart. Starts at zero when the values reach
+    // down toward it; otherwise zooms in (dots, unlike bars, don't need a
+    // zero baseline) — repeat orders run ~2,500–4,000 with ±200 changes
+    // that would be invisible on a 0–5,000 axis. Padded so the difference
+    // labels above/below the points always have room.
+    function cfRange(lo, hi) {
+        if (lo <= hi * 0.5) {
+            const max = niceMax(hi * 1.15);
+            return { min: 0, max, ticks: [0, max / 2, max] };
+        }
+        const span = Math.max(hi - lo, hi * 0.1, 1);
+        const rawMin = lo - span * 0.35;
+        const rawMax = hi + span * 0.35;
+        const rough = (rawMax - rawMin) / 4;
+        const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+        const unit = (rough / mag >= 5 ? 5 : rough / mag >= 2 ? 2 : 1) * mag;
+        const min = Math.max(0, Math.floor(rawMin / unit) * unit);
+        const max = Math.ceil(rawMax / unit) * unit;
+        const count = Math.round((max - min) / unit);
+        const tickStep = count > 5 ? unit * 2 : unit;
+        const ticks = [];
+        for (let v = min; v <= max + 1e-9; v += tickStep) ticks.push(v);
+        return { min, max, ticks };
+    }
+
+    function cfFrame(n, range, months) {
         const innerW = CF.w - CF.padL - CF.padR;
         const innerH = CF.h - CF.padT - CF.padB;
         const step = innerW / n;
         const x = (i) => CF.padL + step * (i + 0.5);
-        const y = (v) => CF.padT + innerH - (v / max) * innerH;
+        const y = (v) => CF.padT + innerH - ((v - range.min) / (range.max - range.min)) * innerH;
         let g = "";
-        [0, 0.5, 1].forEach((f) => {
-            const v = max * f;
+        range.ticks.forEach((v) => {
             g += `<line class="cfGrid" x1="${CF.padL}" x2="${CF.w - CF.padR}" y1="${y(v)}" y2="${y(v)}"/>`;
             g += `<text class="cfTick" x="${CF.padL - 8}" y="${y(v) + 3.5}" text-anchor="end">${fmtNumber(v)}</text>`;
         });
@@ -1657,15 +1681,13 @@ window.THD = window.THD || {};
             g += `<text class="cfMonth" x="${x(i)}" y="${CF.h - CF.padB + 15}" text-anchor="middle">${svgEsc(m.month)}</text>`;
             if (m.isJan || i === 0) g += `<text class="cfYear" x="${x(i)}" y="${CF.h - CF.padB + 28}" text-anchor="middle">${svgEsc(m.year)}</text>`;
         });
-        return { x, y, step, grid: g };
+        return { x, y, step, grid: g, bottom: y(range.min) };
     }
 
     // Difference vs the same month last year, as a small coloured label:
     // green and ABOVE the point when up, red and BELOW it when down — so
     // the sign can be read from position and colour before the number.
-    // onBar: the label sits on top of a bar, where the card-coloured
-    // outline would cut a notch into it — draw it without the outline.
-    function cfDiffChip(cx, yAnchor, diff, f, onBar) {
+    function cfDiffChip(cx, yAnchor, diff, f) {
         if (!Number.isFinite(diff)) return "";
         const up = diff >= 0;
         const text = (up ? "+" : "−") + fmtNumber(Math.abs(diff));
@@ -1673,11 +1695,11 @@ window.THD = window.THD || {};
         // above the higher point for "up", below the lower point for "down",
         // kept inside the plot area
         let cy = up ? yAnchor - 14 : yAnchor + 14;
-        cy = Math.min(Math.max(cy, CF.padT + h / 2), f.y(0) - h / 2 - 2);
+        cy = Math.min(Math.max(cy, CF.padT + h / 2), f.bottom - h / 2 - 2);
         // Plain coloured text (no box, which competed with the marks); a
         // background-coloured outline keeps it legible where it crosses a
         // line or bar — see .cfDiff text in briefing.css.
-        return `<g class="cfDiff ${up ? "up" : "down"}${onBar ? " onBar" : ""}">` +
+        return `<g class="cfDiff ${up ? "up" : "down"}">` +
             `<text x="${cx.toFixed(1)}" y="${(cy + 3.8).toFixed(1)}" text-anchor="middle">${text}</text></g>`;
     }
 
@@ -1687,59 +1709,34 @@ window.THD = window.THD || {};
             : "");
     }
 
-    function newCustomerSvg(rows, lastYear, months) {
-        const max = niceMax(Math.max(...rows.map((r) => r.newOrders), ...lastYear.filter(Number.isFinite)) * 1.15);
-        const f = cfFrame(rows.length, max, months);
+    // The one diagram both panels use (new customers and repeat customers
+    // read exactly the same way): filled dot = this year, ring = the same
+    // month last year, a green/red line joining them, and the difference
+    // printed above (up) or below (down).
+    function customerDotsSvg(rows, key, lastYear, months, ariaLabel) {
+        const cur = rows.map((r) => r[key]);
+        const all = cur.concat(lastYear.filter(Number.isFinite));
+        const f = cfFrame(rows.length, cfRange(Math.min(...all), Math.max(...all)), months);
         let s = f.grid;
         rows.forEach((r, i) => {
             const cx = f.x(i);
+            const v = cur[i];
             const ly = lastYear[i];
             const open = isOpenMonth(r);
-            s += `<g class="cfMonthGroup"><title>${svgEsc(cfTip(months[i].month, r.newOrders, ly))}</title>`;
+            s += `<g class="cfMonthGroup"><title>${svgEsc(cfTip(months[i].month, v, ly))}</title>`;
             s += `<rect class="cfHit" x="${cx - f.step / 2}" y="${CF.padT}" width="${f.step}" height="${CF.h - CF.padT - CF.padB}"/>`;
             if (Number.isFinite(ly)) {
-                const up = r.newOrders >= ly;
-                s += `<line class="cfLink ${up ? "up" : "down"}" x1="${cx}" x2="${cx}" y1="${f.y(ly)}" y2="${f.y(r.newOrders)}"/>`;
+                s += `<line class="cfLink ${v >= ly ? "up" : "down"}" x1="${cx}" x2="${cx}" y1="${f.y(ly)}" y2="${f.y(v)}"/>`;
                 s += `<circle class="cfRing" cx="${cx}" cy="${f.y(ly)}" r="4.5"/>`;
             }
-            s += `<circle class="cfDot${open ? " isOpen" : ""}" cx="${cx}" cy="${f.y(r.newOrders)}" r="5.5"/>`;
+            s += `<circle class="cfDot${open ? " isOpen" : ""}" cx="${cx}" cy="${f.y(v)}" r="5.5"/>`;
             if (Number.isFinite(ly) && !open) {
-                const diff = r.newOrders - ly;
-                const anchor = diff >= 0 ? f.y(Math.max(r.newOrders, ly)) : f.y(Math.min(r.newOrders, ly));
-                s += cfDiffChip(cx, anchor, diff, f);
+                const diff = v - ly;
+                s += cfDiffChip(cx, diff >= 0 ? f.y(Math.max(v, ly)) : f.y(Math.min(v, ly)), diff, f);
             }
             s += "</g>";
         });
-        return `<svg class="cfSvg" viewBox="0 0 ${CF.w} ${CF.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${svgEsc(window.I18N.t("customers.newTitle"))}">${s}</svg>`;
-    }
-
-    // Same reading as the left panel: this year's bar, a short line where
-    // last year's same month was, and the difference as a chip.
-    function repeatOrdersSvg(rows, months, lastYearRepeat) {
-        const vals = rows.map((r) => r.repeatOrders);
-        const max = niceMax(Math.max(...vals, ...lastYearRepeat.filter(Number.isFinite)) * 1.15);
-        const f = cfFrame(rows.length, max, months);
-        const barW = Math.min(14, f.step * 0.36);
-        let s = f.grid;
-        rows.forEach((r, i) => {
-            const cx = f.x(i);
-            const top = f.y(r.repeatOrders);
-            const ly = lastYearRepeat[i];
-            const open = isOpenMonth(r);
-            s += `<g class="cfMonthGroup"><title>${svgEsc(cfTip(months[i].month, r.repeatOrders, ly))}</title>`;
-            s += `<rect class="cfHit" x="${cx - f.step / 2}" y="${CF.padT}" width="${f.step}" height="${CF.h - CF.padT - CF.padB}"/>`;
-            s += `<rect class="cfCol${open ? " isOpen" : ""}" x="${cx - barW / 2}" y="${top}" width="${barW}" height="${f.y(0) - top}" rx="${barW / 2}"/>`;
-            if (Number.isFinite(ly)) {
-                s += `<line class="cfLyMark" x1="${cx - barW}" x2="${cx + barW}" y1="${f.y(ly)}" y2="${f.y(ly)}"/>`;
-                if (!open) {
-                    const diff = r.repeatOrders - ly;
-                    const anchor = diff >= 0 ? Math.min(top, f.y(ly)) : Math.max(top, f.y(ly));
-                    s += cfDiffChip(cx, anchor, diff, f, diff < 0);
-                }
-            }
-            s += "</g>";
-        });
-        return `<svg class="cfSvg" viewBox="0 0 ${CF.w} ${CF.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${svgEsc(window.I18N.t("customers.repeatTitle"))}">${s}</svg>`;
+        return `<svg class="cfSvg" viewBox="0 0 ${CF.w} ${CF.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${svgEsc(ariaLabel)}">${s}</svg>`;
     }
 
     // Business months close on the 20th (see businessMonthOf in data.js);
@@ -1831,8 +1828,6 @@ window.THD = window.THD || {};
         if (statsEl) {
             statsEl.innerHTML =
                 `<div class="custStatMonth">${svgEsc(Number.isFinite(latest.year) ? window.I18N.formatMonth(latest.year, latest.month - 1) : latest.period)}${closedCount === 0 ? " · " + svgEsc(t("brief.vital.partial")) : ""}</div>` +
-                stat(t("customers.statNew"), fmtNumber(latest.newOrders), vsLy(latest.newOrders, lastYear[latestI])) +
-                stat(t("customers.statRepeat"), fmtNumber(latest.repeatOrders), vsLy(latest.repeatOrders, lastYearRepeat[latestI])) +
                 stat(t("customers.statShare"), share(latest).toFixed(1) + "%",
                     lyRow ? t("customers.vsLyPts", { pts: ((share(latest) - share(lyRow)) >= 0 ? "+" : "−") + Math.abs(share(latest) - share(lyRow)).toFixed(1) }) : "");
         }
@@ -1843,8 +1838,24 @@ window.THD = window.THD || {};
             notesEl.innerHTML = notes.map((n) => `<li class="custNote ${n.tone}">${svgEsc(n.text)}</li>`).join("");
         }
 
-        newEl.innerHTML = newCustomerSvg(recentRows, lastYear, months);
-        repEl.innerHTML = repeatOrdersSvg(recentRows, months, lastYearRepeat);
+        // Each panel's header carries its own latest-month figure, so the
+        // number sits inside the frame it belongs to.
+        const monthLabel = Number.isFinite(latest.year) ? window.I18N.formatMonth(latest.year, latest.month - 1) : latest.period;
+        const panelStat = (id, value, ly) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const pct = Number.isFinite(ly) ? pctChange(value, ly) : null;
+            el.innerHTML =
+                `<span class="custPanelStatValue">${fmtNumber(value)}</span>` +
+                `<span class="custPanelStatMeta">${svgEsc(monthLabel)}` +
+                (pct !== null ? ` · <b class="${pct >= 0 ? "up" : "down"}">${svgEsc(t("customers.vsLy", { pct: signedPct(pct), value: fmtNumber(ly) }))}</b>` : "") +
+                `</span>`;
+        };
+        panelStat("custNewStat", latest.newOrders, lastYear[latestI]);
+        panelStat("custRepeatStat", latest.repeatOrders, lastYearRepeat[latestI]);
+
+        newEl.innerHTML = customerDotsSvg(recentRows, "newOrders", lastYear, months, t("customers.newTitle"));
+        repEl.innerHTML = customerDotsSvg(recentRows, "repeatOrders", lastYearRepeat, months, t("customers.repeatTitle"));
     }
 
     /* ==========================================================

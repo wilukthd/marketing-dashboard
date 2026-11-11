@@ -1367,13 +1367,6 @@ body[data-view="overview"] .rangeCompareBar{
 
 .cfSvg .cfValue{ fill:var(--ink); font-size:11.5px; font-weight:700; font-family:var(--font-mono); }
 
-.cfSvg .cfCol{ fill:var(--ink); opacity:.78; }
-.cfSvg .cfCol.isLow{ opacity:1; fill:var(--tone-alert); }
-.cfSvg .cfCol.isOpen{ opacity:.25; }
-
-.cfSvg .cfMedian{ stroke:var(--text-light); stroke-width:1; stroke-dasharray:4 4; }
-.cfSvg .cfMedianLabel{ fill:var(--text-light); font-size:10.5px; font-family:var(--font-mono); }
-
 @media(max-width:900px){
 
     .custTop,
@@ -1560,37 +1553,6 @@ select{ max-width:100%; text-overflow:ellipsis; }
 .cfSvg .cfDiff.up text{ fill:var(--tone-good); }
 .cfSvg .cfDiff.down text{ fill:var(--tone-alert); }
 
-.cfSvg .cfCol{ fill:var(--text-faint); opacity:.55; }
-.cfSvg .cfCol.isOpen{ opacity:.2; }
-.cfSvg .cfLyMark{ stroke:var(--ink); stroke-width:2.2; stroke-linecap:round; }
-
-.custLegend .lgBar{
-
-    width:8px;
-    height:12px;
-    border-radius:4px;
-    background:var(--text-faint);
-    opacity:.7;
-    display:inline-block;
-
-}
-
-.custLegend .lgTick{
-
-    width:14px;
-    height:0;
-    border-top:2.2px solid var(--ink);
-    display:inline-block;
-    margin-left:6px;
-
-}
-
-/* One panel per row: with a difference chip on every month, side-by-side
-   panels were too narrow to read comfortably. */
-.custPanels{ grid-template-columns:minmax(0,1fr); gap:22px; }
-.custPanel .cfSvg{ max-height:260px; }
-
-.cfSvg .cfDiff.onBar text{ stroke:none; }
 
 
 /* Refresh result message */
@@ -1621,3 +1583,137 @@ select{ max-width:100%; text-overflow:ellipsis; }
 .toast[data-tone="bad"]{ background:var(--tone-alert); color:#fff; }
 
 @media print{ .toast{ display:none; } }
+
+
+/* ==========================================================
+   Customer flow — two framed panels, one diagram
+   New and repeat customers use the SAME dot diagram; what tells
+   them apart is the frame: its own box, accent colour, icon badge
+   and header (label + who these customers are + latest figure).
+========================================================== */
+
+.custKey{
+
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px 18px;
+    margin:0 0 14px;
+
+}
+
+.custKey .custHow{ margin:0; }
+
+.custPanels{
+
+    grid-template-columns:minmax(0,1fr);
+    gap:18px;
+
+}
+
+@media(min-width:1100px){
+
+    .custPanels{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+}
+
+.custPanel{
+
+    --cust:var(--m-users);
+    border:1px solid var(--border);
+    border-top:3px solid var(--cust);
+    border-radius:var(--radius);
+    background:var(--surface);
+    overflow:hidden;
+
+}
+
+.custPanel.isRepeat{ --cust:var(--m-cvr); }
+
+.custPanel figcaption.custPanelHead{
+
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:flex-start;
+    gap:10px 12px;
+    margin:0;
+    padding:12px 16px;
+    font-weight:400;
+    background:color-mix(in srgb, var(--cust) 9%, var(--surface));
+    border-bottom:1px solid var(--border);
+
+}
+
+.custBadge{
+
+    flex:0 0 auto;
+    width:38px;
+    height:38px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--cust);
+    color:#fff;
+
+}
+
+.custBadge svg{ width:20px; height:20px; }
+
+.custPanelTitles{
+
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    flex:1 1 180px;
+    line-height:1.35;
+
+}
+
+.custPanelTitles strong{
+
+    font-family:var(--font-display);
+    font-size:17px;
+    font-weight:900;
+    color:var(--cust);
+
+}
+
+.custPanelTitles small{ font-size:11.5px; color:var(--text-light); }
+
+.custPanelStat{
+
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    margin-left:auto;
+    line-height:1.2;
+
+}
+
+.custPanelStatValue{
+
+    font-family:var(--font-mono);
+    font-size:24px;
+    font-weight:500;
+    color:var(--ink);
+
+}
+
+.custPanelStatMeta{ font-size:11px; color:var(--text-light); font-family:var(--font-mono); }
+.custPanelStatMeta b{ font-weight:600; }
+.custPanelStatMeta b.up{ color:var(--tone-good); }
+.custPanelStatMeta b.down{ color:var(--tone-alert); }
+
+.custPanel .custChart{ padding:10px 12px 6px; }
+
+.custPanel .cfSvg{ max-height:260px; }
+
+/* this year's dots take the panel's accent colour */
+.custPanel .cfSvg .cfDot{ fill:var(--cust); }
+.custPanel .cfSvg .cfDot.isOpen{ fill:var(--surface); stroke:var(--cust); }
+.custLegend .lgDot{ background:var(--text); }
+
+/* the share figure now stands alone in the top row */
+.custStats{ grid-template-columns:minmax(0,1fr); }

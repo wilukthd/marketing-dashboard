@@ -918,7 +918,11 @@ window.THD = window.THD || {};
                 sessions: current.map((r) => r.sessions),
                 purchases: current.map((r) => r.purchases),
                 revenue: current.map((r) => r.revenue),
-                cvr: current.map((r) => (r.sessions ? (r.purchases / r.sessions) * 100 : 0))
+                cvr: current.map((r) => (r.sessions ? (r.purchases / r.sessions) * 100 : 0)),
+                // GA4 order value per day — so the briefing's "order value"
+                // card plots on its own chart (the Sales tab's order value is
+                // a different source: the shop's monthly sheet).
+                aov: current.map((r) => (r.purchases ? r.revenue / r.purchases : 0))
             },
             kpi: {
                 users: { value: curUsers, delta: pctDelta(curUsers, prevUsers), daily: curUsers / dayCount, previous: prevUsers },
@@ -1625,8 +1629,8 @@ window.THD = window.THD || {};
                 title: t(up ? "brief.aov.upTitle" : "brief.aov.downTitle", { pct: fmtPctSigned(kpi.aov.delta) }),
                 body: t("brief.aov.body", { prev: fmtYenShort(kpi.aov.previous), cur: fmtYenShort(kpi.aov.value) }),
                 stat: fmtYenShort(kpi.aov.value),
-                spark: null,
-                action: { type: "view", view: "sales" },
+                spark: { values: input.series.aov },
+                action: { type: "metric", metric: "aov" },
                 score: 50
             });
         }
@@ -1797,8 +1801,8 @@ window.THD = window.THD || {};
                             total: fmtYenSigned(dec.total), s: fmtYenSigned(dec.sessions), c: fmtYenSigned(dec.cvr), a: fmtYenSigned(dec.aov)
                         }),
                         stat: fmtYenSigned(lead[1]),
-                        spark: lead[0] === "aov" ? null : { values: input.series[lead[0] === "cvr" ? "cvr" : "sessions"] },
-                        action: lead[0] === "aov" ? { type: "view", view: "sales" } : { type: "metric", metric: lead[0] === "cvr" ? "cvr" : "sessions" },
+                        spark: { values: input.series[lead[0] === "aov" ? "aov" : lead[0] === "cvr" ? "cvr" : "sessions"] },
+                        action: { type: "metric", metric: lead[0] === "aov" ? "aov" : lead[0] === "cvr" ? "cvr" : "sessions" },
                         score: down ? 66 : 44
                     });
                 }

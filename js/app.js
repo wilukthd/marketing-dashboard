@@ -269,7 +269,7 @@
     function onVitalPick(vital) {
         if (!vital) return;
         if (vital.chart) THD.ui.plotMetric(vital.chart, true);
-        else THD.ui.switchToView("sales", THD.charts.resizeCharts); // order value lives on the Sales tab
+        // (every vital, order value included, plots on the briefing's chart)
     }
 
     // Most recent date actually present in the data — what "today"
