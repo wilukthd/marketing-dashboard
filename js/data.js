@@ -79,12 +79,7 @@ window.THD = window.THD || {};
         // worth checking rather than assuming away).
         // Columns: orderId, date, sourceMedium, campaign, revenue,
         // newOrRepeat ("new" or "repeat").
-        TRANSACTIONS_CSV_URL: "",
-
-        // Conversion-rate target shown on the CVR figure (hit/miss).
-        // Change it here until the paused Goals feature (js/goals.js)
-        // ships and takes over.
-        CVR_TARGET: 6.5
+        TRANSACTIONS_CSV_URL: ""
     };
 
     // Google's published-CSV endpoint is cached, so a plain re-fetch on
@@ -937,9 +932,7 @@ window.THD = window.THD || {};
                 cvr: {
                     value: curCvr,
                     delta: pctDelta(curCvr, prevCvr),
-                    deltaPts: prevSessions ? curCvr - prevCvr : null,
-                    target: CONFIG.CVR_TARGET,
-                    daily: CONFIG.CVR_TARGET
+                    deltaPts: prevSessions ? curCvr - prevCvr : null
                 }
             }
         };
@@ -1462,30 +1455,6 @@ window.THD = window.THD || {};
                     score: 95 + Math.min(share, 20)
                 });
             }
-        }
-
-        // ---- 2. CVR vs target ----
-        if (kpi.cvr && kpi.cvr.target && fairCompare) {
-            const gap = kpi.cvr.value - kpi.cvr.target;
-            const below = gap < 0;
-            stories.push({
-                id: "cvrTarget",
-                tone: below ? "bad" : "good",
-                kicker: t("brief.kicker.conversion"),
-                title: t(below ? "brief.cvr.belowTitle" : "brief.cvr.aboveTitle", {
-                    cvr: kpi.cvr.value.toFixed(2), target: kpi.cvr.target.toFixed(2)
-                }),
-                body: kpi.cvr.deltaPts !== null && hasCompareData
-                    ? t("brief.cvr.body", {
-                        pts: (kpi.cvr.deltaPts >= 0 ? "+" : "−") + Math.abs(kpi.cvr.deltaPts).toFixed(2),
-                        vs: t(range && range.isYoy ? "brief.vs.yoy" : "brief.vs.prev")
-                    })
-                    : "",
-                stat: (gap >= 0 ? "+" : "−") + Math.abs(gap).toFixed(2) + "pt",
-                spark: { values: input.series.cvr, target: kpi.cvr.target },
-                action: { type: "metric", metric: "cvr" },
-                score: below ? 80 + Math.min(Math.abs(gap) * 10, 15) : 25
-            });
         }
 
         // ---- 3. Channel efficiency: traffic that doesn't convert / converts unusually well ----

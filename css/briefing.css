@@ -599,17 +599,6 @@ body[data-view="overview"] .rangeCompareBar{
 .vitalDelta.neg{ color:var(--tone-alert); }
 .vitalDelta.neutral{ color:var(--text-faint); }
 
-.vitalTarget{
-
-    font-size:10.5px;
-    padding:1px 7px;
-    border-radius:999px;
-
-}
-
-.vitalTarget.hit{ background:var(--tone-good-bg); color:var(--tone-good); }
-.vitalTarget.miss{ background:var(--tone-alert-bg); color:var(--tone-alert); }
-
 .vital .spark{
 
     width:100%;
@@ -651,15 +640,6 @@ body[data-view="overview"] .rangeCompareBar{
     stroke:var(--text-faint);
     stroke-width:1.2;
     stroke-dasharray:3 3;
-    vector-effect:non-scaling-stroke;
-
-}
-
-.spark .sparkTarget{
-
-    stroke:var(--text-faint);
-    stroke-width:1;
-    stroke-dasharray:2 3;
     vector-effect:non-scaling-stroke;
 
 }

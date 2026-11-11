@@ -1382,7 +1382,6 @@ window.THD = window.THD || {};
         if (vals.length < 2) return "";
 
         const all = vals.concat((opts.compare || []).filter((v) => Number.isFinite(v)));
-        if (Number.isFinite(opts.target)) all.push(opts.target);
         const min = Math.min(...all);
         const max = Math.max(...all);
         const span = max - min || 1;
@@ -1393,9 +1392,6 @@ window.THD = window.THD || {};
         let svg = `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true" preserveAspectRatio="none">`;
         if (opts.compare && opts.compare.length > 1) {
             svg += `<path class="sparkCompare" d="${path(opts.compare.slice(0, values.length))}"/>`;
-        }
-        if (Number.isFinite(opts.target)) {
-            svg += `<line class="sparkTarget" x1="${pad}" x2="${w - pad}" y1="${y(opts.target).toFixed(1)}" y2="${y(opts.target).toFixed(1)}"/>`;
         }
         const area = `${path(values)}L${x(values.length - 1, values.length).toFixed(1)},${h - pad}L${pad},${h - pad}Z`;
         svg += `<path class="sparkArea" d="${area}"/>`;
@@ -1450,10 +1446,6 @@ window.THD = window.THD || {};
             const data = kpi[v.key];
             if (!data) return "";
             const values = v.key === "aov" ? aovSeries : series[v.key];
-            const target = v.key === "cvr" && data.target ? data.target : null;
-            const targetHtml = target
-                ? `<span class="vitalTarget ${data.value >= target ? "hit" : "miss"}">${window.I18N.t("brief.vital.target", { target: fmtPercent(target) })}</span>`
-                : "";
             const plotted = v.chart && checked.includes(v.chart);
             return `
                 <button class="vital${plotted ? " isPlotted" : ""}" type="button" data-vital="${v.key}" style="--vital:var(--m-${v.key})"
@@ -1461,8 +1453,8 @@ window.THD = window.THD || {};
                         ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
                     <span class="vitalLabel">${window.I18N.t(v.labelKey)}${v.chart ? `<span class="vitalOnChart">${window.I18N.t("brief.vital.onChart")}</span>` : ""}</span>
                     <span class="vitalValue">${v.fmt(data.value)}</span>
-                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData, partial)}${targetHtml}</span>
-                    ${sparkSvg(values, { target, w: 140, h: 34 })}
+                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData, partial)}</span>
+                    ${sparkSvg(values, { w: 140, h: 34 })}
                 </button>`;
         }).join("");
 
@@ -1535,7 +1527,7 @@ window.THD = window.THD || {};
 
     function storyHtml(story, index) {
         const spark = story.spark && story.spark.values
-            ? sparkSvg(story.spark.values, { highlight: story.spark.highlight, compare: story.spark.compare, target: story.spark.target, w: 160, h: 44 })
+            ? sparkSvg(story.spark.values, { highlight: story.spark.highlight, compare: story.spark.compare, w: 160, h: 44 })
             : "";
         return `
             <li class="story tone-${story.tone}${index === 0 ? " isLead" : ""}" data-story-idx="${index}" tabindex="0" role="button">
