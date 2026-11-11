@@ -1639,7 +1639,10 @@ window.THD = window.THD || {};
         return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
     }
 
-    const CF = { w: 640, h: 210, padL: 44, padR: 12, padT: 18, padB: 34 };
+    // Drawn at roughly the size it's shown (one full-width panel per row),
+    // so labels render near their real pixel size instead of being
+    // stretched up or squeezed down.
+    const CF = { w: 1040, h: 300, padL: 52, padR: 16, padT: 24, padB: 40 };
 
     // Axis range for a dot chart. Starts at zero when the values reach
     // down toward it; otherwise zooms in (dots, unlike bars, don't need a
@@ -1691,16 +1694,16 @@ window.THD = window.THD || {};
         if (!Number.isFinite(diff)) return "";
         const up = diff >= 0;
         const text = (up ? "+" : "−") + fmtNumber(Math.abs(diff));
-        const h = 14;
+        const h = 16;
         // above the higher point for "up", below the lower point for "down",
         // kept inside the plot area
-        let cy = up ? yAnchor - 14 : yAnchor + 14;
+        let cy = up ? yAnchor - 19 : yAnchor + 19;
         cy = Math.min(Math.max(cy, CF.padT + h / 2), f.bottom - h / 2 - 2);
         // Plain coloured text (no box, which competed with the marks); a
         // background-coloured outline keeps it legible where it crosses a
         // line or bar — see .cfDiff text in briefing.css.
         return `<g class="cfDiff ${up ? "up" : "down"}">` +
-            `<text x="${cx.toFixed(1)}" y="${(cy + 3.8).toFixed(1)}" text-anchor="middle">${text}</text></g>`;
+            `<text x="${cx.toFixed(1)}" y="${(cy + 4.5).toFixed(1)}" text-anchor="middle">${text}</text></g>`;
     }
 
     function cfTip(month, cur, ly) {
@@ -1727,9 +1730,9 @@ window.THD = window.THD || {};
             s += `<rect class="cfHit" x="${cx - f.step / 2}" y="${CF.padT}" width="${f.step}" height="${CF.h - CF.padT - CF.padB}"/>`;
             if (Number.isFinite(ly)) {
                 s += `<line class="cfLink ${v >= ly ? "up" : "down"}" x1="${cx}" x2="${cx}" y1="${f.y(ly)}" y2="${f.y(v)}"/>`;
-                s += `<circle class="cfRing" cx="${cx}" cy="${f.y(ly)}" r="4.5"/>`;
+                s += `<circle class="cfRing" cx="${cx}" cy="${f.y(ly)}" r="6"/>`;
             }
-            s += `<circle class="cfDot${open ? " isOpen" : ""}" cx="${cx}" cy="${f.y(v)}" r="5.5"/>`;
+            s += `<circle class="cfDot${open ? " isOpen" : ""}" cx="${cx}" cy="${f.y(v)}" r="7.5"/>`;
             if (Number.isFinite(ly) && !open) {
                 const diff = v - ly;
                 s += cfDiffChip(cx, diff >= 0 ? f.y(Math.max(v, ly)) : f.y(Math.min(v, ly)), diff, f);

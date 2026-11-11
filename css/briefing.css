@@ -1611,11 +1611,7 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 }
 
-@media(min-width:1100px){
-
-    .custPanels{ grid-template-columns:repeat(2, minmax(0,1fr)); }
-
-}
+/* One panel per row at every width: side by side they were too small. */
 
 .custPanel{
 
@@ -1708,7 +1704,12 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 .custPanel .custChart{ padding:10px 12px 6px; }
 
-.custPanel .cfSvg{ max-height:260px; }
+/* Phones: keep the chart at a readable size and let it scroll sideways
+   inside its frame instead of shrinking the text. */
+.custPanel .custChart{ overflow-x:auto; }
+@media(max-width:720px){
+    .custPanel .cfSvg{ min-width:680px; }
+}
 
 /* this year's dots take the panel's accent colour */
 .custPanel .cfSvg .cfDot{ fill:var(--cust); }
@@ -1717,3 +1718,11 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 /* the share figure now stands alone in the top row */
 .custStats{ grid-template-columns:minmax(0,1fr); }
+
+/* Full-width customer panels: marks and labels sized for the bigger plot */
+.custPanel .cfSvg .cfLink{ stroke-width:3.5; }
+.custPanel .cfSvg .cfRing{ stroke-width:2; }
+.custPanel .cfSvg .cfDiff text{ font-size:13.5px; stroke-width:4px; }
+.custPanel .cfSvg .cfTick,
+.custPanel .cfSvg .cfMonth{ font-size:12.5px; }
+.custPanel .cfSvg .cfYear{ font-size:11px; }
