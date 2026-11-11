@@ -36,14 +36,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css?v=63">
-    <link rel="stylesheet" href="css/layout.css?v=63">
-    <link rel="stylesheet" href="css/cards.css?v=63">
-    <link rel="stylesheet" href="css/charts.css?v=63">
-    <link rel="stylesheet" href="css/tables.css?v=63">
-    <link rel="stylesheet" href="css/dark.css?v=63">
-    <link rel="stylesheet" href="css/briefing.css?v=63">
-    <link rel="stylesheet" href="css/print.css?v=63" media="print">
+    <link rel="stylesheet" href="css/main.css?v=64">
+    <link rel="stylesheet" href="css/layout.css?v=64">
+    <link rel="stylesheet" href="css/cards.css?v=64">
+    <link rel="stylesheet" href="css/charts.css?v=64">
+    <link rel="stylesheet" href="css/tables.css?v=64">
+    <link rel="stylesheet" href="css/dark.css?v=64">
+    <link rel="stylesheet" href="css/briefing.css?v=64">
+    <link rel="stylesheet" href="css/print.css?v=64" media="print">
 
 </head>
 
@@ -114,6 +114,11 @@ Replaces the old fixed sidebar. Nav links keep the
             <a href="#" data-view="sales">
                 <i data-lucide="shopping-bag"></i>
                 <span data-i18n="nav.sales">Sales</span>
+            </a>
+
+            <a href="#" data-view="ads">
+                <i data-lucide="megaphone"></i>
+                <span data-i18n="nav.ads">Ads</span>
             </a>
 
             <a href="#" data-view="notes">
@@ -1094,6 +1099,101 @@ MAIN
 
 
 
+<!-- ================= ADS PERFORMANCE (META) ================= -->
+<!-- Cost from Meta Ads Manager, orders/revenue from HandKey, joined in
+     the THD 広告パフォーマンス sheet (feed_ads tab). Rendered by
+     THD.ui.renderAds / THD.charts.renderAdsChart. -->
+
+<div class="dashboardView viewHidden" data-view="ads">
+
+<div class="adsToolbar">
+
+    <label class="adsProductPick">
+        <span data-i18n="ads.productLabel">Product</span>
+        <select id="adsProductSelect">
+            <option value="all" data-i18n="ads.allProducts">All products</option>
+        </select>
+    </label>
+
+    <small class="adsCompareLabel" id="adsCompareLabel"></small>
+
+</div>
+
+<div class="adsEmpty" id="adsEmpty" style="display:none;"></div>
+
+<div id="adsContent">
+
+    <section class="vitals adsVitals" id="adsVitals" aria-label="Ads KPIs"></section>
+
+    <p class="adsSourceNote" id="adsSourceNote"></p>
+
+    <section class="chartCard">
+
+        <div class="chartHeader">
+            <div>
+                <h3 data-i18n="ads.chartTitle">Spend and orders</h3>
+                <small data-i18n="ads.chartSub">Bars: HandKey orders (new / repeat). Line: Meta ad spend.</small>
+            </div>
+        </div>
+
+        <div class="chartBody">
+            <canvas id="adsChart"></canvas>
+        </div>
+
+    </section>
+
+    <section class="chartCard">
+
+        <div class="chartHeader">
+            <div>
+                <h3 data-i18n="ads.splitTitle">New vs repeat</h3>
+                <small data-i18n="ads.splitSub">Orders and revenue from HandKey</small>
+            </div>
+        </div>
+
+        <div class="adsSplit" id="adsSplit"></div>
+
+    </section>
+
+    <section class="tableCard">
+
+        <div class="tableHeader">
+            <h3 data-i18n="ads.campaignTitle">By campaign</h3>
+        </div>
+
+        <div class="tableResponsive">
+            <table class="modernTable adsTable">
+                <thead>
+                    <tr>
+                        <th data-i18n="th.ads.campaign">Campaign</th>
+                        <th data-i18n="th.ads.product">Product</th>
+                        <th class="number" data-i18n="th.ads.spend">Spend</th>
+                        <th class="number" data-i18n="th.ads.imp">Impr.</th>
+                        <th class="number" data-i18n="th.ads.clicks">Clicks</th>
+                        <th class="number" data-i18n="th.ads.ctr">CTR</th>
+                        <th class="number" data-i18n="th.ads.cpc">CPC</th>
+                        <th class="number" data-i18n="th.ads.metaCv">Meta CV (ref.)</th>
+                        <th class="number" data-i18n="th.ads.orders">Orders</th>
+                        <th class="number" data-i18n="th.ads.new">New</th>
+                        <th class="number" data-i18n="th.ads.repeat">Repeat</th>
+                        <th class="number" data-i18n="th.ads.revenue">Revenue</th>
+                        <th class="number" data-i18n="th.ads.roas">ROAS</th>
+                        <th class="number" data-i18n="th.ads.cpa">CPA</th>
+                        <th class="number" data-i18n="th.ads.newCpa">New CPA</th>
+                    </tr>
+                </thead>
+                <tbody id="adsCampaignTable"></tbody>
+            </table>
+        </div>
+
+    </section>
+
+</div>
+
+</div>
+
+
+
 <!-- ================= NOTES ================= -->
 
 <div class="dashboardView viewHidden" data-view="notes">
@@ -1240,19 +1340,19 @@ MAIN
 
 </script>
 
-<script src="js/i18n.js?v=63"></script>
-<script src="js/gate.js?v=63"></script>
-<script src="js/charts.js?v=63"></script>
-<script src="js/ui.js?v=63"></script>
-<script src="js/data.js?v=63"></script>
-<script src="js/export.js?v=63"></script>
+<script src="js/i18n.js?v=64"></script>
+<script src="js/gate.js?v=64"></script>
+<script src="js/charts.js?v=64"></script>
+<script src="js/ui.js?v=64"></script>
+<script src="js/data.js?v=64"></script>
+<script src="js/export.js?v=64"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="js/notes.js?v=63"></script>
+<script src="js/notes.js?v=64"></script>
 <!-- js/goals.js (Monthly Targets) — built for v2 but paused before ship,
      see thd-dashboard-changelog.md. Re-add this tag plus the wiring
      commented out in app.js's init() to bring it back. -->
-<script src="js/app.js?v=63"></script>
+<script src="js/app.js?v=64"></script>
 
 </body>
 </html>

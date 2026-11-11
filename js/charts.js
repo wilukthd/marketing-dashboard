@@ -572,6 +572,91 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Ads Performance chart
+       HandKey orders as stacked bars (new / repeat, right axis)
+       under Meta ad spend as a line (left axis). Daily for ranges
+       up to ~2 months, weekly beyond (see buildAdsReport).
+    ========================================================== */
+
+    let adsChartInstance = null;
+
+    function renderAdsChart(trend) {
+        const canvas = document.getElementById("adsChart");
+        if (!canvas) return;
+        if (adsChartInstance) {
+            adsChartInstance.destroy();
+            adsChartInstance = null;
+        }
+        if (!trend || !trend.labels || !trend.labels.length) return;
+
+        const colors = getChartColors();
+        const t = window.I18N.t;
+        const yen = (v) => "¥" + Math.round(v).toLocaleString("en-US");
+        const labels = trend.labels.map((d) => {
+            const day = window.I18N.formatDayLabel(d + "T00:00:00");
+            return trend.granularity === "week" ? t("ads.weekOf", { date: day }) : day;
+        });
+        const newColor = cssVar("--m-purchases", "#2B7A4B");
+        const repeatColor = cssVar("--m-sessions", "#0F8A8A");
+        const spendColor = cssVar("--m-cvr", "#6B47D6");
+
+        adsChartInstance = new Chart(canvas.getContext("2d"), {
+            data: {
+                labels,
+                datasets: [
+                    { type: "line", label: t("ads.spend"), data: trend.spend, yAxisID: "ySpend", order: 0,
+                        borderColor: spendColor, backgroundColor: spendColor, borderWidth: 2, pointRadius: 0,
+                        pointHoverRadius: 4, tension: 0.3 },
+                    { type: "bar", label: t("ads.newTitle"), data: trend.newOrders, yAxisID: "yOrders", stack: "orders", order: 1,
+                        backgroundColor: newColor, borderRadius: 3, maxBarThickness: 22 },
+                    { type: "bar", label: t("ads.repeatTitle"), data: trend.repeatOrders, yAxisID: "yOrders", stack: "orders", order: 1,
+                        backgroundColor: repeatColor, borderRadius: 3, maxBarThickness: 22 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    legend: { position: "top", align: "end", labels: { color: colors.textLight, boxWidth: 12, usePointStyle: true } },
+                    tooltip: {
+                        backgroundColor: "#181A22",
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: (item) => item.dataset.yAxisID === "ySpend"
+                                ? `${item.dataset.label}: ${yen(item.parsed.y)}`
+                                : `${item.dataset.label}: ${Math.round(item.parsed.y).toLocaleString("en-US")}`,
+                            footer: (items) => {
+                                const i = items[0] && items[0].dataIndex;
+                                if (i === undefined) return "";
+                                const orders = (trend.newOrders[i] || 0) + (trend.repeatOrders[i] || 0);
+                                const roas = trend.roas[i];
+                                return [
+                                    `${t("ads.orders")}: ${orders}`,
+                                    `${t("ads.revenue")}: ${yen(trend.revenue[i] || 0)}`,
+                                    `${t("ads.roas")}: ${roas === null || roas === undefined ? "—" : Math.round(roas) + "%"}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { color: colors.textLight, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+                    ySpend: {
+                        position: "left", beginAtZero: true, grid: { color: colors.grid }, border: { display: false },
+                        ticks: { color: colors.textLight, callback: (v) => yen(v) }
+                    },
+                    yOrders: {
+                        position: "right", stacked: true, beginAtZero: true, grid: { display: false }, border: { display: false },
+                        ticks: { color: colors.textLight, precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+
     // Charts created while their tab is hidden (display:none) get stuck
     // at Chart.js's zero-size fallback, since nothing tells them to
     // remeasure once the container becomes visible again. Call this
@@ -581,6 +666,7 @@ window.THD = window.THD || {};
         if (aovChartInstance) aovChartInstance.resize();
         if (channelTrendChartInstance) channelTrendChartInstance.resize();
         if (landingRisingChartInstance) landingRisingChartInstance.resize();
+        if (adsChartInstance) adsChartInstance.resize();
         Object.values(trafficChartInstances).forEach((chart) => chart.resize());
     }
 
@@ -590,6 +676,7 @@ window.THD = window.THD || {};
         renderChannelTrendChart,
         renderAovChart,
         renderLandingPageMiniChart,
+        renderAdsChart,
         resizeCharts
     };
 

@@ -83,10 +83,8 @@ window.THD = window.THD || {};
         if (!status.sources) keys.push("dataWarning.sources");
         if (!status.landingPages) keys.push("dataWarning.landingPages");
         if (!status.newRepeat) keys.push("dataWarning.newRepeat");
-        // Ads/transactions only matter once their tab exists — until then
-        // nothing on screen uses them, so a warning would just be noise.
-        if (THD.ui.renderAdsKpis && !status.adSpend) keys.push("dataWarning.adSpend");
-        if (THD.ui.renderTransactionsTable && !status.transactions) keys.push("dataWarning.transactions");
+        // The Ads feed never falls back to demo numbers; its own tab says
+        // when it isn't connected or didn't load, so it's not listed here.
 
         if (!keys.length) {
             el.style.display = "none";
@@ -1177,6 +1175,7 @@ window.THD = window.THD || {};
         overview: ["header.overview.title", "header.overview.subtitle"],
         traffic: ["header.traffic.title", "header.traffic.subtitle"],
         sales: ["header.sales.title", "header.sales.subtitle"],
+        ads: ["header.ads.title", "header.ads.subtitle"],
         notes: ["header.notes.title", "header.notes.subtitle"],
         settings: ["header.settings.title", "header.settings.subtitle"]
     };
@@ -2002,6 +2001,156 @@ window.THD = window.THD || {};
         });
     }
 
+    /* ==========================================================
+       Ads Performance (Meta)
+       Cost from Meta Ads Manager, results from HandKey — see
+       buildAdsReport in data.js. ROAS is shown as a percentage
+       (revenue ÷ spend × 100), the way the ads team reads it.
+    ========================================================== */
+
+    const adsT = (k, vars) => window.I18N.t(k, vars);
+    const esc = (s) => String(s === null || s === undefined ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const orDash = (v, f) => (v === null || v === undefined || !Number.isFinite(v) ? "—" : f(v));
+    const fmtRoas = (v) => orDash(v, (x) => Math.round(x).toLocaleString("en-US") + "%");
+
+    function populateAdsProducts(products, current) {
+        const sel = document.getElementById("adsProductSelect");
+        if (!sel) return;
+        const want = ["all"].concat(products || []);
+        const have = Array.from(sel.options).map((o) => o.value);
+        if (want.join("|") !== have.join("|")) {
+            sel.innerHTML = want.map((p) => `<option value="${esc(p)}">${esc(p === "all" ? adsT("ads.allProducts") : p)}</option>`).join("");
+        } else if (sel.options[0]) {
+            sel.options[0].textContent = adsT("ads.allProducts"); // language may have changed
+        }
+        sel.value = want.includes(current) ? current : "all";
+    }
+
+    function setAdsState(showContent) {
+        const content = document.getElementById("adsContent");
+        const empty = document.getElementById("adsEmpty");
+        if (content) content.style.display = showContent ? "" : "none";
+        if (empty) empty.style.display = showContent ? "none" : "";
+    }
+
+    function renderAdsEmpty(configured) {
+        setAdsState(false);
+        const el = document.getElementById("adsEmpty");
+        if (!el) return;
+        el.innerHTML = `<i data-lucide="plug-zap"></i>
+            <strong>${esc(adsT(configured ? "ads.emptyFailedTitle" : "ads.emptyTitle"))}</strong>
+            <p>${esc(adsT(configured ? "ads.emptyFailedBody" : "ads.emptyBody"))}</p>`;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    // Relative change in %, or null when there's nothing to compare against.
+    const relChange = (cur, prev) => (Number.isFinite(cur) && Number.isFinite(prev) && prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null);
+
+    // goodWhen: "up" | "down" | null (neutral, e.g. spend)
+    function adsDelta(cur, prev, hasCompare, goodWhen, pts) {
+        if (!hasCompare) return `<span class="vitalDelta neutral">${esc(adsT("kpi.noCompareData"))}</span>`;
+        if (pts) {
+            if (!Number.isFinite(cur) || !Number.isFinite(prev)) return `<span class="vitalDelta neutral">—</span>`;
+            const d = cur - prev;
+            const tone = goodWhen === null ? "neutral" : ((d >= 0) === (goodWhen === "up") ? "pos" : "neg");
+            return `<span class="vitalDelta ${tone}">${d > 0 ? "▲ " : d < 0 ? "▼ " : "– "}${Math.abs(d).toFixed(0)}pt</span>`;
+        }
+        const ch = relChange(cur, prev);
+        if (ch === null) return `<span class="vitalDelta neutral">—</span>`;
+        const tone = goodWhen === null || ch === 0 ? "neutral" : ((ch > 0) === (goodWhen === "up") ? "pos" : "neg");
+        return `<span class="vitalDelta ${tone}">${fmtDelta(ch)}</span>`;
+    }
+
+    function renderAds(report, range) {
+        setAdsState(true);
+        const t = report.totals, p = report.prevTotals, hc = report.hasCompare;
+
+        const note = document.getElementById("adsSourceNote");
+        if (note) {
+            const asOf = report.latestDate ? window.I18N.formatDayLabel(report.latestDate + "T00:00:00") : "—";
+            note.textContent = adsT("ads.sourceNote", { date: asOf });
+        }
+        const cmp = document.getElementById("adsCompareLabel");
+        if (cmp) cmp.textContent = hc ? adsT(range && range.isYoy ? "ads.vsYoy" : "ads.vsPrev") : "";
+
+        const tile = (color, label, value, delta, sub) => `
+            <div class="vital adsTile" style="--vital:var(--m-${color})">
+                <span class="vitalLabel">${esc(label)}</span>
+                <span class="vitalValue">${value}</span>
+                <span class="vitalFoot">${delta}</span>
+                ${sub ? `<span class="adsTileSub">${sub}</span>` : ""}
+            </div>`;
+        const tiles = document.getElementById("adsVitals");
+        if (tiles) {
+            tiles.innerHTML = [
+                tile("cvr", adsT("ads.spend"), esc(fmtYen(t.spend)), adsDelta(t.spend, p.spend, hc, null),
+                    esc(adsT("ads.spendSub", { imp: fmtNumber(t.impressions), clicks: fmtNumber(t.clicks) }))),
+                tile("purchases", adsT("ads.orders"), esc(fmtNumber(t.orders)), adsDelta(t.orders, p.orders, hc, "up"),
+                    esc(adsT("ads.ordersSub", { n: fmtNumber(t.newOrders), r: fmtNumber(t.repeatOrders) })) +
+                    `<br><span class="adsRef">${esc(adsT("ads.metaRef", { n: fmtNumber(t.metaPurchases) }))}</span>`),
+                tile("revenue", adsT("ads.revenue"), esc(fmtYen(t.revenue)), adsDelta(t.revenue, p.revenue, hc, "up"),
+                    esc(adsT("ads.aovSub", { v: orDash(t.aov, fmtYen) }))),
+                tile("aov", adsT("ads.roas"), esc(fmtRoas(t.roas)), adsDelta(t.roas, p.roas, hc, "up", true),
+                    esc(adsT("ads.roasSub", { n: fmtRoas(t.newRoas), r: fmtRoas(t.repeatRoas) }))),
+                tile("sessions", adsT("ads.cpa"), esc(orDash(t.cpa, fmtYen)), adsDelta(t.cpa, p.cpa, hc, "down"),
+                    esc(adsT("ads.metaCpaRef", { v: orDash(t.metaCpa, fmtYen) }))),
+                tile("users", adsT("ads.newCpa"), esc(orDash(t.newCpa, fmtYen)), adsDelta(t.newCpa, p.newCpa, hc, "down"),
+                    esc(adsT("ads.boughtAgainSub", { n: fmtNumber(t.newBoughtAgain), of: fmtNumber(t.newOrders) })))
+            ].join("");
+        }
+
+        // New vs repeat, side by side
+        const split = document.getElementById("adsSplit");
+        if (split) {
+            const row = (label, value) => `<div class="adsSplitRow"><span>${esc(label)}</span><b>${value}</b></div>`;
+            const share = (part) => (t.orders ? Math.round((part / t.orders) * 100) + "%" : "—");
+            split.innerHTML = `
+                <div class="adsSplitCol isNew">
+                    <div class="adsSplitHead"><i data-lucide="user-plus"></i><strong>${esc(adsT("ads.newTitle"))}</strong><small>${esc(adsT("ads.shareOfOrders", { pct: share(t.newOrders) }))}</small></div>
+                    ${row(adsT("ads.orders"), esc(fmtNumber(t.newOrders)))}
+                    ${row(adsT("ads.revenue"), esc(fmtYen(t.newRevenue)))}
+                    ${row(adsT("ads.aov"), esc(orDash(t.newAov, fmtYen)))}
+                    ${row(adsT("ads.roas"), esc(fmtRoas(t.newRoas)))}
+                    ${row(adsT("ads.newCpa"), esc(orDash(t.newCpa, fmtYen)))}
+                    ${row(adsT("ads.boughtAgain"), esc(`${fmtNumber(t.newBoughtAgain)} / ${fmtNumber(t.newOrders)}`) +
+                        ` <small>(${esc(orDash(t.boughtAgainRate, (v) => v.toFixed(1) + "%"))})</small>`)}
+                </div>
+                <div class="adsSplitCol isRepeat">
+                    <div class="adsSplitHead"><i data-lucide="repeat"></i><strong>${esc(adsT("ads.repeatTitle"))}</strong><small>${esc(adsT("ads.shareOfOrders", { pct: share(t.repeatOrders) }))}</small></div>
+                    ${row(adsT("ads.orders"), esc(fmtNumber(t.repeatOrders)))}
+                    ${row(adsT("ads.revenue"), esc(fmtYen(t.repeatRevenue)))}
+                    ${row(adsT("ads.aov"), esc(orDash(t.repeatAov, fmtYen)))}
+                    ${row(adsT("ads.roas"), esc(fmtRoas(t.repeatRoas)))}
+                </div>`;
+        }
+
+        // Campaign table
+        const body = document.getElementById("adsCampaignTable");
+        if (body) {
+            const cells = (c) => `
+                <td class="number">${esc(fmtYen(c.spend))}</td>
+                <td class="number">${esc(fmtNumber(c.impressions))}</td>
+                <td class="number">${esc(fmtNumber(c.clicks))}</td>
+                <td class="number">${esc(orDash(c.ctr, (v) => v.toFixed(2) + "%"))}</td>
+                <td class="number">${esc(orDash(c.cpc, fmtYen))}</td>
+                <td class="number adsRefCell">${esc(fmtNumber(c.metaPurchases))}</td>
+                <td class="number"><b>${esc(fmtNumber(c.orders))}</b></td>
+                <td class="number">${esc(fmtNumber(c.newOrders))}</td>
+                <td class="number">${esc(fmtNumber(c.repeatOrders))}</td>
+                <td class="number">${esc(fmtYen(c.revenue))}</td>
+                <td class="number"><b>${esc(fmtRoas(c.roas))}</b></td>
+                <td class="number">${esc(orDash(c.cpa, fmtYen))}</td>
+                <td class="number">${esc(orDash(c.newCpa, fmtYen))}</td>`;
+            const rows = report.campaigns.map((c) => `<tr><td>${esc(c.campaign)}</td><td>${esc(c.product)}</td>${cells(c)}</tr>`);
+            body.innerHTML = rows.length
+                ? rows.join("") + `<tr class="adsTotalRow"><td>${esc(adsT("ads.total"))}</td><td></td>${cells(t)}</tr>`
+                : `<tr><td colspan="15" class="textLight">${esc(adsT("ads.noRows"))}</td></tr>`;
+        }
+
+        if (window.lucide) lucide.createIcons();
+    }
+
     THD.ui = {
         renderTrafficTree,
         wireTrafficTree,
@@ -2066,7 +2215,10 @@ window.THD = window.THD || {};
         setGoalsStatus,
         renderGoalProgress,
         wireCsvExportButtons,
-        wireExportPdfButton
+        wireExportPdfButton,
+        populateAdsProducts,
+        renderAdsEmpty,
+        renderAds
     };
 
 })(window.THD);

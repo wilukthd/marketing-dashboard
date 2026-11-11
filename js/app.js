@@ -17,10 +17,9 @@
     let dailyRows = [];       // full daily GA4 rows (real or dummy), oldest -> newest
     let sourceRows = [];      // full per-day-per-source rows (real or dummy)
     let landingRows = [];     // full per-day-per-path-per-source rows (real or dummy)
-    let adSpendRows = [];     // full daily ad spend rows (real or dummy) — see Ads Performance
-    let transactionRows = []; // full per-order rows (real or dummy) — see Ads Performance
-    let lastCampaignRows = []; // last-rendered Ads Performance campaign table rows, cached for its CSV export button
-    let lastTransactionRows = []; // last-rendered (full, unsliced) Transactions rows, cached for its CSV export button
+    let adSpendRows = [];     // Ads feed rows (day × campaign), live only — never demo data
+    let adsProduct = "all";   // Ads tab product filter
+    let lastAdsRange = null;  // range of the last render, so the product filter can re-render the Ads tab alone
     let currentRange = "month";
     let currentCustomRange = null; // { start: Date, end: Date }, only used when currentRange === "custom"
     let compareMode = "previous"; // "previous" | "yoy" — see #compareModeSelect / resolveRange in data.js
@@ -326,8 +325,7 @@
     ];
 
     // Campaign names randomly attached to the paid rows above, so the
-    // Ads Performance tab's campaign-level matching has something
-    // real to demo (see buildAdPerformance in data.js). "google / cpc"
+    // demo traffic data has campaign-tagged paid rows. "google / cpc"
     // rows get a Google campaign; "facebook / cpc" / "instagram / cpc"
     // get a Meta one — everything else stays campaign: null, same as
     // it would on a sheet that hasn't added the column yet.
@@ -354,66 +352,6 @@
                 const revenue = purchases * (7000 + Math.random() * 6000);
                 rows.push({ sourceMedium: name, date: dateStr, sessions, users, purchases, revenue, channel: null, campaign: randomCampaignFor(name) });
             });
-        }
-        return rows;
-    }
-
-    // Daily spend for the same 3 Google + 3 Meta campaigns tagged
-    // onto the dummy source rows above, plus one deliberately
-    // unmatched Meta campaign (no matching GA4 campaign name) — so
-    // demo mode also shows the campaign table's "unmatched" state,
-    // not just the happy path.
-    const AD_SPEND_CAMPAIGNS = [
-        ...GOOGLE_CAMPAIGNS.map((campaign) => ({ platform: "Google", campaign })),
-        ...META_CAMPAIGNS.map((campaign) => ({ platform: "Meta", campaign })),
-        { platform: "Meta", campaign: "Video_Views_TopFunnel" } // intentionally unmatched
-    ];
-
-    function buildDummyAdSpend(days = 900) {
-        const rows = [];
-        for (let i = 0; i < days; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - (days - 1 - i));
-            const dateStr = d.toISOString().slice(0, 10);
-
-            AD_SPEND_CAMPAIGNS.forEach(({ platform, campaign }) => {
-                const clicks = Math.round(Math.random() * 40 + 5);
-                const impressions = Math.round(clicks * (12 + Math.random() * 18));
-                const spend = Math.round(clicks * (55 + Math.random() * 45));
-                rows.push({ date: dateStr, platform, campaign, spend, impressions, clicks });
-            });
-        }
-        return rows;
-    }
-
-    // A handful of orders per day, skewed toward the paid sources so
-    // the Transactions table actually has something to reconcile
-    // against ad spend — same sourceMedium/campaign pairing as above.
-    const TRANSACTION_SOURCE_POOL = [
-        "google / cpc", "google / cpc", "facebook / cpc", "instagram / cpc",
-        "google / organic", "(direct) / (none)", "yahoo / organic", "rakuten / referral"
-    ];
-
-    function buildDummyTransactions(days = 900) {
-        const rows = [];
-        let counter = 1;
-        for (let i = 0; i < days; i++) {
-            const d = new Date();
-            d.setDate(d.getDate() - (days - 1 - i));
-            const dateStr = d.toISOString().slice(0, 10);
-
-            const orderCount = Math.round(Math.random() * 4);
-            for (let n = 0; n < orderCount; n++) {
-                const sourceMedium = TRANSACTION_SOURCE_POOL[Math.floor(Math.random() * TRANSACTION_SOURCE_POOL.length)];
-                rows.push({
-                    orderId: `THD-${dateStr.replace(/-/g, "")}-${String(counter++).padStart(4, "0")}`,
-                    date: dateStr,
-                    sourceMedium,
-                    campaign: randomCampaignFor(sourceMedium),
-                    revenue: Math.round(3000 + Math.random() * 12000),
-                    newOrRepeat: Math.random() < 0.2 ? "new" : "repeat"
-                });
-            }
         }
         return rows;
     }
@@ -743,35 +681,20 @@
         // renderGoalsProgressFromState();
     }
 
-    // Spend/ROAS/CPA KPIs, the spend-vs-revenue trend chart, the
-    // campaign table, and the Transactions table — all recomputed
-    // together since they all key off the same date range. See
-    // buildAdPerformance in data.js for how spend gets matched to
-    // GA4 sessions/revenue (platform-level, always on; campaign-level,
-    // best-effort where both feeds tag a matching campaign name).
-    //
-    // STATUS: data layer only — the UI half of this feature (a new
-    // Ads Performance tab, its KPI cards, chart, and both tables in
-    // index.html/ui.js/charts.js) hasn't been built yet, so the
-    // THD.ui./THD.charts. calls below are existence-checked rather
-    // than called directly. Remove the checks once those functions
-    // exist; until then this just computes the numbers without
-    // anywhere to show them, and does nothing else.
-    // Ads Performance has a data layer but no screen yet; computing it on
-    // every render (and loading/generating its feeds) was pure overhead.
-    // Flip on together with the UI.
-    const ADS_ENABLED = false;
-
+    // Ads tab (Meta): cost from Meta Ads Manager, results from HandKey —
+    // see buildAdsReport in data.js. Follows the main date range and
+    // compare mode; has its own product filter.
     function renderAdsTab(range) {
-        if (!ADS_ENABLED) return;
-        const perf = THD.data.buildAdPerformance(adSpendRows, sourceRows, range);
-        if (THD.ui.renderAdsKpis) THD.ui.renderAdsKpis(perf);
-        if (THD.charts.renderAdSpendChart) THD.charts.renderAdSpendChart(perf.trend.labels, perf.trend.spend, perf.trend.revenue);
-        lastCampaignRows = perf.campaigns;
-        if (THD.ui.renderCampaignTable) THD.ui.renderCampaignTable(lastCampaignRows);
-
-        lastTransactionRows = THD.data.buildTransactionsList(transactionRows, range);
-        if (THD.ui.renderTransactionsTable) THD.ui.renderTransactionsTable(lastTransactionRows);
+        lastAdsRange = range;
+        THD.ui.populateAdsProducts(THD.data.listAdProducts(adSpendRows), adsProduct);
+        if (!adSpendRows.length) {
+            THD.ui.renderAdsEmpty(THD.data.isAdsFeedConfigured());
+            THD.charts.renderAdsChart(null);
+            return;
+        }
+        const report = THD.data.buildAdsReport(adSpendRows, range, adsProduct);
+        THD.ui.renderAds(report, range);
+        THD.charts.renderAdsChart(report.trend);
     }
 
     // Goal progress always compares "This Month" actuals against
@@ -901,6 +824,14 @@
         });
         THD.ui.wireMetricToggles(renderTrendOnly);
         THD.ui.wireMetricToggles(renderAovChartOnly, "aovMetricToggles");
+
+        const adsProductSelect = document.getElementById("adsProductSelect");
+        if (adsProductSelect) {
+            adsProductSelect.addEventListener("change", () => {
+                adsProduct = adsProductSelect.value;
+                if (lastAdsRange) renderAdsTab(lastAdsRange);
+            });
+        }
         THD.ui.wireTrendOverlayToggle(renderTrendOnly);
         THD.ui.wireSourceFilterToggle((channel) => {
             sourceFilterChannel = channel;
@@ -1112,13 +1043,12 @@
 
         // Each source loads independently and falls back to dummy
         // data on its own, so a partial live setup still works.
-        const [liveDaily, liveSources, liveNewRepeat, liveLandingPages, liveAdSpend, liveTransactions] = await Promise.all([
+        const [liveDaily, liveSources, liveNewRepeat, liveLandingPages, liveAdSpend] = await Promise.all([
             THD.data.loadDailyGA4(),
             THD.data.loadSources(),
             THD.data.loadNewRepeat(),
             THD.data.loadLandingPages(),
-            ADS_ENABLED ? THD.data.loadAdSpend() : Promise.resolve(null),
-            ADS_ENABLED ? THD.data.loadTransactions() : Promise.resolve(null)
+            THD.data.isAdsFeedConfigured() ? THD.data.loadAdSpend() : Promise.resolve(null)
         ]);
 
         // On a REFRESH, a feed that fails keeps its last good data instead
@@ -1143,8 +1073,10 @@
         THD.data.setLatestDataDate(latestDataDate(dailyRows));
         sourceRows = sourcesPick.rows;
         landingRows = landingPick.rows;
-        adSpendRows = !ADS_ENABLED ? [] : (liveAdSpend && liveAdSpend.length ? liveAdSpend : buildDummyAdSpend());
-        transactionRows = !ADS_ENABLED ? [] : (liveTransactions && liveTransactions.length ? liveTransactions : buildDummyTransactions());
+        // Ads: live data only. A failed refresh keeps the last good rows.
+        const adsLive = !!(liveAdSpend && liveAdSpend.length);
+        if (adsLive) adSpendRows = liveAdSpend;
+        else if (adSpendRows.length) lastLoadPartialFailure = true;
         const newRepeat = newRepeatPick.rows;
 
         dataSourceStatus = {
@@ -1152,8 +1084,8 @@
             sources: sourcesPick.live,
             landingPages: landingPick.live,
             newRepeat: newRepeatPick.live,
-            adSpend: !!(liveAdSpend && liveAdSpend.length),
-            transactions: !!(liveTransactions && liveTransactions.length)
+            // only a problem when the feed is set up but didn't load
+            adSpend: !THD.data.isAdsFeedConfigured() || adsLive || adSpendRows.length > 0
         };
         THD.ui.renderDataSourceWarning(dataSourceStatus);
 
