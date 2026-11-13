@@ -45,7 +45,9 @@ window.THD = window.THD || {};
 
         const lookingAt = `${window.I18N.t("rangeCompare.lookingAt")} <strong>${fmtISODate(range.start)} – ${fmtISODate(range.end)}</strong>`;
 
-        if (!hasCompareData) {
+        if (feedFailed("daily")) {
+            el.innerHTML = `<i data-lucide="calendar-range"></i>${lookingAt}`;
+        } else if (!hasCompareData) {
             el.innerHTML = `
                 <i data-lucide="calendar-range"></i>
                 ${lookingAt}
@@ -73,27 +75,38 @@ window.THD = window.THD || {};
        section — so nobody mistakes those numbers for real ones.
     ========================================================== */
 
-    function renderDataSourceWarning(status) {
+    // Per-feed load state ("live" | "failed" | "demo"), so an empty section
+    // can say "couldn't load" instead of "nothing happened in this period".
+    let feedStates = {};
+    const feedFailed = (key) => feedStates[key] === "failed";
+    const emptyMsg = (feedKey, defaultKey) => window.I18N.t(feedFailed(feedKey) ? "data.unavailable" : defaultKey);
+
+    function renderDataSourceWarning(status, states) {
+        feedStates = states || {};
         const el = document.getElementById("dataSourceWarning");
         const textEl = document.getElementById("dataSourceWarningText");
         if (!el || !textEl || !status) return;
 
-        const keys = [];
-        if (!status.daily) keys.push("dataWarning.daily");
-        if (!status.sources) keys.push("dataWarning.sources");
-        if (!status.landingPages) keys.push("dataWarning.landingPages");
-        if (!status.newRepeat) keys.push("dataWarning.newRepeat");
-        // The Ads feed never falls back to demo numbers; its own tab says
-        // when it isn't connected or didn't load, so it's not listed here.
+        // A wired feed that didn't load is "couldn't load" (its sections
+        // are empty); demo numbers only stand in for a feed not wired yet.
+        // The Ads feed has its own message on its tab, so it's not listed.
+        const failed = [], demo = [];
+        ["daily", "sources", "landingPages", "newRepeat"].forEach((k) => {
+            if (status[k]) return;
+            (states && states[k] === "demo" ? demo : failed).push("dataWarning." + k);
+        });
 
-        if (!keys.length) {
+        if (!failed.length && !demo.length) {
             el.style.display = "none";
             return;
         }
 
         const separator = window.I18N.getLang() === "ja" ? "、" : ", ";
-        const list = keys.map((k) => window.I18N.t(k)).join(separator);
-        textEl.textContent = window.I18N.t("dataWarning.prefix", { list });
+        const list = (keys) => keys.map((k) => window.I18N.t(k)).join(separator);
+        const parts = [];
+        if (failed.length) parts.push(window.I18N.t("dataWarning.failed", { list: list(failed) }));
+        if (demo.length) parts.push(window.I18N.t("dataWarning.prefix", { list: list(demo) }));
+        textEl.textContent = parts.join(" ");
         el.style.display = "flex";
         if (window.lucide) lucide.createIcons();
     }
@@ -251,7 +264,7 @@ window.THD = window.THD || {};
 
         if (!allLandingPages.length) {
             visibleLandingPages = [];
-            container.innerHTML = `<p class="emptyRow">${window.I18N.t("landing.empty")}</p>`;
+            container.innerHTML = `<p class="emptyRow">${emptyMsg("landingPages", "landing.empty")}</p>`;
             const btn = document.getElementById("toggleLandingPagesBtn");
             if (btn) btn.style.display = "none";
             return;
@@ -981,7 +994,7 @@ window.THD = window.THD || {};
         if (!tbody) return;
 
         if (!rows.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("source.emptyFilter")}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${emptyMsg("sources", "source.emptyFilter")}</td></tr>`;
             const btn = document.getElementById("toggleSourcesBtn");
             if (btn) btn.style.display = "none";
             return;
@@ -1036,6 +1049,10 @@ window.THD = window.THD || {};
     function renderMonthlyTable(rows) {
         const tbody = document.getElementById("monthlyTable");
         if (!tbody) return;
+        if (!rows || !rows.length) {
+            tbody.innerHTML = `<tr><td colspan="${tbody.closest("table").querySelectorAll("thead th").length || 6}" class="emptyRow">${window.I18N.t("data.unavailable")}</td></tr>`;
+            return;
+        }
 
         tbody.innerHTML = rows.map((r) => `
             <tr>
@@ -1062,7 +1079,7 @@ window.THD = window.THD || {};
         if (!container) return;
 
         if (!insights || !insights.length) {
-            container.innerHTML = `<li>${window.I18N.t("newRepeatInsights.empty")}</li>`;
+            container.innerHTML = `<li>${emptyMsg("newRepeat", "newRepeatInsights.empty")}</li>`;
             return;
         }
 
@@ -1076,6 +1093,10 @@ window.THD = window.THD || {};
     function renderNewRepeatTable(rows) {
         const tbody = document.getElementById("newRepeatTable");
         if (!tbody) return;
+        if (!rows || !rows.length) {
+            tbody.innerHTML = `<tr><td colspan="${tbody.closest("table").querySelectorAll("thead th").length || 9}" class="emptyRow">${emptyMsg("newRepeat", "newRepeatInsights.empty")}</td></tr>`;
+            return;
+        }
 
         tbody.innerHTML = rows.map((r) => `
             <tr>
@@ -1451,9 +1472,9 @@ window.THD = window.THD || {};
                         ${v.chart ? `aria-pressed="${plotted ? "true" : "false"}"` : ""}
                         ${v.chart ? `title="${window.I18N.t("brief.vital.hint")}"` : ""}>
                     <span class="vitalLabel">${window.I18N.t(v.labelKey)}${v.chart ? `<span class="vitalOnChart">${window.I18N.t("brief.vital.onChart")}</span>` : ""}</span>
-                    <span class="vitalValue">${v.fmt(data.value)}</span>
-                    <span class="vitalFoot">${vitalDeltaHtml(v.key, data, hasCompareData, partial)}</span>
-                    ${sparkSvg(values, { w: 140, h: 34 })}
+                    <span class="vitalValue">${feedFailed("daily") ? "—" : v.fmt(data.value)}</span>
+                    <span class="vitalFoot">${feedFailed("daily") ? "" : vitalDeltaHtml(v.key, data, hasCompareData, partial)}</span>
+                    ${feedFailed("daily") ? "" : sparkSvg(values, { w: 140, h: 34 })}
                 </button>`;
         }).join("");
 
@@ -1513,10 +1534,10 @@ window.THD = window.THD || {};
         const fmt = (d) => window.I18N.formatDayLabel(d);
         if (rangeEl) rangeEl.textContent = window.I18N.t("brief.kickerRange", { start: fmt(range.start), end: fmt(range.end) });
         if (cmpEl) {
-            cmpEl.textContent = hasCompareData
+            cmpEl.textContent = feedFailed("daily") ? "" : hasCompareData
                 ? window.I18N.t(range.isYoy ? "brief.kickerYoy" : "brief.kickerCompare", { start: fmt(range.prevStart), end: fmt(range.prevEnd) })
                 : window.I18N.t("rangeCompare.noCompareData", { start: fmtISODate(range.prevStart), end: fmtISODate(range.prevEnd) });
-            cmpEl.classList.toggle("isWarning", !hasCompareData);
+            cmpEl.classList.toggle("isWarning", !hasCompareData && !feedFailed("daily"));
         }
         if (asOfEl) asOfEl.textContent = dataAsOf ? window.I18N.t("brief.dataAsOf", { date: fmt(dataAsOf) }) : "";
         if (partialEl) partialEl.style.display = range.partial ? "" : "none";
@@ -1558,7 +1579,7 @@ window.THD = window.THD || {};
 
         if (!list) return;
         if (!briefing.stories.length) {
-            list.innerHTML = `<li class="storyEmpty">${window.I18N.t("brief.feedEmpty")}</li>`;
+            list.innerHTML = `<li class="storyEmpty">${emptyMsg("daily", "brief.feedEmpty")}</li>`;
             return;
         }
         // A briefing should be short: the 5 most important stories, the
@@ -1904,7 +1925,8 @@ window.THD = window.THD || {};
         if (n.level === "platform") {
             const hk = "platHint." + n.label;
             const hint = t(hk);
-            return hint === hk ? null : { name: null, hint };
+            if (hint === hk) return null;
+            return { name: null, hint: n.label === "(not set)" && lastTreeUnsettled ? hint + " " + t("traffic.unsettledNote") : hint };
         }
         if (n.level !== "channel") return null;
         for (const k of [(n.platform || "") + "|" + n.label, n.label]) {
@@ -2009,13 +2031,16 @@ window.THD = window.THD || {};
     }
 
     // colors: channel label -> doughnut color (from renderTrafficChart)
-    function renderTrafficTree(tree, filter, colors) {
+    let lastTreeUnsettled = false; // range reaches into days GA4 is still attributing
+
+    function renderTrafficTree(tree, filter, colors, unsettled) {
         if (tree) lastTree = tree;
         if (colors) lastTreeColors = colors;
+        if (typeof unsettled === "boolean") lastTreeUnsettled = unsettled;
         const tbody = document.getElementById("trafficCompareTable");
         if (!tbody) return;
         if (!lastTree.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${window.I18N.t("traffic.empty")}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="emptyRow">${emptyMsg("sources", "traffic.empty")}</td></tr>`;
             return;
         }
         if (filter) expandPathTo(filter);
@@ -2121,7 +2146,9 @@ window.THD = window.THD || {};
             note.textContent = adsT("ads.sourceNote", { date: asOf });
         }
         const cmp = document.getElementById("adsCompareLabel");
-        if (cmp) cmp.textContent = hc ? adsT(range && range.isYoy ? "ads.vsYoy" : "ads.vsPrev") : "";
+        if (cmp) cmp.textContent = hc
+            ? adsT(range && range.isYoy ? "ads.vsYoy" : "ads.vsPrev") + (report.compareDays ? adsT("ads.sameDays", { n: report.compareDays }) : "")
+            : "";
 
         const tile = (color, label, value, delta, sub) => `
             <div class="vital adsTile" style="--vital:var(--m-${color})">

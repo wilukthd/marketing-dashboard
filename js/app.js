@@ -89,6 +89,7 @@
         THD.ui.showChannelTrendMode(THD.ui.trafficFilterTitle(activeSourceFilter));
         THD.charts.renderChannelTrendChart("trafficChannelTrendChart", label, trendData, THD.ui.getChannelTrendMetric());
     }
+    let dataFeedState = { daily: "live", sources: "live", landingPages: "live", newRepeat: "live" }; // "live" | "failed" | "demo"
     let dataSourceStatus = { daily: true, sources: true, landingPages: true, newRepeat: true }; // true = live data loaded successfully; false = fell back to demo data
 
     function renderNewRepeatSourceNote() {
@@ -538,7 +539,7 @@
         // Left at "all", nothing changes from before this feature.
         const effectiveSourceRows = sourceFilterChannel === "all"
             ? sourceRows
-            : sourceRows.filter((r) => THD.data.classifyForGroupBy(r, "channel") === sourceFilterChannel);
+            : sourceRows.filter((r) => THD.data.classifyForGroupBy(r, "platform") === sourceFilterChannel);
         const effectiveDailyRows = sourceFilterChannel === "all"
             ? dailyRows
             : THD.data.buildDailyRowsFromSources(effectiveSourceRows);
@@ -581,7 +582,7 @@
         previousChannels.concat(currentChannels).forEach((c) => { channelColors[c.label] = c.color; });
 
         lastTrafficTree = THD.data.buildTrafficTree(splitCurrent, splitPrevious);
-        THD.ui.renderTrafficTree(lastTrafficTree, activeSourceFilter, channelColors);
+        THD.ui.renderTrafficTree(lastTrafficTree, activeSourceFilter, channelColors, THD.data.rangeHasUnsettledDays(range));
         renderChannelTrendOrDoughnuts();
 
         // Briefing, insights and anomalies stay platform-level ("Meta Ads"
@@ -633,6 +634,7 @@
             sourceRows: effectiveSourceRows,
             groupBy,
             range,
+            feedFailed: dataFeedState.daily === "failed",
             ...metaAdsForBriefing(range)
         }), onBriefAction);
 
@@ -668,7 +670,7 @@
         // the partial current one, rather than quietly losing a
         // month's worth of the "whole year" picture every time.
         const businessMonths = THD.data.buildBusinessMonths(effectiveDailyRows, 13);
-        lastBusinessMonths = businessMonths.length ? businessMonths : DUMMY_MONTHLY;
+        lastBusinessMonths = businessMonths;
         THD.ui.renderMonthlyTable(lastBusinessMonths);
 
         // Ads Performance: same date range as the rest of this
@@ -1079,16 +1081,20 @@
         const prev = dataSourceStatus;
         const keep = (live, ok, current) => !!(live && live.length) ? null : (ok && current && current.length ? current : null);
         lastLoadPartialFailure = false;
-        const pick = (live, wasLive, current, dummy) => {
-            if (live && live.length) return { rows: live, live: true };
+        // state: "live" | "failed" (wired feed that didn't load — shown as
+        // unavailable, never as made-up numbers) | "demo" (no feed wired yet).
+        const pick = (key, live, wasLive, current, dummy) => {
+            if (live && live.length) return { rows: live, live: true, state: "live" };
             const kept = keep(live, wasLive, current);
-            if (kept) { lastLoadPartialFailure = true; return { rows: kept, live: true }; }
-            return { rows: dummy(), live: false };
+            if (kept) { lastLoadPartialFailure = true; return { rows: kept, live: true, state: "live" }; }
+            if (THD.data.isFeedConfigured(key)) { lastLoadPartialFailure = true; return { rows: [], live: false, state: "failed" }; }
+            return { rows: dummy(), live: false, state: "demo" };
         };
-        const dailyPick = pick(liveDaily, prev.daily && dataFingerprint !== null, dailyRows, buildDummyDailyRows);
-        const sourcesPick = pick(liveSources, prev.sources && dataFingerprint !== null, sourceRows, buildDummySourcesDaily);
-        const landingPick = pick(liveLandingPages, prev.landingPages && dataFingerprint !== null, landingRows, buildDummyLandingPagesDaily);
-        const newRepeatPick = pick(liveNewRepeat, prev.newRepeat && dataFingerprint !== null, fullNewRepeatRows, buildDummyNewRepeat);
+        const dailyPick = pick("daily", liveDaily, prev.daily && dataFingerprint !== null, dailyRows, buildDummyDailyRows);
+        const sourcesPick = pick("sources", liveSources, prev.sources && dataFingerprint !== null, sourceRows, buildDummySourcesDaily);
+        const landingPick = pick("landingPages", liveLandingPages, prev.landingPages && dataFingerprint !== null, landingRows, buildDummyLandingPagesDaily);
+        const newRepeatPick = pick("newRepeat", liveNewRepeat, prev.newRepeat && dataFingerprint !== null, fullNewRepeatRows, buildDummyNewRepeat);
+        dataFeedState = { daily: dailyPick.state, sources: sourcesPick.state, landingPages: landingPick.state, newRepeat: newRepeatPick.state };
 
         dailyRows = dailyPick.rows;
         THD.data.setLatestDataDate(latestDataDate(dailyRows));
@@ -1108,9 +1114,10 @@
             // only a problem when the feed is set up but didn't load
             adSpend: !THD.data.isAdsFeedConfigured() || adsLive || adSpendRows.length > 0
         };
-        THD.ui.renderDataSourceWarning(dataSourceStatus);
+        THD.ui.renderDataSourceWarning(dataSourceStatus, dataFeedState);
 
-        availableChannels = THD.data.listAvailableChannels(sourceRows, "channel");
+        // By platform — the same names as the Traffic table's top-level rows.
+        availableChannels = THD.data.listAvailableChannels(sourceRows, "platform");
         if (sourceFilterChannel !== "all" && !availableChannels.includes(sourceFilterChannel)) {
             sourceFilterChannel = "all";
         }

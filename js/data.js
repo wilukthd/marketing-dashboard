@@ -491,6 +491,8 @@ window.THD = window.THD || {};
         "organic shopping": "Shopping",
         "paid shopping": "Shopping",
         "cross-network": "Cross-network",
+        "ai assistant": "AI Assistants",
+        "ai assistants": "AI Assistants",
         "paid other": "Paid (Other)",
         "mobile push notifications": "Other",
         "sms": "Other",
@@ -654,9 +656,29 @@ window.THD = window.THD || {};
     // populate the "All Sources" filter dropdown with real options
     // instead of a hardcoded list that might not match what's there.
     function listAvailableChannels(sourceRows, groupBy = "channel") {
-        const set = new Set();
-        (sourceRows || []).forEach((r) => set.add(classifyForGroupBy(r, groupBy)));
-        return Array.from(set).sort();
+        const sessions = new Map();
+        (sourceRows || []).forEach((r) => {
+            const k = classifyForGroupBy(r, groupBy);
+            sessions.set(k, (sessions.get(k) || 0) + (r.sessions || 0));
+        });
+        // biggest first, so the options people actually pick are at the top
+        return Array.from(sessions.keys()).sort((a, b) => sessions.get(b) - sessions.get(a) || a.localeCompare(b));
+    }
+
+    // A feed with a URL is "wired": if it doesn't load, the dashboard says
+    // so. Demo data is only for a feature that has no feed yet.
+    function isFeedConfigured(key) {
+        return !!({
+            daily: CONFIG.GA4_DAILY_CSV_URL,
+            sources: CONFIG.GA4_SOURCES_CSV_URL,
+            landingPages: CONFIG.GA4_LANDING_PAGES_CSV_URL,
+            newRepeat: CONFIG.NEW_REPEAT_CSV_URL
+        })[key];
+    }
+
+    // True when the range reaches into the days GA4 is still attributing.
+    function rangeHasUnsettledDays(range) {
+        return !!(range && range.end && range.end > settledCutoff());
     }
 
     // Collapses per-day-per-source rows (already filtered down to one
@@ -1450,7 +1472,7 @@ window.THD = window.THD || {};
         // export lands) — say so instead of "Revenue ¥0, −100%" and a
         // "CVR 0.00% below target" lead story.
         if (!kpi.sessions || !kpi.sessions.value) {
-            return { headline: { main: t("brief.headline.empty"), dek: "" }, stories: [] };
+            return { headline: { main: t(input.feedFailed ? "brief.headline.failed" : "brief.headline.empty"), dek: "" }, stories: [] };
         }
         // A partial day (Today, or the 1st of the month) compared against
         // full days isn't a fair fight — keep the numbers, drop the
@@ -3054,12 +3076,23 @@ window.THD = window.THD || {};
 
     function buildAdsReport(adRows, range, product = "all") {
         const rows = (adRows || []).filter((r) => product === "all" || r.product === product);
-        const cur = rows.filter((r) => inRange(r.date, range.start, range.end));
-        const prev = rows.filter((r) => inRange(r.date, range.prevStart, range.prevEnd));
-
         const dates = (adRows || []).map((r) => r.date).sort();
         const firstDate = dates[0] || null;
         const latestDate = dates[dates.length - 1] || null;
+
+        // The feed is refreshed weekly, so it can stop short of the range.
+        // Compare only the days it covers against the same number of days
+        // at the start of the previous window — not 10 days against 12.
+        const latest = latestDate ? parseLocalDate(latestDate) : null;
+        const short = !!latest && latest >= range.start && latest < range.end;
+        const coveredDays = short ? Math.round((latest - range.start) / 86400000) + 1 : null;
+        let prevEnd = range.prevEnd;
+        if (short) {
+            prevEnd = new Date(range.prevStart);
+            prevEnd.setDate(prevEnd.getDate() + coveredDays - 1);
+        }
+        const cur = rows.filter((r) => inRange(r.date, range.start, range.end));
+        const prev = rows.filter((r) => inRange(r.date, range.prevStart, prevEnd));
         // Only compare when the feed actually covers the whole previous window.
         const hasCompare = !!firstDate && parseLocalDate(firstDate) <= range.prevStart;
 
@@ -3096,6 +3129,7 @@ window.THD = window.THD || {};
             totals: sumAdRows(cur),
             prevTotals: sumAdRows(prev),
             hasCompare,
+            compareDays: coveredDays,   // set when both sides were cut to the days the feed covers
             firstDate,
             latestDate,
             trend: {
@@ -3174,6 +3208,8 @@ window.THD = window.THD || {};
         buildBusinessMonths,
         loadAdSpend,
         isAdsFeedConfigured,
+        isFeedConfigured,
+        rangeHasUnsettledDays,
         buildAdsReport,
         listAdProducts
     };

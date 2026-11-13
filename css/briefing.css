@@ -1864,3 +1864,11 @@ body[data-view="ads"] #sourceFilterSelect{ display:none; }
     .trafficCompareTable .tcHint{ display:none; }
     .trafficCompareTable .tcSourceInner{ padding-left:calc(var(--depth, 0) * 12px); gap:6px; }
 }
+
+/* Sales is a fixed monthly view: the date range and compare mode don't apply. */
+.filterNote{ display:none; font-size:12px; color:var(--text-faint); align-self:center; }
+body[data-view="sales"] .filterNote{ display:inline; }
+body[data-view="sales"] #dateRangeSelect,
+body[data-view="sales"] #customRangeInputs,
+body[data-view="sales"] #compareModeSelect,
+body[data-view="sales"] .rangeCompareBar{ display:none !important; }
