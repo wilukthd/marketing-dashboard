@@ -149,6 +149,11 @@ window.I18N = (function () {
             "traffic.title": "Traffic Sources",
             "traffic.subtitle": "Platform → campaign type → source. ▸ opens a row; click a row to see its trend and sources",
             "traffic.smallSources": "Small sources ({n})",
+            "platHint.(not set)": "GA4 couldn't record where these visits came from — a tracking gap, not a channel",
+            "ctype.(not set)|(not set)": "Source and type both unknown",
+            "ctypeHint.(not set)|(not set)": "Nothing about the origin was recorded",
+            "ctype.(not set)|Cross-network": "Probably P-MAX ads (source lost)",
+            "ctypeHint.(not set)|Cross-network": "GA4 knew it was an ad visit but didn't keep the source — most likely Google Ads P-MAX",
             "ctype.Cross-network": "P-MAX (Performance Max)",
             "ctypeHint.Cross-network": "Google places the ads automatically across Search, YouTube, Display and Gmail",
             "ctype.Paid Search": "Search ads",
@@ -584,6 +589,11 @@ window.I18N = (function () {
             "traffic.title": "トラフィック獲得経路",
             "traffic.subtitle": "プラットフォーム → キャンペーン種別 → 参照元。▸で内訳を開き、行をクリックで推移と参照元を表示",
             "traffic.smallSources": "少数の流入元（{n}）",
+            "platHint.(not set)": "GA4が流入元を記録できなかった訪問（計測の抜け。チャネルではありません）",
+            "ctype.(not set)|(not set)": "流入元・種類とも不明",
+            "ctypeHint.(not set)|(not set)": "どこから来たか一切記録されていない訪問",
+            "ctype.(not set)|Cross-network": "P-MAX広告の可能性（流入元が欠落）",
+            "ctypeHint.(not set)|Cross-network": "広告経由と判定されたが流入元が残っていない。Google 広告のP-MAXの可能性が高い",
             "ctype.Cross-network": "P-MAX（パフォーマンス最大化）",
             "ctypeHint.Cross-network": "Googleが検索・YouTube・ディスプレイ・Gmailなどへ自動で配信",
             "ctype.Paid Search": "検索広告",
@@ -911,6 +921,9 @@ window.I18N = (function () {
     ========================================================== */
 
     const CHANNEL_LABELS = {
+        en: {
+            "(not set)": "Unknown source (not set)"
+        },
         ja: {
             "Direct": "ダイレクト",
             "Organic Search": "オーガニック検索",
@@ -922,7 +935,7 @@ window.I18N = (function () {
             "Paid Social": "有料ソーシャル",
             "Affiliates": "アフィリエイト",
             "Other": "その他",
-            "(not set)": "（未設定）",
+            "(not set)": "流入元不明（未設定）",
             "Google Ads": "Google 広告",
             "Google Organic": "Google オーガニック",
             "Meta Ads": "Meta 広告",
@@ -989,8 +1002,8 @@ window.I18N = (function () {
 
     function channelLabel(key) {
         const lang = getLang();
-        if (lang === "ja" && CHANNEL_LABELS.ja[key]) return CHANNEL_LABELS.ja[key];
-        return key;
+        const map = CHANNEL_LABELS[lang] || {};
+        return map[key] || key;
     }
 
     function deviceLabel(key) {

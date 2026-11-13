@@ -1897,18 +1897,28 @@ window.THD = window.THD || {};
 
     // A campaign type inside an ad platform reads in plain words
     // ("P-MAX", "Search ads") rather than GA4's channel name.
+    // Inside "(not set)" the same campaign type means something different
+    // (an ad visit whose source was lost), so a platform-scoped key wins.
     function campaignType(n) {
+        const t = window.I18N.t;
+        if (n.level === "platform") {
+            const hk = "platHint." + n.label;
+            const hint = t(hk);
+            return hint === hk ? null : { name: null, hint };
+        }
         if (n.level !== "channel") return null;
-        const key = "ctype." + n.label;
-        const name = window.I18N.t(key);
-        return name === key ? null : { name, hint: window.I18N.t("ctypeHint." + n.label) };
+        for (const k of [(n.platform || "") + "|" + n.label, n.label]) {
+            const name = t("ctype." + k);
+            if (name !== "ctype." + k) return { name, hint: t("ctypeHint." + k) };
+        }
+        return null;
     }
 
     function treeLabel(n) {
         if (n.level === "group") return escAttr(window.I18N.t("traffic.smallSources", { n: n.children.length }));
         if (n.level === "source") return escAttr(n.label); // raw GA4 source / medium — untrusted text
         const ct = campaignType(n);
-        if (ct) return escAttr(ct.name);
+        if (ct && ct.name) return escAttr(ct.name);
         return escAttr(window.I18N.channelLabel(n.label));
     }
 
@@ -1935,7 +1945,7 @@ window.THD = window.THD || {};
             // isn't a channel metric, so don't invite comparing it.
             const notChannel = n.label === "Internal / Payment";
             const ct = campaignType(n);
-            const tip = [ct ? window.I18N.channelLabel(n.label) : "", n.soleSource || ""].filter(Boolean).join(" · ");
+            const tip = [ct && ct.name ? window.I18N.channelLabel(n.label) : "", n.soleSource || ""].filter(Boolean).join(" · ");
             const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
             const row = `
                 <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
