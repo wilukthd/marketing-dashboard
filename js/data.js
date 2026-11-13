@@ -1294,7 +1294,13 @@ window.THD = window.THD || {};
         channels.forEach((c) => {
             const trend = buildChannelTrend(sourceRows, c.label, groupBy, range);
             const trimmed = excludeToday(trend.labels, { sessions: trend.series.sessions.current });
-            const values = trimmed.series.sessions;
+            let values = trimmed.series.sessions;
+            if (c.label === "(not set)") {
+                // GA4 is still attributing the newest days — a "(not set)"
+                // spike there is processing lag, not an event.
+                const keep = Math.round((settledCutoff() - range.start) / 86400000) + 1;
+                values = values.slice(0, Math.max(0, keep));
+            }
             const n = values.length;
             if (n < ANOMALY_MIN_DAYS) return;
 
@@ -1387,6 +1393,45 @@ window.THD = window.THD || {};
     const fmtInt = (v) => Math.round(v).toLocaleString("en-US");
     const fmtPctSigned = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%";
 
+    // GA4 keeps filing the freshest ~2 days as "(not set)" until attribution
+    // is processed, so tracking-gap claims are judged on settled days only.
+    const GA4_SETTLE_DAYS = 2;
+    const ATTRIBUTION_GAP_SHARE = 5;          // % of revenue with no real channel worth a story (same bar as the session share)
+
+    // Sessions / revenue by "is it attributed" over the settled part of the
+    // current window, plus (not set) sessions in the previous window scaled
+    // to the same number of days. null when no settled day is in range.
+    // Last day GA4 has finished attributing (today and the 2 days before it are not).
+    function settledCutoff() {
+        const cutoff = new Date();
+        cutoff.setHours(0, 0, 0, 0);
+        cutoff.setDate(cutoff.getDate() - GA4_SETTLE_DAYS - 1);
+        return cutoff;
+    }
+
+    function settledAttribution(sourceRows, range, groupBy) {
+        if (!sourceRows || !sourceRows.length || !range || !range.start || !range.end) return null;
+        const cutoff = settledCutoff();
+        const end = cutoff < range.end ? cutoff : range.end;
+        if (end < range.start) return null;
+        const days = (a, b) => Math.round((b - a) / 86400000) + 1;
+        const out = { sessions: 0, revenue: 0, notSetSessions: 0, notSetRevenue: 0, internalRevenue: 0, prevNotSet: 0, trimmed: end < range.end };
+        sourceRows.forEach((r) => {
+            const d = parseLocalDate(r.date);
+            const label = classifyForGroupBy(r, groupBy || "platform");
+            if (d >= range.start && d <= end) {
+                out.sessions += r.sessions;
+                out.revenue += r.revenue;
+                if (label === "(not set)") { out.notSetSessions += r.sessions; out.notSetRevenue += r.revenue; }
+                else if (label === "Internal / Payment") out.internalRevenue += r.revenue;
+            } else if (range.prevStart && d >= range.prevStart && d <= range.prevEnd && label === "(not set)") {
+                out.prevNotSet += r.sessions;
+            }
+        });
+        if (range.prevStart) out.prevNotSet *= days(range.start, end) / days(range.prevStart, range.prevEnd);
+        return out;
+    }
+
     // input: {
     //   kpi, hasCompareData, labels, series,        — from filterDailyRange
     //   channels,                                   — deriveTrafficBreakdown(current).channels
@@ -1423,14 +1468,16 @@ window.THD = window.THD || {};
         const totalSessions = channels.reduce((s, c) => s + c.sessions, 0);
 
         // ---- 1. Tracking gap: unattributed sessions ----
-        const notSetRow = comparisonRows.find((r) => r.label === "(not set)");
-        // Skipped on a partial day: GA4 reports the freshest hours as
-        // "(not set)" until attribution is processed (often 70%+ of
-        // today), which is lag, not a broken tracker.
-        if (notSetRow && notSetRow.current && totalSessions && !(range && range.partial)) {
-            const cur = notSetRow.current.sessions;
-            const prev = notSetRow.previous ? notSetRow.previous.sessions : 0;
-            const share = (cur / totalSessions) * 100;
+        // Skipped on a partial day, and judged without the newest days: GA4
+        // reports the freshest sessions as "(not set)" until attribution is
+        // processed, which is lag, not a broken tracker.
+        const settled = channels.length && !(range && range.partial)
+            ? settledAttribution(input.sourceRows, range, input.groupBy) : null;
+        const settledNote = settled && settled.trimmed ? " " + t("brief.tracking.settledNote", { n: GA4_SETTLE_DAYS }) : "";
+        if (settled && settled.sessions && settled.notSetSessions) {
+            const cur = settled.notSetSessions;
+            const prev = Math.round(settled.prevNotSet);
+            const share = (cur / settled.sessions) * 100;
             const growth = prev ? ((cur - prev) / prev) * 100 : null;
             const jumped = growth !== null && growth >= 100 && cur >= 200;
             if (share >= 5 || jumped) {
@@ -1441,7 +1488,7 @@ window.THD = window.THD || {};
                     title: jumped
                         ? t("brief.tracking.jumpTitle", { prev: fmtInt(prev), cur: fmtInt(cur) })
                         : t("brief.tracking.shareTitle", { share: share.toFixed(0) }),
-                    body: t("brief.tracking.body", { share: share.toFixed(1) }),
+                    body: t("brief.tracking.body", { share: share.toFixed(1) }) + settledNote,
                     stat: jumped ? fmtPctSigned(growth) : share.toFixed(0) + "%",
                     spark: channelSpark("(not set)"),
                     action: { type: "channel", channel: "(not set)" },
@@ -1449,6 +1496,37 @@ window.THD = window.THD || {};
                 });
             }
         }
+
+        // ---- 1b. Attribution health: revenue sitting on rows that aren't channels ----
+        // Orders credited to payment redirects / own domains / "(not set)"
+        // really belong to ads, search, email... so every channel is understated.
+        if (settled && settled.revenue > 0) {
+            const lost = settled.internalRevenue + settled.notSetRevenue;
+            const share = (lost / settled.revenue) * 100;
+            if (share >= ATTRIBUTION_GAP_SHARE) {
+                stories.push({
+                    id: "attribution",
+                    tone: "alert",
+                    kicker: t("brief.kicker.tracking"),
+                    title: t("brief.attribution.title", { share: share.toFixed(0), amount: fmtYenShort(lost) }),
+                    body: t("brief.attribution.body", {
+                        internal: fmtYenShort(settled.internalRevenue),
+                        notSet: fmtYenShort(settled.notSetRevenue)
+                    }) + settledNote,
+                    stat: share.toFixed(0) + "%",
+                    spark: null,
+                    action: { type: "channel", channel: settled.internalRevenue >= settled.notSetRevenue ? "Internal / Payment" : "(not set)" },
+                    // a standing issue until GA4 is fixed: visible, but it shouldn't lead every briefing unless it's large
+                    score: 52 + Math.min(share, 30)
+                });
+            }
+        }
+
+        // GA4 under-counts purchases from Meta ads (in-app browser, buying
+        // later on another device), so its "this traffic isn't buying" verdict
+        // is checked against real orders from the ads feed when there are any.
+        const adsTotals = input.adsTotals && input.adsTotals.orders > 0 && input.adsTotals.spend > 0 ? input.adsTotals : null;
+        const adsCovers = (label) => label === "Meta Ads" && !!adsTotals;
 
         // ---- 3. Channel efficiency: traffic that doesn't convert / converts unusually well ----
         // Not on a partial day: GA4 attributes the freshest purchases late,
@@ -1470,7 +1548,24 @@ window.THD = window.THD || {};
             const weak = eligible
                 .filter((c) => c.cvr < siteCvr * BRIEF_LOW_CVR_RATIO && zVsRest(c) <= -2)
                 .sort((a, b) => b.sessions - a.sessions)[0];
-            if (weak) {
+            if (weak && adsCovers(weak.label)) {
+                stories.push({
+                    id: "adsReconcile",
+                    tone: "info",
+                    kicker: t("brief.kicker.channel"),
+                    title: t("brief.adsReconcile.title", {
+                        label: chLabel(weak.label), cvr: weak.cvr.toFixed(2),
+                        orders: fmtInt(adsTotals.orders), roas: Math.round(adsTotals.roas)
+                    }),
+                    body: t("brief.adsReconcile.body", {
+                        spend: fmtYenShort(adsTotals.spend), orders: fmtInt(adsTotals.orders), revenue: fmtYenShort(adsTotals.revenue)
+                    }) + (input.adsThrough ? " " + t("brief.adsReconcile.through", { date: input.adsThrough }) : ""),
+                    stat: Math.round(adsTotals.roas) + "%",
+                    spark: channelSpark(weak.label),
+                    action: { type: "view", view: "ads" },
+                    score: 58
+                });
+            } else if (weak) {
                 const row = comparisonRows.find((r) => r.label === weak.label);
                 const prev = row && row.previous ? row.previous.sessions : 0;
                 const growth = prev ? ((weak.sessions - prev) / prev) * 100 : null;
@@ -1484,7 +1579,7 @@ window.THD = window.THD || {};
                         growth: growth !== null ? fmtPctSigned(growth) : "",
                         revenue: fmtYenShort(weak.revenue),
                         site: siteCvr.toFixed(2)
-                    }),
+                    }) + (weak.label === "Meta Ads" && input.adsAvailable ? " " + t("brief.weak.adsNote") : ""),
                     stat: weak.cvr.toFixed(2) + "%",
                     spark: channelSpark(weak.label),
                     action: { type: "channel", channel: weak.label },
@@ -1719,6 +1814,8 @@ window.THD = window.THD || {};
         const chLabel = (l) => escapeHtml(window.I18N.channelLabel(l));
         const { kpi, comparisonRows = [] } = input;
         const existing = new Set(stories.map((s) => s.action && s.action.channel).filter(Boolean));
+        // GA4's revenue for Meta ads is under-counted; when real orders are on hand, don't judge its yield from GA4.
+        const adsCovers = (label) => label === "Meta Ads" && !!(input.adsTotals && input.adsTotals.orders > 0 && input.adsTotals.spend > 0);
 
         // ---- A. Traffic up, conversion down (or the reverse) ----
         if (fairCompare) {
@@ -1792,6 +1889,7 @@ window.THD = window.THD || {};
             const lowYield = rows
                 .filter((r) => r.ps > 0 && r.pp >= 20 && r.cp >= 20 && r.cs - r.ps >= BRIEF_LOWYIELD_MIN_ADDED && (r.cs - r.ps) / r.ps >= 0.2)
                 .map((r) => ({ ...r, addedS: r.cs - r.ps, addedR: r.cr - r.pr, z: twoProportionZ(r.cp, r.cs, r.pp, r.ps) }))
+                .filter((r) => !adsCovers(r.label))
                 .filter((r) => sitePerSession && r.addedR / r.addedS < sitePerSession * BRIEF_LOWYIELD_RATIO && r.z <= -2)
                 .sort((a, b) => b.addedS - a.addedS)[0];
             if (lowYield) {

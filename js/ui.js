@@ -890,7 +890,7 @@ window.THD = window.THD || {};
         const title = document.getElementById("trafficChannelTrendTitle");
         if (doughnuts) doughnuts.style.display = "none";
         if (trendWrap) trendWrap.style.display = "";
-        if (title) title.textContent = window.I18N.channelLabel(channelLabel);
+        if (title) title.textContent = channelLabel; // already display text — see trafficFilterTitle
     }
 
     function hideChannelTrendMode() {
@@ -1007,7 +1007,7 @@ window.THD = window.THD || {};
         if (!status || !labelEl) return;
         const label = filter && typeof filter === "object" ? filter.label : filter;
         if (label) {
-            labelEl.textContent = window.I18N.channelLabel(label);
+            labelEl.textContent = filter && typeof filter === "object" ? trafficFilterTitle(filter) : window.I18N.channelLabel(label);
             status.style.display = "flex";
         } else {
             status.style.display = "none";
@@ -1914,6 +1914,18 @@ window.THD = window.THD || {};
         return null;
     }
 
+    // Plain-text name of a picked row, with its parent platform — the same
+    // words the table row uses ("Google 広告 › 検索広告").
+    function trafficFilterTitle(f) {
+        const L = window.I18N.channelLabel;
+        let own = f.groupBy === "source" ? f.label : L(f.label);
+        if (f.groupBy === "channel") {
+            const ct = campaignType({ level: "channel", label: f.label, platform: f.platform });
+            if (ct && ct.name) own = ct.name;
+        }
+        return f.platform && f.platform !== f.label ? L(f.platform) + " › " + own : own;
+    }
+
     function treeLabel(n) {
         if (n.level === "group") return escAttr(window.I18N.t("traffic.smallSources", { n: n.children.length }));
         if (n.level === "source") return escAttr(n.label); // raw GA4 source / medium — untrusted text
@@ -1928,12 +1940,14 @@ window.THD = window.THD || {};
         if (prev > 0) {
             const delta = ((cur - prev) / prev) * 100;
             // More unattributed traffic is a tracking problem, not growth.
-            const upIsBad = n.label === "(not set)";
+            const upIsBad = n.label === "(not set)" || n.platform === "(not set)";
             const good = upIsBad ? delta <= 0 : delta >= 0;
             return `<span class="deltaBadge ${good ? "positive" : "negative"}">${fmtDelta(delta)}</span>`;
         }
         return cur > 0 ? `<span class="deltaBadge positive">${window.I18N.t("traffic.new")}</span>` : "—";
     }
+
+    const TREE_THIN_SESSIONS = 100;
 
     function treeRowsHtml(nodes, depth, filter) {
         return nodes.map((n) => {
@@ -1946,7 +1960,12 @@ window.THD = window.THD || {};
             const notChannel = n.label === "Internal / Payment";
             const ct = campaignType(n);
             const tip = [ct && ct.name ? window.I18N.channelLabel(n.label) : "", n.soleSource || ""].filter(Boolean).join(" · ");
-            const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
+            // Too few sessions for the rate to mean much: one order moves it by points.
+            const thin = n.cur.sessions > 0 && n.cur.sessions < TREE_THIN_SESSIONS;
+            const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>`
+                : !n.cur.sessions ? "—"
+                : thin ? `<span class="tcThin" title="${escAttr(window.I18N.t("traffic.thinHint", { n: TREE_THIN_SESSIONS }))}">${fmtPercent(n.cur.cvr)}<sup>*</sup></span>`
+                : fmtPercent(n.cur.cvr);
             const row = `
                 <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
                     data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}" data-platform="${n.platform ? escAttr(n.platform) : ""}" data-channel="${n.channel ? escAttr(n.channel) : ""}">
@@ -2215,6 +2234,7 @@ window.THD = window.THD || {};
         renderSourceBreakdownDetail,
         wireLandingRisingPanelClose,
         showChannelTrendMode,
+        trafficFilterTitle,
         hideChannelTrendMode,
         getChannelTrendMetric,
         wireChannelTrendMetricToggle,

@@ -1851,3 +1851,16 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 /* The traffic-source filter has no meaning for the ads feed. */
 body[data-view="ads"] #sourceFilterSelect{ display:none; }
+
+/* CVR on too few sessions reads as a guide, not a result */
+.tcThin{ color:var(--text-faint); cursor:help; }
+.tcThin sup{ font-size:10px; margin-left:1px; }
+.tcFootnote{ margin:10px 4px 0; font-size:11.5px; color:var(--text-faint); }
+
+/* Phones: the previous-period column and the grey notes go; the delta stays */
+@media (max-width:640px){
+    .trafficCompareTable th:nth-child(3),
+    .trafficCompareTable td:nth-child(3){ display:none; }
+    .trafficCompareTable .tcHint{ display:none; }
+    .trafficCompareTable .tcSourceInner{ padding-left:calc(var(--depth, 0) * 12px); gap:6px; }
+}

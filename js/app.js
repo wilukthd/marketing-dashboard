@@ -86,7 +86,7 @@
         // Pre-scope the rows (platform / channel parents), then trend the label.
         const scoped = currentEffectiveSourceRows.filter((r) => THD.data.matchesTrafficFilter(r, activeSourceFilter));
         const trendData = THD.data.buildChannelTrend(scoped, label, groupBy, currentRangeObj);
-        THD.ui.showChannelTrendMode(label);
+        THD.ui.showChannelTrendMode(THD.ui.trafficFilterTitle(activeSourceFilter));
         THD.charts.renderChannelTrendChart("trafficChannelTrendChart", label, trendData, THD.ui.getChannelTrendMetric());
     }
     let dataSourceStatus = { daily: true, sources: true, landingPages: true, newRepeat: true }; // true = live data loaded successfully; false = fell back to demo data
@@ -632,7 +632,8 @@
             pageSpikes: landingLive ? pageSpikes : [],
             sourceRows: effectiveSourceRows,
             groupBy,
-            range
+            range,
+            ...metaAdsForBriefing(range)
         }), onBriefAction);
 
         const insightSentences = [
@@ -683,6 +684,22 @@
         // "Goal" stat keeps showing its original placeholder value
         // rather than being blanked to "--" by an empty targets object.
         // renderGoalsProgressFromState();
+    }
+
+    // Real Meta results (HandKey orders) for the briefing's range, so a
+    // GA4-based "Meta isn't converting" story can be checked against them.
+    // adsThrough is set when the weekly feed stops short of the range end.
+    function metaAdsForBriefing(range) {
+        const meta = adSpendRows.filter((r) => /meta|facebook|instagram/i.test(r.platform || ""));
+        if (!meta.length) return { adsTotals: null, adsAvailable: false, adsThrough: null };
+        const report = THD.data.buildAdsReport(meta, range, "all");
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(report.latestDate || "");
+        const latest = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+        return {
+            adsTotals: report.totals,
+            adsAvailable: true,
+            adsThrough: latest && latest < range.end ? `${latest.getMonth() + 1}/${latest.getDate()}` : null
+        };
     }
 
     // Ads tab (Meta): cost from Meta Ads Manager, results from HandKey —
