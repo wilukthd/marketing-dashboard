@@ -147,7 +147,7 @@ window.I18N = (function () {
             "trend.movingAvgSuffix": " (7-day avg)",
 
             "traffic.title": "Traffic Sources",
-            "traffic.subtitle": "Channel → platform → source. ▸ opens a row; click a row to see its trend and sources",
+            "traffic.subtitle": "Platform → campaign type → source. ▸ opens a row; click a row to see its trend and sources",
             "traffic.smallSources": "Small sources ({n})",
             "traffic.showMore": "Show {n} more",
             "traffic.expand": "Show breakdown",
@@ -570,7 +570,7 @@ window.I18N = (function () {
             "trend.movingAvgSuffix": "（7日移動平均）",
 
             "traffic.title": "トラフィック獲得経路",
-            "traffic.subtitle": "チャネル → プラットフォーム → 参照元。▸で内訳を開き、行をクリックで推移と参照元を表示",
+            "traffic.subtitle": "プラットフォーム → キャンペーン種別 → 参照元。▸で内訳を開き、行をクリックで推移と参照元を表示",
             "traffic.smallSources": "少数の流入元（{n}）",
             "traffic.showMore": "さらに{n}件を表示",
             "traffic.expand": "内訳を表示",

@@ -625,9 +625,12 @@ window.THD = window.THD || {};
     // every source row once per channel on every render (≈4s for "This
     // Year"), and a row's sourceMedium never changes after load.
     // {groupBy, label, channel?} filter from the traffic tree / briefing.
+    // f.platform / f.channel scope a row picked inside a parent (e.g. "P-MAX
+    // under Google Ads" = Cross-network sessions that are ALSO Google Ads).
     function matchesTrafficFilter(row, f) {
         if (!f) return true;
         if (classifyForGroupBy(row, f.groupBy) !== f.label) return false;
+        if (f.platform && classifyForGroupBy(row, "platform") !== f.platform) return false;
         return !f.channel || classifyForGroupBy(row, "channel") === f.channel;
     }
 
@@ -2000,12 +2003,16 @@ window.THD = window.THD || {};
             (rows || []).forEach((r) => {
                 const ch = classifyForGroupBy(r, "channel");
                 const pl = classifyForGroupBy(r, "platform");
-                const cN = node("c:" + ch, "channel", "channel", ch, null);
-                const pN = node("p:" + ch + "|" + pl, "platform", "platform", pl, cN);
-                const sN = node(pN.id + "|s:" + r.sourceMedium, "source", "source", r.sourceMedium, pN);
+                // Platform first: "how is Google Ads doing" is answered by one
+                // row, with its campaign types (P-MAX vs Search, which GA4
+                // files under different channels) inside it.
+                const pN = node("p:" + pl, "platform", "platform", pl, null);
+                const cN = node("c:" + pl + "|" + ch, "channel", "channel", ch, pN);
+                const sN = node(cN.id + "|s:" + r.sourceMedium, "source", "source", r.sourceMedium, cN);
+                cN.platform = pl;
+                sN.platform = pl;
                 sN.channel = ch;
-                pN.channel = ch;
-                [cN, pN, sN].forEach((n) => {
+                [pN, cN, sN].forEach((n) => {
                     n[period].sessions += r.sessions;
                     n[period].users += r.users;
                     n[period].purchases += r.purchases;
@@ -2022,9 +2029,9 @@ window.THD = window.THD || {};
             });
             n.children.sort((a, b) => b.cur.sessions - a.cur.sessions || b.prev.sessions - a.prev.sessions);
             n.children.forEach(finish);
-            // A channel with a single platform: lift the sources up a level.
-            if (n.level === "channel" && n.children.length === 1) {
-                n.alsoPlatform = n.children[0].label; // so a platform-level filter (e.g. from the briefing) still finds this row
+            // A platform with a single campaign type / channel: that level
+            // would just repeat its parent — lift the sources up.
+            if (n.level === "platform" && n.children.length === 1) {
                 n.children = n.children[0].children;
             }
             // A platform with a single source that IS the platform's only
@@ -2038,8 +2045,11 @@ window.THD = window.THD || {};
         const big = [];
         const small = [];
         roots.forEach((n) => {
-            // AI assistants stay visible however small — it's a trend to watch.
-            const tiny = n.label !== "AI Assistants" &&
+            // AI assistants and every paid ad platform stay visible however
+            // small — ad efficiency is judged per platform, and AI is a trend
+            // to watch.
+            const alwaysShown = n.label === "AI Assistants" || / Ads$/.test(n.label) || n.label === "Criteo" || n.label === "Paid (Other)";
+            const tiny = !alwaysShown &&
                 n.cur.sessions / totalCur < TREE_SMALL_SHARE && n.prev.sessions / totalPrev < TREE_SMALL_SHARE;
             (tiny ? small : big).push(n);
         });

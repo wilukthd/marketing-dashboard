@@ -1447,12 +1447,14 @@ select{ max-width:100%; text-overflow:ellipsis; }
 
 }
 
-.trafficCompareTable tr.lvl-channel td{ font-weight:600; }
+.trafficCompareTable tr.lvl-platform td{ font-weight:600; }
 
 .trafficCompareTable tr.lvl-group td{ font-style:italic; color:var(--text-light); }
 
-.trafficCompareTable tr.lvl-platform td,
+.trafficCompareTable tr.lvl-channel td,
 .trafficCompareTable tr.lvl-source td{ font-size:12.5px; }
+/* a platform folded inside "small sources" isn't a top-level row */
+.trafficCompareTable tr.lvl-group ~ tr.lvl-platform td{ font-weight:500; }
 
 .trafficCompareTable tr.lvl-source .tcLabel{
 

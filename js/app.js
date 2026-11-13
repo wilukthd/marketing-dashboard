@@ -68,7 +68,8 @@
     let lastSourceTableRows = [];   // exactly what the Session Source table shows (for CSV export)
 
     // activeSourceFilter is { groupBy: "channel"|"platform"|"source", label } or null.
-    const sameFilter = (a, b) => !!a && !!b && a.groupBy === b.groupBy && a.label === b.label && (a.channel || "") === (b.channel || "");
+    const sameFilter = (a, b) => !!a && !!b && a.groupBy === b.groupBy && a.label === b.label &&
+        (a.platform || "") === (b.platform || "") && (a.channel || "") === (b.channel || "");
 
     function refreshTrafficSelection() {
         THD.ui.renderTrafficTree(null, activeSourceFilter, null);
@@ -81,8 +82,10 @@
             THD.ui.hideChannelTrendMode();
             return;
         }
-        const { groupBy, label, channel } = activeSourceFilter;
-        const trendData = THD.data.buildChannelTrend(currentEffectiveSourceRows, label, groupBy, currentRangeObj, channel);
+        const { groupBy, label } = activeSourceFilter;
+        // Pre-scope the rows (platform / channel parents), then trend the label.
+        const scoped = currentEffectiveSourceRows.filter((r) => THD.data.matchesTrafficFilter(r, activeSourceFilter));
+        const trendData = THD.data.buildChannelTrend(scoped, label, groupBy, currentRangeObj);
         THD.ui.showChannelTrendMode(label);
         THD.charts.renderChannelTrendChart("trafficChannelTrendChart", label, trendData, THD.ui.getChannelTrendMetric());
     }
@@ -569,8 +572,9 @@
         renderFilteredSourceTable();
 
         // Doughnuts + the tree's top level: channels (≈10 slices, readable).
-        const channelCurrent = THD.data.deriveTrafficBreakdown(splitCurrent, "channel");
-        const channelPrevious = THD.data.deriveTrafficBreakdown(splitPrevious, "channel");
+        // Doughnuts by platform, matching the table's top-level rows.
+        const channelCurrent = THD.data.deriveTrafficBreakdown(splitCurrent, "platform");
+        const channelPrevious = THD.data.deriveTrafficBreakdown(splitPrevious, "platform");
         const currentChannels = THD.charts.renderTrafficChart("trafficChartCurrent", channelCurrent.channels, channelCurrent.totalSessions);
         const previousChannels = THD.charts.renderTrafficChart("trafficChartPrevious", channelPrevious.channels, channelPrevious.totalSessions);
         const channelColors = {};

@@ -1869,15 +1869,14 @@ window.THD = window.THD || {};
 
     const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+    // Same label AND same parent scope: "P-MAX under Google Ads" is a
+    // different row from "P-MAX" elsewhere. A briefing link is a plain
+    // platform filter, which matches the platform's top-level row.
     function treeNodeMatches(n, filter) {
         if (!filter) return false;
-        if (n.groupBy === filter.groupBy && n.label === filter.label) {
-            // A scoped filter (platform/source picked inside a channel)
-            // only matches that channel's row; a global one (from the
-            // briefing) matches it wherever it appears.
-            return !filter.channel || filter.channel === n.channel;
-        }
-        return filter.groupBy === "platform" && !filter.channel && n.alsoPlatform === filter.label;
+        return n.groupBy === filter.groupBy && n.label === filter.label &&
+            (filter.platform || "") === (n.platform || "") &&
+            (filter.channel || "") === (n.channel || "");
     }
 
     // Opens every ancestor of the node the filter points at, so a
@@ -1920,14 +1919,14 @@ window.THD = window.THD || {};
             const hasKids = n.children.length > 0;
             const open = hasKids && treeExpanded.has(n.id);
             const active = treeNodeMatches(n, filter);
-            const color = n.level === "channel" ? (lastTreeColors[n.label] || "var(--text-faint)") : null;
+            const color = n.level === "platform" && depth === 0 ? (lastTreeColors[n.label] || "var(--text-faint)") : null;
             // Internal / Payment sessions are mid-checkout — their CVR
             // isn't a channel metric, so don't invite comparing it.
             const notChannel = n.label === "Internal / Payment";
             const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
             const row = `
                 <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
-                    data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}" data-channel="${n.level === "channel" || !n.channel ? "" : escAttr(n.channel)}">
+                    data-group-by="${n.groupBy || ""}" data-label="${escAttr(n.label)}" data-platform="${n.platform ? escAttr(n.platform) : ""}" data-channel="${n.channel ? escAttr(n.channel) : ""}">
                     <td class="tcSource">
                         <span class="tcSourceInner" style="--depth:${depth}">
                             ${hasKids
@@ -1997,7 +1996,12 @@ window.THD = window.THD || {};
                 return;
             }
             if (e.target.closest(".tcCaret") || row.dataset.level === "group") { toggle(); return; }
-            onFilter({ groupBy: row.dataset.groupBy, label: row.dataset.label, channel: row.dataset.channel || undefined });
+            onFilter({
+                groupBy: row.dataset.groupBy,
+                label: row.dataset.label,
+                platform: row.dataset.platform || undefined,
+                channel: row.dataset.channel || undefined
+            });
         });
     }
 
