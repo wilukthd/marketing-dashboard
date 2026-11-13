@@ -1895,9 +1895,20 @@ window.THD = window.THD || {};
         walk(lastTree, []);
     }
 
+    // A campaign type inside an ad platform reads in plain words
+    // ("P-MAX", "Search ads") rather than GA4's channel name.
+    function campaignType(n) {
+        if (n.level !== "channel") return null;
+        const key = "ctype." + n.label;
+        const name = window.I18N.t(key);
+        return name === key ? null : { name, hint: window.I18N.t("ctypeHint." + n.label) };
+    }
+
     function treeLabel(n) {
         if (n.level === "group") return escAttr(window.I18N.t("traffic.smallSources", { n: n.children.length }));
         if (n.level === "source") return escAttr(n.label); // raw GA4 source / medium — untrusted text
+        const ct = campaignType(n);
+        if (ct) return escAttr(ct.name);
         return escAttr(window.I18N.channelLabel(n.label));
     }
 
@@ -1923,6 +1934,8 @@ window.THD = window.THD || {};
             // Internal / Payment sessions are mid-checkout — their CVR
             // isn't a channel metric, so don't invite comparing it.
             const notChannel = n.label === "Internal / Payment";
+            const ct = campaignType(n);
+            const tip = [ct ? window.I18N.channelLabel(n.label) : "", n.soleSource || ""].filter(Boolean).join(" · ");
             const cvr = notChannel ? `<span class="tcMuted" title="${escAttr(window.I18N.t("traffic.internalCvrHint"))}">—</span>` : (n.cur.sessions ? fmtPercent(n.cur.cvr) : "—");
             const row = `
                 <tr class="tcRow lvl-${n.level}${active ? " active" : ""}${notChannel ? " isInternal" : ""}" data-id="${escAttr(n.id)}" data-level="${n.level}"
@@ -1933,7 +1946,10 @@ window.THD = window.THD || {};
                                 ? `<button type="button" class="tcCaret${open ? " isOpen" : ""}" aria-expanded="${open}" aria-label="${escAttr(window.I18N.t(open ? "traffic.collapse" : "traffic.expand"))}">›</button>`
                                 : `<span class="tcCaretSpacer"></span>`}
                             ${color ? `<span class="legendColor" style="background:${color}"></span>` : ""}
-                            <span class="tcLabel">${treeLabel(n)}</span>
+                            <span class="tcLabelWrap"${tip ? ` title="${escAttr(tip)}"` : ""}>
+                                <span class="tcLabel">${treeLabel(n)}</span>
+                                ${ct ? `<small class="tcHint">${escAttr(ct.hint)}</small>` : ""}
+                            </span>
                             ${hasKids ? `<small class="tcCount">${n.children.length}</small>` : ""}
                         </span>
                     </td>

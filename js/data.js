@@ -2032,10 +2032,17 @@ window.THD = window.THD || {};
             // A platform with a single campaign type / channel: that level
             // would just repeat its parent — lift the sources up.
             if (n.level === "platform" && n.children.length === 1) {
-                n.children = n.children[0].children;
+                const only = n.children[0];
+                n.children = only.children;
+                if (only.soleSource) n.soleSource = only.soleSource;
             }
-            // A platform with a single source that IS the platform's only
-            // traffic still keeps its source row — the raw value is useful.
+            // A row whose only child is one source would just repeat its own
+            // numbers on the next line — make it a leaf, keep the raw
+            // source / medium for the tooltip.
+            if (n.level !== "source" && n.children.length === 1 && n.children[0].level === "source") {
+                n.soleSource = n.children[0].label;
+                n.children = [];
+            }
         };
         roots.forEach(finish);
         roots.sort((a, b) => b.cur.sessions - a.cur.sessions || b.prev.sessions - a.prev.sessions);
